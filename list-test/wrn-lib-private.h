@@ -60,6 +60,11 @@ struct wrn_buffer {
         msgs.pop_back();
         return rv;
     }
+
+    int count()
+    {
+        return msgs.size();
+    }
     
     pthread_mutex_t mutex;
     std::deque<wrn_message> msgs;

@@ -78,7 +78,7 @@ static int init_hmq( struct wrn_dev *dev )
     dev->hmq.n_in = n_in;
     dev->hmq.n_out = n_out;
 
-    //printf("init_hmq: CPU->Host (outgoing) slots: %d, Host->CPU (incoming) slots: %d\n", n_out, n_in);
+    printf("init_hmq: CPU->Host (outgoing) slots: %d, Host->CPU (incoming) slots: %d\n", n_out, n_in);
 
     for(i=0 ; i<n_out; i++)
     {
@@ -86,7 +86,7 @@ static int init_hmq( struct wrn_dev *dev )
         width = 1 << (( slot_status >> 28) & 0xf);
         entries = 1 << (( slot_status >> 2) & 0x3f);
         hmq_writel(dev, HMQ_OUT(i), MQUEUE_CMD_PURGE, MQUEUE_SLOT_COMMAND);
-     //   printf(" - out%d: width=%d, entries=%d\n", i, width, entries);
+        printf(" - out%d: width=%d, entries=%d\n", i, width, entries);
     }
     for(i =0 ; i<n_in; i++)
     {
@@ -94,14 +94,14 @@ static int init_hmq( struct wrn_dev *dev )
         width = 1 << (( slot_status >> 28) & 0xf);
         entries = 1 << (( slot_status >> 2) & 0x3f);
         hmq_writel(dev, HMQ_IN(i), MQUEUE_CMD_PURGE, MQUEUE_SLOT_COMMAND);
-	//printf(" - in%d: width=%d, entries=%d\n", i, width, entries);
+	   printf(" - in%d: width=%d, entries=%d\n", i, width, entries);
     }
     return 0;
 }
 
 int init_cpus(struct wrn_dev *dev)
 {
-    wrn_writel(dev, 0xffffffff, BASE_CPU_CSR + WRN_CPU_CSR_REG_RESET);
+ //   wrn_writel(dev, 0xffffffff, BASE_CPU_CSR + WRN_CPU_CSR_REG_RESET);
 
     dev->cpu_count = wrn_readl(dev, BASE_CPU_CSR + WRN_CPU_CSR_REG_CORE_COUNT) & 0xf;
     //printf("init_cpus: %d CPU CBs\n", dev->cpu_count);
@@ -135,6 +135,8 @@ struct wrn_dev* wrn_open_by_lun( int lun )
     init_hmq ( dev );
     
     start_update_thread( dev );
+
+
     return dev;
 }
 
@@ -265,7 +267,11 @@ static bool do_rx(struct wrn_dev *dev, wrn_message& msg, int& slot)
     //uint32_t cnt = hmq_readl(dev, HMQ_GCR, MQUEUE_GCR_SLOT_COUNT);
 
 
-   // printf("gcr %x\n", in_stat);
+    /*printf("gcr %x\n", in_stat);
+    if(in_stat & 1)
+    {
+        printf("Got!\n");
+    }*/
     if(in_stat & SLOT_OUT_MASK)
     {
     	int i, j;
@@ -330,14 +336,18 @@ void do_tx(struct wrn_dev *dev, const wrn_message& msg, int slot )
 
 
 
-void update_mqueues( struct wrn_dev * dev )
+int update_mqueues( struct wrn_dev * dev )
 {
     wrn_message msg;
     int slot;
-    
+    int rx_limit = 5;
+    int got_sth = 0;
     // outgoing path (from CPUs)
-    while(do_rx (dev, msg, slot))
+    while(do_rx (dev, msg, slot) && rx_limit)
     {
+    //    printf("RxLim %d\n", rx_limit);
+        rx_limit--;
+        got_sth = 1;
         //printf("slot %d rx %d words\n", slot, msg.size());
         for (wrn_connmap::iterator i = dev->fds.begin(); i != dev->fds.end(); ++i)
         {
@@ -350,6 +360,7 @@ void update_mqueues( struct wrn_dev * dev )
                 //printf("locked\n");
                 buf->process(msg);
                 buf->unlock();
+
             }
         }
     }
@@ -363,13 +374,15 @@ void update_mqueues( struct wrn_dev * dev )
             if(tx_ready(dev, buf->slot))
             {
                 buf->lock(true);
+                got_sth = 1;
+//                printf("DoTX\n");
                 do_tx(dev, buf->pop(), buf->slot);
                 buf->unlock();
             }
 
         }
     }
-    
+    return got_sth;
 
 }
 
@@ -420,6 +433,7 @@ int wrn_open_slot ( struct wrn_dev *dev, int slot, int flags )
         conn->in = new wrn_buffer(slot);
     
     dev->fds[fd] = conn;
+    printf("open slot %d, fd = %d\n", slot, fd);
     return fd;
 }
 
@@ -445,14 +459,18 @@ int wrn_recv ( struct wrn_dev *dev, int fd, uint32_t *buffer, size_t buf_size, i
 
     int64_t t_start = get_tics();
 
+    if(!timeout_us && conn->out->empty())
+        return 0;
 
     while(conn->out->empty())
     {
 
-        if(get_tics() - t_start >= timeout_us )
+        if(timeout_us >= 0 && (get_tics() - t_start) >= timeout_us )
             return 0;
 
-        usleep(1000);
+        //fprintf(stderr,"w");
+        usleep(1);
+
     }
     
     conn->out->lock(true);    
@@ -491,7 +509,7 @@ void *update_thread_entry( void *data )
 //    fprintf(stderr,"readout thread started\n");
     for(;;)
     {
-        update_mqueues(dev);
-        usleep(10000);
+        if( !update_mqueues(dev) );
+            usleep(1000);
     }
 }

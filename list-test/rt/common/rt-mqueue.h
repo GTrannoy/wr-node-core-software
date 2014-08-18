@@ -1,5 +1,5 @@
-#ifndef __MQUEUE_H
-#define __MQUEUE_H
+#ifndef __RT_MQUEUE_H
+#define __RT_MQUEUE_H
 
 #define REG_LR_POLL    0x100000
 
@@ -63,6 +63,11 @@ static void *mq_map_in_buffer(int remote, int slot)
 static inline uint32_t mq_poll()
 {
   return *(volatile uint32_t *) ( REG_LR_POLL );
+}
+
+static inline uint32_t rmq_poll(int slot)
+{
+  return *(volatile uint32_t *) ( REG_LR_POLL ) & ( 1<< (16 + slot ));
 }
 
 #endif

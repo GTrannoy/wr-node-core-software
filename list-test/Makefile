@@ -4,12 +4,15 @@ CFLAGS = -I. -g
 CXXFLAGS = -I. -g
 OBJS = wrn-lib.o fmc-lib.o list-lib.o
 
-all:	lib test-rx
+all:	lib list-boot test-rx
 
 lib:	$(OBJS)
 	ar rc libwrn.a $(OBJS)
 
-test-rx:	test-rx.o
+list-boot:	list-boot.o $(OBJS)
+	${CXX} -o list-boot list-boot.o $(OBJS) -L. -lwrn -lpthread
+
+test-rx:	test-rx.o $(OBJS)
 	${CXX} -o test-rx test-rx.o $(OBJS) -L. -lwrn -lpthread
 
 clean:

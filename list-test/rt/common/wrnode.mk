@@ -7,8 +7,8 @@ OBJDUMP =	$(CROSS_COMPILE)objdump
 OBJCOPY =	$(CROSS_COMPILE)objcopy
 SIZE =		$(CROSS_COMPILE)size
 
-CFLAGS = -g -Os -I. -I../common
-OBJS += ../common/wrn-crt0.o ../common/vsprintf-mini.o ../common/printf.o
+CFLAGS = -DWRNODE_RT -g -O3 -I. -I../common -mmultiply-enabled -mbarrel-shift-enabled
+OBJS += ../common/wrn-crt0.o ../common/vsprintf-xint.o ../common/printf.o ../common/rt-common.o
 LDSCRIPT = ../common/wrnode.ld
 
 $(OUTPUT): $(LDSCRIPT) $(OBJS)

@@ -1,15 +1,33 @@
+/*
+ * This work is part of the White Rabbit Node Core project.
+ *
+ * Copyright (C) 2013-2014 CERN (www.cern.ch)
+ * Author: Tomasz Wlostowski <tomasz.wlostowski@cern.ch>
+ *
+ * Released according to the GNU GPL, version 2 or any later version.
+ */
+
+
+/* 
+ * LHC Instability Trigger Distribution (LIST) Firmware 
+ *
+ * rt-tdc.c: real-time CPU application for the FMC TDC mezzanine (Trigger Input)
+ */
+
 #include <string.h>
 
 #include "rt.h"
 #include "list-common.h"
 #include "hw/fmctdc-direct.h"
 
+#define DEFAULT_DEAD_TIME (80000/16)
 
 struct tdc_channel_state {
     struct list_id id;
     struct list_timestamp delay;
     struct list_timestamp timebase_offset;
     struct list_timestamp last;
+    struct list_timestamp prev;
     struct list_trigger_entry last_sent;
     uint32_t flags;
     uint32_t log_level;
@@ -19,8 +37,7 @@ struct tdc_channel_state {
     int32_t sent_pulses;
     uint32_t seq;
     uint32_t dead_time;
-    int32_t worst_latency;
-
+    
 };
 
 static struct tdc_channel_state channels[TDC_NUM_CHANNELS];
@@ -104,6 +121,15 @@ static inline void do_channel (int channel, struct list_timestamp *ts)
 
     ts_add(ts, &ch->delay);
 
+    int delta = ts->seconds - ch->prev.seconds;
+    delta *= 125000000;    
+    delta += ts->cycles - ch->prev.cycles;
+
+    if(delta < 0)
+	pp_printf("FUCK!");
+
+    ch->prev = *ts;
+
     if( (ch->flags & LIST_TRIGGER_ASSIGNED ) && (ch->flags & LIST_ARMED) )
     {
     	ch->seq++;
@@ -145,11 +171,13 @@ static inline void do_input ()
         // convert from ACAM bins (81ps) to WR time format
         ts.frac = ( (meta & 0x3ffff) * 5308 ) >> 7;
     
+#if 0
         if(ts.cycles >= 125000000) // fixme: fix in hw (Eva working on the issue)
         {
             ts.cycles -= 125000000;
             ts.seconds --;
         }
+#endif
 
     	ts.cycles += ts.frac >> 12;
     	ts.frac &= 0xfff;
@@ -202,9 +230,6 @@ static inline void ctl_chan_enable (int seq, uint32_t *buf)
     } 
 
     dp_writel(mask, DR_REG_CHAN_ENABLE);
-
-    //pp_printf("enable ch %d mask %x", channel, mask);
-
 
     ctl_ack(seq);
 }
@@ -341,8 +366,6 @@ static inline void ctl_chan_arm (int seq, uint32_t *buf)
 
     struct tdc_channel_state *ch = &channels[channel];
 
-    //pp_printf("arm ch %d %d", channel, buf[1]);
-
     if(buf[1]) {
         ch->flags |= LIST_ARMED;
         ch->flags &= ~LIST_TRIGGERED;
@@ -368,13 +391,24 @@ static inline void ctl_chan_assign_trigger (int seq, uint32_t *buf)
         ch->id.trigger = buf[4];
         ch->flags |= LIST_TRIGGER_ASSIGNED;
         ch->flags &= ~LIST_LAST_VALID;
-        //pp_printf("assign: ch %d en %d %d %d %d", channel, buf[1], buf[2], buf[3], buf[4]);
     } else {
         ch->id.system = 0;
         ch->id.source_port = 0;
         ch->id.trigger = 0;
         ch->flags &= ~LIST_TRIGGER_ASSIGNED;
     }
+
+    ctl_ack(seq);
+}
+
+static inline void ctl_chan_reset_counters (int seq, uint32_t *buf)
+{
+    int channel = buf[0];
+    struct tdc_channel_state *ch = &channels[channel];    
+    
+    ch->total_pulses = 0;
+    ch->sent_pulses = 0;
+    ch->flags &= ~LIST_LAST_VALID;
 
     ctl_ack(seq);
 }
@@ -412,9 +446,9 @@ static inline void do_control()
 
 	switch(cmd)
 	{
-	    _CMD(ID_TDC_CMD_CHAN_ENABLE,                ctl_chan_enable)
-		_CMD(ID_TDC_CMD_CHAN_SET_DEAD_TIME,         ctl_chan_set_dead_time)
-	    _CMD(ID_TDC_CMD_CHAN_SET_DELAY,             ctl_chan_set_delay)
+        _CMD(ID_TDC_CMD_CHAN_ENABLE,                ctl_chan_enable)
+	_CMD(ID_TDC_CMD_CHAN_SET_DEAD_TIME,         ctl_chan_set_dead_time)
+	_CMD(ID_TDC_CMD_CHAN_SET_DELAY,             ctl_chan_set_delay)
         _CMD(ID_TDC_CMD_CHAN_SET_TIMEBASE_OFFSET,   ctl_chan_set_timebase_offset)
         _CMD(ID_TDC_CMD_CHAN_GET_STATE,             ctl_chan_get_state)
         _CMD(ID_TDC_CMD_SOFTWARE_TRIGGER,           ctl_software_trigger)
@@ -423,6 +457,7 @@ static inline void do_control()
         _CMD(ID_TDC_CMD_CHAN_ARM,                   ctl_chan_arm)
         _CMD(ID_TDC_CMD_CHAN_SET_SEQ,               ctl_chan_set_seq)
         _CMD(ID_TDC_CMD_CHAN_SET_LOG_LEVEL,         ctl_chan_set_log_level)
+        _CMD(ID_TDC_CMD_CHAN_RESET_COUNTERS,        ctl_chan_reset_counters)
         _CMD(ID_TDC_CMD_PING,                       ctl_ping)
         default:
 		  break;
@@ -436,12 +471,14 @@ void init()
     int i;
 
     dp_writel( 0x0, DR_REG_CHAN_ENABLE);
-    dp_writel( 0x1, DR_REG_DEAD_TIME);
+    dp_writel( DEFAULT_DEAD_TIME, DR_REG_DEAD_TIME);
 
     for(i=0;i<TDC_NUM_CHANNELS;i++)
     {
     	memset(&channels[i], 0, sizeof(struct tdc_channel_state));
         channels[i].n = i;
+        channels[i].mode = LIST_TRIGGER_MODE_AUTO;
+        channels[i].dead_time = DEFAULT_DEAD_TIME;
     }
 }
 
@@ -449,6 +486,7 @@ void init()
 main()
 {   
     int i = 0;
+    rt_set_debug_slot(TDC_OUT_SLOT_CONTROL);
     init();
 
     pp_printf("RT_TDC firmware initialized.");

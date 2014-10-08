@@ -153,9 +153,7 @@ main()
     struct list_id trig = { 10, 20, 30 };
     struct list_id trig2 = { 10, 20, 31 };
     
-    fprintf(stderr,"SDT\n");
     list_in_set_dead_time(n, 1, 90 * 1000 * 1000);
-fprintf(stderr,"STO\n");
     list_in_set_timebase_offset (n, 1, 216000ULL );
     int i;
 

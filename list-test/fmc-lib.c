@@ -1,6 +1,3 @@
-/* A simple console for accessing the SVEC virtual UART (i.e. for communicating with the WR Core shell
-   from a Linux terminal. */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>

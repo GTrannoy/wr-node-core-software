@@ -1,3 +1,18 @@
+/*
+ * This work is part of the White Rabbit Node Core project.
+ *
+ * Copyright (C) 2013-2014 CERN (www.cern.ch)
+ * Author: Tomasz Wlostowski <tomasz.wlostowski@cern.ch>
+ *
+ * Released according to the GNU GPL, version 2 or any later version.
+ */
+
+/*.
+ * White Rabbit Node Core
+ *
+ * rt-common.c: common RT CPU functions
+ */
+
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -5,12 +20,19 @@
 #include "rt-mqueue.h"
 #include "rt-common.h"
 
+static int debug_slot;
+
+void rt_set_debug_slot(int slot)
+{
+    debug_slot = slot;
+}
+
 int puts(const char *p)
 {
     int i;
-    volatile uint32_t *buf = mq_map_out_buffer(0, 1);
+    volatile uint32_t *buf = mq_map_out_buffer(0, debug_slot);
     
-    mq_claim(0, 1);
+    mq_claim(0, debug_slot);
     
     buf[0] = 0xdeadbeef;
     for(i=0;i<127;i++,p++)
@@ -21,24 +43,7 @@ int puts(const char *p)
 	       break;
       }
 
-    mq_send(0, 1, i + 1);
+    mq_send(0, debug_slot, i + 1);
     return i;
 }
 
-/*
-
-void ts_add(struct list_timestamp *a, struct list_timestamp *b)
-{
-  a->frac += b->frac;
-  if(a->frac >= 4096)
-    a->cycles += 1 + b->cycles;
-  else
-    a->cycles += b->cycles;
-
-  if(a->cycle > 125 * 1000 * 1000)
-    a->seconds += 1 + b->seconds;
-  else
-    a->seconds += b->seconds;
-}
-
-*/

@@ -1,3 +1,19 @@
+/*
+ * This work is part of the White Rabbit Node Core project.
+ *
+ * Copyright (C) 2013-2014 CERN (www.cern.ch)
+ * Author: Tomasz Wlostowski <tomasz.wlostowski@cern.ch>
+ *
+ * Released according to the GNU GPL, version 2 or any later version.
+ */
+
+
+/*.
+ * White Rabbit Node Core
+ *
+ * rt-common.h: common WRN CPU definitions and routines
+ */
+
 #ifndef __RT_COMMON_H
 #define __RT_COMMON_H
 
@@ -6,8 +22,13 @@
 
 #include "hw/wrn_cpu_lr.h"
 
+/* Dedicated Peripheral base */
 #define CPU_DP_BASE 0x200000
+
+/* CPU Local Registers base */
 #define CPU_LR_BASE 0x100000
+
+void rt_set_debug_slot(int slot);
 
 static inline uint32_t dp_readl ( uint32_t reg )
 {
@@ -39,6 +60,7 @@ static inline void gpio_clear ( int pin )
     lr_writel ( (1<<pin), WRN_CPU_LR_REG_GPIO_CLEAR );
 }
 
+/* fixme: use Timing Unit */
 static inline void delay(int n)
 {
     int i;

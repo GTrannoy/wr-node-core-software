@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "list-lib.h"
+
 void list_boot_node(struct list_node *dev);
 
 main(int argc, char *argv[])
@@ -23,6 +24,8 @@ main(int argc, char *argv[])
 	}
 
 	list_boot_node(dev);
+
+	sleep(2);
 
 	return 0;
 

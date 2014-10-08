@@ -6,6 +6,11 @@
 
 #include "rt/common/list-common.h"
 
+struct list_trigger_handle {
+    uint32_t ptr_cond;
+    uint32_t ptr_trig;
+    int channel;
+};
   
 struct list_input_state {
     int input;
@@ -23,6 +28,39 @@ struct list_input_state {
     struct list_timestamp dead_time;
     struct list_timestamp delay;
     struct list_timestamp last;
+};
+
+struct list_trigger_handle handle;
+
+struct list_output_trigger_state {
+    int is_conditional;
+    int enabled;
+    struct list_id trigger;
+    struct list_id condition;
+    struct list_timestamp delay_trig;
+    struct list_timestamp delay_cond;
+    struct list_trigger_handle handle;
+};
+
+struct list_output_state {
+    int output;
+
+    uint32_t executed_pulses;
+    uint32_t missed_pulses_late;
+    uint32_t missed_pulses_deadtime;
+    uint32_t missed_pulses_overflow;
+
+    struct list_trigger_entry last_executed;
+    struct list_trigger_entry last_programmed;
+    struct list_trigger_entry last_enqueued;
+
+    uint32_t flags;           ///> enum list_io_flags
+    uint32_t log_level;       ///> enum list_log_level
+    int mode;
+    uint32_t dead_time;
+    uint32_t pulse_width;
+    struct list_timestamp worst_rx_delay;
+    uint32_t total_rx_packets;
 };
 
 struct list_node;
@@ -52,6 +90,8 @@ void list_close_node ( struct list_node *node );
   \param enable non-0 enables the input, 0 disables it.
 */
 int list_in_enable(struct list_node *dev, int input, int enable);
+int list_in_is_enabled(struct list_node *dev, int input);
+
 
 /* 3.3.1b Get/set the Trigger/System/Source Port ID. Change the IDs during operation of the node. */
 
@@ -121,24 +161,31 @@ int list_in_set_timebase_offset ( struct list_node *dev, int input, uint64_t off
 
 int list_in_get_state ( struct list_node *, int input, struct list_input_state *state );
 
+int list_in_reset_counters ( struct list_node *dev, int input );
+
 int list_in_set_log_level ( struct list_node *, int input, uint32_t log_level);
 
 
 int list_out_enable(struct list_node *dev, int output, int enable);
 int list_out_set_dead_time ( struct list_node *dev, int output, uint64_t dead_time_ps );
-int list_out_add_trigger ( struct list_node *dev, int output, struct list_id *trig );
-int list_out_add_conditional_trigger ( struct list_node *dev, int output, struct list_id *trig, struct list_id *condition );
-int list_out_get_trigger_count ( struct list_node *dev, int output ); 
-int list_out_set_delay ( struct list_node *, int output, uint64_t delay_ps );
-int list_out_set_condition_delay ( struct list_node *, int output, uint64_t delay_ps );
-int list_out_read_raw ( struct list_node*, struct list_timestamp *ts, int count );
-//int list_out_read_log ( struct list_node*, int output_mask, struct list_input_log_entry *ts, int count );
 
+int list_out_trig_assign ( struct list_node *dev, struct list_trigger_handle *handle, int output, struct list_id *trig, struct list_id *condition );
+int list_out_trig_remove (struct list_node *dev, struct list_trigger_handle *handle);
+int list_out_trig_get_all (struct list_node *, int output, struct list_output_trigger_state *triggers, int max_count);
+int list_out_trig_set_delay ( struct list_node *, struct list_trigger_handle *handle, uint64_t delay_ps );
+int list_out_trig_set_condition_delay ( struct list_node *, struct list_trigger_handle *handle, uint64_t delay_ps );
+int list_out_trig_get_state ( struct list_node *, struct list_trigger_handle *handle, struct list_output_trigger_state *state );
+int list_out_trig_enable ( struct list_node *, struct list_trigger_handle *handle, int enable );
+
+int list_out_read_log ( struct list_node*, struct list_log_entry *log, int flags, int output_mask, int count );
+
+int list_out_set_log_level ( struct list_node *, int output, uint32_t log_level);
 int list_out_set_trigger_mode ( struct list_node *, int output, int mode );
 int list_out_arm ( struct list_node *node, int input, int armed );
-int list_out_get_state ( struct list_node *node, int input, int armed );
+//int list_out_get_state ( struct list_node *node, int input, int armed );
 
+int list_out_reset_counters ( struct list_node *dev, int output );
 int list_out_check_triggered ( struct list_node *, int output );
-int list_out_wait_trigger ( struct list_node*, int output_mask, struct list_id *id );
+//int list_out_wait_trigger ( struct list_node*, int output_mask, struct list_id *id );
 
 #endif 

@@ -16,8 +16,6 @@ $(OUTPUT): $(LDSCRIPT) $(OBJS)
 	${OBJCOPY} -O binary $(OUTPUT).elf $(OUTPUT).bin
 	${OBJDUMP} -S $(OUTPUT).elf  > disasm.S
 	$(SIZE) $(OUTPUT).elf
-#	../genramvhd -p wrc_simulation_firmware $(OUTPUT).bin >  wrc_simulation_firmware_pkg.vhd
-#	../common/genraminit $(OUTPUT).bin > $(OUTPUT).ram
 
 clean:
 	rm -f $(OBJS) $(OUTPUT).bin

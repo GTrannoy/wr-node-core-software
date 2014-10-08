@@ -21,6 +21,7 @@
 
 #include "rt-mqueue.h"
 #include "rt-common.h"
+#include "rt-smem.h"
 
 #include "pp-printf.h"
 

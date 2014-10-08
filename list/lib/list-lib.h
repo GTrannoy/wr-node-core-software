@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#include "rt/common/list-common.h"
+#include "list-common.h"
 
 struct list_trigger_handle {
     uint32_t ptr_cond;

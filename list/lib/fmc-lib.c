@@ -20,7 +20,6 @@ struct svec_dev {
     pthread_mutex_t lock;
 };
 
-
 static void svec_lock( struct svec_dev *dev )
 {
     pthread_mutex_lock(&dev->lock);
@@ -56,7 +55,7 @@ static uint64_t generic_readq(struct fmc_dev *dev, uint64_t addr)
 static uint32_t svec_readl(struct fmc_dev *dev, uint64_t addr)
 {
     int addr_fd, data_fd;
-    struct svec_dev *svec = (struct svec_dev *) dev->priv;   
+    struct svec_dev *svec = (struct svec_dev *) dev->priv;
     char str[1024];
     svec_lock(svec);
     sprintf(str,"/sys/bus/vme/devices/svec.%d/vme_addr", svec->lun);
@@ -86,7 +85,6 @@ static uint32_t svec_readl(struct fmc_dev *dev, uint64_t addr)
     sscanf(str, "%x", &data);
     return data;
 }
-
 
 static void svec_writel(struct fmc_dev *dev, uint32_t data, uint64_t addr)
 {
@@ -119,7 +117,7 @@ static void *load_binary ( const char *filename, int *size )
 {
     FILE *f=fopen(filename,"rb");
     if(!f)
-	return NULL;    
+	return NULL;
     fseek(f,0,SEEK_END);
     int s = ftell(f);
     rewind(f);
@@ -170,7 +168,6 @@ static int svec_reprogram ( struct fmc_dev *dev, const char *filename )
     return 0;
 }
 
-
 #define INTERCONNECT 0
 #define DEVICE 1
 #define BRIDGE 2
@@ -201,7 +198,7 @@ static uint32_t sdb_traverse (struct fmc_dev *dev, uint32_t base, uint32_t sdb_a
 		    return rv;
 		break;
 	    }
-	    case DEVICE: 
+	    case DEVICE:
 	    {
 		uint64_t dev_addr = base + dev->readq(dev, addr + 8);
 		uint64_t dev_vendor = dev->readq(dev, addr + 24);
@@ -211,7 +208,7 @@ static uint32_t sdb_traverse (struct fmc_dev *dev, uint32_t base, uint32_t sdb_a
 		break;
 	    }
 	}
-	
+
 	addr += 0x40;
     }
     return -1;
@@ -236,7 +233,6 @@ struct fmc_dev *fmc_svec_create(int lun)
     struct fmc_dev *dev =malloc(sizeof(struct fmc_dev));
     struct svec_dev *svec =malloc(sizeof(struct svec_dev));
 
-
     dev->priv =svec;
     dev->readl = svec_readl;
     dev->writel = svec_writel;
@@ -248,5 +244,5 @@ struct fmc_dev *fmc_svec_create(int lun)
     svec->lun = lun;
     pthread_mutex_init(&svec->lock, NULL);
     return dev;
-        
+
 }

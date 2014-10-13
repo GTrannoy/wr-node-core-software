@@ -39,7 +39,7 @@ void wrn_close_slot ( struct wrn_dev *, int slot );
 #define WRN_FILTER_NOT 3
 
 struct wrn_message_filter {
-  
+
     struct rule {
         int op;
         int word_offset;
@@ -57,7 +57,6 @@ int wrn_recv ( struct wrn_dev *, int fd, uint32_t *buffer, size_t buf_size, int 
 int wrn_send ( struct wrn_dev *, int fd, uint32_t *buffer, size_t buf_size, int timeout_us );
 
 //void wrn_update_mqueues( struct wrn_dev * dev );
-
 
 #ifdef __cplusplus
 };

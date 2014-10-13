@@ -4,7 +4,6 @@
 #include "wrn-lib.h"
 #include "list-lib.h"
 
-
 #define TDC_APPLICATION "rt/tdc/rt-tdc.bin"
 #define FD_APPLICATION "rt/fd/rt-fd.bin"
 
@@ -22,7 +21,6 @@ struct list_node {
 
 	struct wrn_dev *wrn;
 };
-
 
 struct list_timestamp picos_to_ts( uint64_t p )
 {
@@ -78,13 +76,11 @@ static int check_node_running( struct list_node *dev )
 	uint32_t rsp[2];
 
 	if ( cpu_cmd( n, 0, ID_TDC_CMD_PING, NULL, 0, rsp) == 2);
-	
 
-	return rsp[0] == ID_TDC	
+	return rsp[0] == ID_TDC
 }
 
 #endif
-
 
 // private function used by list-init, move to the driver
 void list_boot_node(struct list_node *dev)
@@ -118,24 +114,23 @@ struct list_node* list_open_node_by_lun(int lun)
 		case WRN_APPID_LIST_TDC_FD:
 //			printf("Found TDC-FD node\n");
 			n->n_inputs = 5;
-			n->n_outputs = 4;			
+			n->n_outputs = 4;
 			n->fd_cpu_control[0] =  wrn_open_slot ( wrn, 0, WRN_SLOT_OUTGOING | WRN_SLOT_INCOMING );
 			n->fd_cpu_control[1] =  wrn_open_slot ( wrn, 1, WRN_SLOT_OUTGOING | WRN_SLOT_INCOMING );
 			n->fd_cpu_logging[0] =  wrn_open_slot ( wrn, 2, WRN_SLOT_OUTGOING );
 			n->fd_cpu_logging[1] =  wrn_open_slot ( wrn, 3, WRN_SLOT_OUTGOING );
-			
+
 			break;
 	}
 
 	return n;
 }
 
-
 int list_in_enable(struct list_node *dev, int input, int enable)
 {
 	if(input < 1 || input > 5)
 		return -EINVAL;
-	
+
 	return rt_requestf (dev, 0, ID_TDC_CMD_CHAN_ENABLE, 2, input - 1, enable ? 1 : 0 );
 }
 
@@ -157,7 +152,7 @@ int list_in_software_trigger ( struct list_node* dev, struct list_trigger_entry 
 	uint32_t rsp[128];
 
 	int n = rt_request(dev, 0, ID_TDC_CMD_SOFTWARE_TRIGGER, (uint32_t *) trigger, sizeof(struct list_trigger_entry) / 4, rsp);
-	
+
 	if(n == 2 && rsp[0] == ID_REP_ACK)
 		return 0;
 	else
@@ -168,9 +163,9 @@ int list_in_assign_trigger ( struct list_node *dev, int input, struct list_id *t
 {
 	if(input < 1 || input > dev->n_inputs)
 		return -EINVAL;
-	
+
 	if(trig == NULL) // un-assign
-		return rt_requestf(dev, 0, ID_TDC_CMD_CHAN_ASSIGN_TRIGGER, 5,  input - 1, 0, 0, 0, 0);	
+		return rt_requestf(dev, 0, ID_TDC_CMD_CHAN_ASSIGN_TRIGGER, 5,  input - 1, 0, 0, 0, 0);
 	else
 		return rt_requestf(dev, 0, ID_TDC_CMD_CHAN_ASSIGN_TRIGGER, 5,  input - 1, 1, trig->system, trig->source_port, trig->trigger);
 }
@@ -188,18 +183,18 @@ int list_out_enable ( struct list_node *dev, int output, int enable )
 
 int list_in_arm ( struct list_node *dev, int input, int armed )
 {
-	return rt_requestf(dev, 0, ID_TDC_CMD_CHAN_ARM, 2, input - 1, armed ? 1 : 0 );		
+	return rt_requestf(dev, 0, ID_TDC_CMD_CHAN_ARM, 2, input - 1, armed ? 1 : 0 );
 }
 
 int list_in_reset_counters ( struct list_node *dev, int input  )
 {
-	return rt_requestf(dev, 0, ID_TDC_CMD_CHAN_RESET_COUNTERS, 1, input - 1 );		
+	return rt_requestf(dev, 0, ID_TDC_CMD_CHAN_RESET_COUNTERS, 1, input - 1 );
 }
 
 int list_in_set_timebase_offset ( struct list_node *dev, int input, uint64_t offset )
 {
 	struct list_timestamp t = picos_to_ts( offset );
-	return rt_requestf(dev, 0, ID_TDC_CMD_CHAN_SET_TIMEBASE_OFFSET, 4, input - 1, t.seconds, t.cycles, t.frac );		
+	return rt_requestf(dev, 0, ID_TDC_CMD_CHAN_SET_TIMEBASE_OFFSET, 4, input - 1, t.seconds, t.cycles, t.frac );
 }
 
 static void unbag_ts(uint32_t *buf, int offset, struct list_timestamp *ts)
@@ -219,7 +214,7 @@ int list_in_get_state ( struct list_node *dev, int input, struct list_input_stat
 	req[0] = input - 1;
 
 	int n = rt_request(dev, 0, ID_TDC_CMD_CHAN_GET_STATE, req, 1, rsp);
-	
+
 	if(n == 29 && rsp[0] == ID_REP_STATE)
 	{
 		state->input = input;
@@ -235,7 +230,7 @@ int list_in_get_state ( struct list_node *dev, int input, struct list_input_stat
 		state->assigned_id.system = rsp[3];
 	    state->assigned_id.source_port = rsp[4];
 	    state->assigned_id.trigger = rsp[5];
-	    
+
 	    unbag_ts(rsp, 6, &state->delay);
 	    unbag_ts(rsp, 12, &state->last);
 	    unbag_ts(rsp, 21, &state->last_sent.ts);
@@ -249,20 +244,18 @@ int list_in_get_state ( struct list_node *dev, int input, struct list_input_stat
 	} else
 		return -1;
 
-
 }
 
 int list_in_set_delay ( struct list_node *dev, int input, uint64_t delay_ps )
 {
 	struct list_timestamp t = picos_to_ts(delay_ps);
 
-    
-	return rt_requestf(dev, 0, ID_TDC_CMD_CHAN_SET_DELAY, 4, input - 1, t.seconds, t.cycles, t.frac );		
+	return rt_requestf(dev, 0, ID_TDC_CMD_CHAN_SET_DELAY, 4, input - 1, t.seconds, t.cycles, t.frac );
 }
 
 int list_in_set_log_level ( struct list_node *dev, int input, uint32_t log_level)
 {
-	return rt_requestf(dev, 0, ID_TDC_CMD_CHAN_SET_LOG_LEVEL, 2, input - 1, log_level );		
+	return rt_requestf(dev, 0, ID_TDC_CMD_CHAN_SET_LOG_LEVEL, 2, input - 1, log_level );
 }
 
 int list_in_read_log ( struct list_node *dev, struct list_log_entry *log, int flags, int input_mask, int count )
@@ -293,15 +286,13 @@ int list_in_read_log ( struct list_node *dev, struct list_log_entry *log, int fl
 				n_read++;
 				cur++;
 			}
-		} else 
+		} else
 			break;
 	}
 
 	return n_read;
 
-
 }
-
 
 int list_out_trig_assign ( struct list_node *dev, struct list_trigger_handle *handle, int output, struct list_id *trig, struct list_id *condition )
 {
@@ -315,7 +306,7 @@ int list_out_trig_assign ( struct list_node *dev, struct list_trigger_handle *ha
     req[1] = trig->system;
     req[2] = trig->source_port;
     req[3] = trig->trigger;
-    
+
     if(condition)
     {
 	req[5] = condition->system;
@@ -333,7 +324,7 @@ int list_out_trig_assign ( struct list_node *dev, struct list_trigger_handle *ha
 	    handle->ptr_cond = rsp[3];
     	    handle->ptr_trig = rsp[4];
 	}
-    
+
     	return 0;
     } else
 	return -1;
@@ -346,9 +337,9 @@ int list_out_trig_remove ( struct list_node *dev, struct list_trigger_handle *ha
     req[0] = handle->channel;
     req[1] = handle->ptr_cond;
     req[2] = handle->ptr_trig;
-    
+
 //    printf("remove: %x %x %x\n", handle->channel, handle->ptr_cond, handle->ptr_trig);
-    
+
     int n = rt_request(dev, 1, ID_FD_CMD_CHAN_REMOVE_TRIGGER, req, 3, rsp);
 
     if(n == 2 && rsp[0] == ID_REP_ACK)
@@ -377,7 +368,7 @@ int list_out_trig_get_all (struct list_node *dev, int output, struct list_output
 		    req[1] = index;
 		    req[2] = output - 1;
 		    int n = rt_request(dev, 1, ID_FD_CMD_READ_HASH, req, 3, rsp);
-		   
+
 		    if(n != 11 && rsp[0] != ID_REP_HASH_ENTRY)
 				return -1;
 
@@ -386,15 +377,16 @@ int list_out_trig_get_all (struct list_node *dev, int output, struct list_output
 				break;
 
 			uint32_t state = rsp[8];
-			    
+
 //			printf("%d %d %x\n", bucket, index, state);
+
 			if (state != HASH_ENT_EMPTY && !(state & HASH_ENT_CONDITIONAL))
 			{
 		    	    struct list_output_trigger_state *current = &triggers[count];
 		    	    current->handle.channel = output -1;
 		    	    current->handle.ptr_cond = rsp[9];
 		    	    current->handle.ptr_trig = rsp[10];
-		    	    
+
     		    	    current->trigger.system = rsp[3];
 		    	    current->trigger.source_port = rsp[4];
 		    	    current->trigger.trigger = rsp[5];
@@ -429,8 +421,7 @@ int list_out_trig_get_all (struct list_node *dev, int output, struct list_output
 int list_out_trig_set_delay ( struct list_node *dev, struct list_trigger_handle *handle, uint64_t delay_ps )
 {
     struct list_timestamp t = picos_to_ts(delay_ps);
-    
-    
+
     return rt_requestf(dev, 1, ID_FD_CMD_CHAN_SET_DELAY, 4, handle->channel, handle->ptr_trig, t.cycles, t.frac );
 }
 
@@ -443,7 +434,7 @@ int list_out_get_state ( struct list_node *dev, int output, struct list_output_s
     req[0] = output - 1;
 
     int n = rt_request(dev, 1, ID_FD_CMD_CHAN_GET_STATE, req, 1, rsp);
-    
+
     if(n == 29 && rsp[0] == ID_REP_STATE)
     {
 	state->output = output;
@@ -452,7 +443,7 @@ int list_out_get_state ( struct list_node *dev, int output, struct list_output_s
 	state->missed_pulses_deadtime = rsp[5];
 	state->missed_pulses_overflow = rsp[6];
 
-        
+
 	state->rx_packets = rsp[27];
 	state->rx_loopback = rsp[28];
 

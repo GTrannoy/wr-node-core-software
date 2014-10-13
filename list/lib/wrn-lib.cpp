@@ -34,7 +34,7 @@ int wrn_lib_init()
 
 void wrn_lib_exit()
 {
-    
+
 }
 
 int wrn_get_node_count()
@@ -121,22 +121,20 @@ static void start_update_thread ( wrn_dev *dev )
 struct wrn_dev* wrn_open_by_lun( int lun )
 {
     struct wrn_dev * dev= new wrn_dev();
-    
+
     dev->base = 0xc0000;
     dev->fmc = fmc_svec_create(lun);
-    
+
     dev->app_id = wrn_readl( dev, BASE_CPU_CSR + WRN_CPU_CSR_REG_APP_ID );
     DBG("wrn_open: application ID = 0x%08x\n", dev->app_id);
 
     init_cpus( dev );
     init_hmq ( dev );
-    
-    start_update_thread( dev );
 
+    start_update_thread( dev );
 
     return dev;
 }
-
 
 uint32_t wrn_get_app_id( struct wrn_dev *dev )
 {
@@ -171,7 +169,7 @@ int wrn_cpu_reset ( struct wrn_dev *dev, uint32_t mask )
 int wrn_cpu_load_application ( struct wrn_dev *dev, int cpu, const void *code, size_t code_size )
 {
     int i;
-   
+
    wrn_cpu_stop(dev, (1<<cpu));
 
     wrn_writel(dev, cpu, BASE_CPU_CSR + WRN_CPU_CSR_REG_CORE_SEL );
@@ -179,7 +177,6 @@ int wrn_cpu_load_application ( struct wrn_dev *dev, int cpu, const void *code, s
     DBG("CPU%d: loading %d bytes of LM32 code\n", cpu, code_size);
 
     uint32_t *code_c = (uint32_t *)code;
-
 
     for(i = 0; i < 8192; i++) // fixme: memsize
     {
@@ -235,8 +232,7 @@ static void *load_binary ( const char *filename, int *size )
     return buf;
 }
 
-
-int wrn_cpu_load_file ( struct wrn_dev *dev, int cpu, const char *filename) 
+int wrn_cpu_load_file ( struct wrn_dev *dev, int cpu, const char *filename)
 {
     int size;
     void *p = load_binary(filename,&size);
@@ -248,7 +244,6 @@ int wrn_cpu_load_file ( struct wrn_dev *dev, int cpu, const char *filename)
     free(p);
     return rv;
 }
-
 
 //#define SLOT_OUT_MASK 0xffff
 
@@ -287,7 +282,7 @@ static bool do_rx(struct wrn_dev *dev, wrn_message& msg, int& slot)
                 }
                 return true;
     	    }
-    	}	
+    	}
     }
 
     return false;
@@ -297,6 +292,7 @@ static bool do_rx(struct wrn_dev *dev, wrn_message& msg, int& slot)
 bool tx_ready(struct wrn_dev *dev, int slot)
 {
     uint32_t slot_stat = hmq_readl (dev, MQUEUE_BASE_IN(slot), MQUEUE_SLOT_STATUS );
+
     return !(slot_stat & MQUEUE_SLOT_STATUS_FULL);
 }
 
@@ -310,8 +306,6 @@ void do_tx(struct wrn_dev *dev, const wrn_message& msg, int slot )
     }
     hmq_writel(dev, MQUEUE_BASE_IN(slot), MQUEUE_CMD_READY, MQUEUE_SLOT_COMMAND);
 }
-
-
 
 int update_mqueues( struct wrn_dev * dev )
 {
@@ -363,7 +357,6 @@ wrn_buffer::wrn_buffer (int slot_)
     pthread_mutex_init(&mutex, NULL);
 }
 
-
 bool wrn_buffer::lock(bool blocking)
 {
     if (blocking)
@@ -385,9 +378,6 @@ wrn_buffer::~wrn_buffer()
     pthread_mutex_destroy(&mutex);
 }
 
-
- 
-
 int wrn_open_slot ( struct wrn_dev *dev, int slot, int flags )
 {
     int fd = fd_base;
@@ -399,10 +389,10 @@ int wrn_open_slot ( struct wrn_dev *dev, int slot, int flags )
     conn->out = NULL;
     if(flags & WRN_SLOT_OUTGOING)
         conn->out = new wrn_buffer(slot);
-    
+
     if(flags & WRN_SLOT_INCOMING)
         conn->in = new wrn_buffer(slot);
-    
+
     dev->fds[fd] = conn;
     DBG("open slot %d, fd = %d\n", slot, fd);
     return fd;
@@ -443,11 +433,11 @@ int wrn_recv ( struct wrn_dev *dev, int fd, uint32_t *buffer, size_t buf_size, i
         usleep(1);
 
     }
-    
-    conn->out->lock(true);    
+
+    conn->out->lock(true);
     wrn_message msg = conn->out->pop();
     conn->out->unlock();
-    
+
     int n = std::min(buf_size, msg.size());
     for(int i = 0; i<n; i++)
         buffer[i] = msg[i];
@@ -461,17 +451,14 @@ int wrn_send ( struct wrn_dev *dev, int fd, uint32_t *buffer, size_t buf_size, i
 
     wrn_message msg;
 
-
     for(int i = 0; i < buf_size; i++)
         msg.push_back(buffer[i]);
 
-    conn->in->lock(true);    
+    conn->in->lock(true);
     conn->in->push( msg );
     conn->in->unlock();
     return buf_size;
 }
-
-
 
 void *update_thread_entry( void *data )
 {

@@ -251,38 +251,38 @@ static bool do_rx(struct wrn_dev *dev, wrn_message& msg, int& slot)
 {
     uint32_t in_stat = hmq_readl(dev, MQUEUE_BASE_GCR, MQUEUE_GCR_SLOT_STATUS);
 
-    if(in_stat & MQUEUE_GCR_SLOT_STATUS_OUT_MASK)
+    if(!(in_stat & MQUEUE_GCR_SLOT_STATUS_OUT_MASK))
+        return false;
+
+    int i, j;
+    for(i = 0; i < dev->hmq.n_out; i++)
     {
-    	int i, j;
-    	for(i = 0; i < dev->hmq.n_out; i++)
-    	{
-    	    if (in_stat & (1<<i))
-    	    {
-    		uint32_t slot_stat = hmq_readl (dev, MQUEUE_BASE_OUT(i), MQUEUE_SLOT_STATUS );
-    		int size = (slot_stat & MQUEUE_SLOT_STATUS_MSG_SIZE_MASK) >> MQUEUE_SLOT_STATUS_MSG_SIZE_SHIFT;
-                msg.clear();
+        if (!(in_stat & (1<<i)))
+	    continue;
 
-    		for(j=0;j<size;j++)
-                {
-                    uint32_t rv = hmq_readl(dev, MQUEUE_BASE_OUT(i), MQUEUE_SLOT_DATA_START + j * 4);
-                    msg.push_back(rv);
-                }
+	uint32_t slot_stat = hmq_readl (dev, MQUEUE_BASE_OUT(i), MQUEUE_SLOT_STATUS );
+	int size = (slot_stat & MQUEUE_SLOT_STATUS_MSG_SIZE_MASK) >> MQUEUE_SLOT_STATUS_MSG_SIZE_SHIFT;
+	msg.clear();
 
-    		slot = i;
-                hmq_writel(dev, MQUEUE_BASE_OUT(i), MQUEUE_CMD_DISCARD, MQUEUE_SLOT_COMMAND);
+	for(j=0;j<size;j++)
+	{
+	    uint32_t rv = hmq_readl(dev, MQUEUE_BASE_OUT(i), MQUEUE_SLOT_DATA_START + j * 4);
+	    msg.push_back(rv);
+	}
 
-                if (msg[0] == 0xdeadbeef)
-                {
-                    char str[128];
-                    for(j=1;j<msg.size();j++)
-                        str[j-1] = msg[j];
-                    str[j-1] = 0;
-                    fprintf(stderr,"* DBG%d: %s\n", slot, str );
-                    return false;
-                }
-                return true;
-    	    }
-    	}
+	slot = i;
+	hmq_writel(dev, MQUEUE_BASE_OUT(i), MQUEUE_CMD_DISCARD, MQUEUE_SLOT_COMMAND);
+
+	if (msg[0] == 0xdeadbeef)
+	{
+	    char str[128];
+	    for(j=1;j<msg.size();j++)
+	        str[j-1] = msg[j];
+	    str[j-1] = 0;
+	    fprintf(stderr,"* DBG%d: %s\n", slot, str );
+	    return false;
+	}
+	return true;
     }
 
     return false;

@@ -40,6 +40,7 @@ struct list_output_trigger_state {
     struct list_timestamp delay_trig;
     struct list_timestamp delay_cond;
     struct list_trigger_handle handle;
+    int worst_latency_us;
 };
 
 struct list_output_state {
@@ -60,7 +61,8 @@ struct list_output_state {
     uint32_t dead_time;
     uint32_t pulse_width;
     struct list_timestamp worst_rx_delay;
-    uint32_t total_rx_packets;
+    uint32_t rx_packets;
+    uint32_t rx_loopback;
 };
 
 struct list_node;

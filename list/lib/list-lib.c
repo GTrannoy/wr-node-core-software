@@ -347,7 +347,7 @@ int list_out_trig_remove ( struct list_node *dev, struct list_trigger_handle *ha
     req[1] = handle->ptr_cond;
     req[2] = handle->ptr_trig;
     
-    printf("remove: %x %x %x\n", handle->channel, handle->ptr_cond, handle->ptr_trig);
+//    printf("remove: %x %x %x\n", handle->channel, handle->ptr_cond, handle->ptr_trig);
     
     int n = rt_request(dev, 1, ID_FD_CMD_CHAN_REMOVE_TRIGGER, req, 3, rsp);
 
@@ -387,7 +387,7 @@ int list_out_trig_get_all (struct list_node *dev, int output, struct list_output
 
 			uint32_t state = rsp[8];
 			    
-			printf("%d %d %x\n", bucket, index, state);
+//			printf("%d %d %x\n", bucket, index, state);
 			if (state != HASH_ENT_EMPTY && !(state & HASH_ENT_CONDITIONAL))
 			{
 		    	    struct list_output_trigger_state *current = &triggers[count];
@@ -402,6 +402,8 @@ int list_out_trig_get_all (struct list_node *dev, int output, struct list_output
 		    	    current->delay_trig.cycles = rsp[6];
 		    	    current->delay_trig.frac = rsp[7];
 		    	    current->is_conditional = 0;
+			    current->worst_latency_us = (rsp[17] + 124) / 125;
+
 			    if(rsp[9]) // condition assigned?
 			    {
 		    		current->is_conditional = 1;
@@ -442,18 +444,23 @@ int list_out_get_state ( struct list_node *dev, int output, struct list_output_s
 
     int n = rt_request(dev, 1, ID_FD_CMD_CHAN_GET_STATE, req, 1, rsp);
     
-    if(n == 28 && rsp[0] == ID_REP_STATE)
+    if(n == 29 && rsp[0] == ID_REP_STATE)
     {
+	state->output = output;
 	state->executed_pulses = rsp[3];
 	state->missed_pulses_late = rsp[4];
 	state->missed_pulses_deadtime = rsp[5];
 	state->missed_pulses_overflow = rsp[6];
-	state->total_rx_packets = rsp[27];
+
+        
+	state->rx_packets = rsp[27];
+	state->rx_loopback = rsp[28];
 
 	unbag_ts(rsp, 10, &state->last_executed.ts);
 	unbag_ts(rsp, 13, &state->last_enqueued.ts);
 	unbag_ts(rsp, 16, &state->last_programmed.ts);
 
+	printf("Correct\n");
 
 	return 0;
     }
@@ -470,5 +477,5 @@ int list_out_get_state ( struct list_node *dev, int output, struct list_output_s
     obuf[24] = st->dead_time;
     obuf[25] = st->width_cycles;
     obuf[26] = st->worst_latency;*/
-
+    return -1;
 }

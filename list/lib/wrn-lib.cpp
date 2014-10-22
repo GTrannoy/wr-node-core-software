@@ -19,7 +19,6 @@
 
 #define MAX_MQUEUE_SLOTS 16
 
-#define BASE_HMQ 	0x00000
 #define BASE_CPU_CSR 	0x10000
 
 static int fd_base = 1;
@@ -53,10 +52,6 @@ static void wrn_writel(struct wrn_dev *dev, uint32_t data, uint32_t addr)
     return dev->fmc->writel(dev->fmc, data, dev->base + addr);
 }
 
-#define HMQ_OUT(x) (0x8000 + 0x400 *(x))
-#define HMQ_IN(x) (0x4000 + 0x400 *(x))
-#define HMQ_GCR 0
-
 static uint32_t hmq_readl(struct wrn_dev *dev, uint32_t what, uint32_t offset)
 {
     return wrn_readl(dev, BASE_HMQ + what + offset);
@@ -72,10 +67,10 @@ static int init_hmq( struct wrn_dev *dev )
     uint32_t slot_count, slot_status;
     int i, entries, width;
 
-    slot_count = hmq_readl (dev, HMQ_GCR, MQUEUE_GCR_SLOT_COUNT);
+    slot_count = hmq_readl (dev, MQUEUE_BASE_GCR, MQUEUE_GCR_SLOT_COUNT);
 
-    int n_in = slot_count & 0xff;
-    int n_out = (slot_count >> 8) & 0xff;
+    int n_in = (slot_count & MQUEUE_GCR_SLOT_COUNT_N_IN_MASK) >> MQUEUE_GCR_SLOT_COUNT_N_IN_SHIFT;
+    int n_out = (slot_count & MQUEUE_GCR_SLOT_COUNT_N_OUT_MASK) >> MQUEUE_GCR_SLOT_COUNT_N_OUT_SHIFT;
 
     dev->hmq.n_in = n_in;
     dev->hmq.n_out = n_out;
@@ -84,18 +79,18 @@ static int init_hmq( struct wrn_dev *dev )
 
     for(i=0 ; i<n_out; i++)
     {
-	slot_status = hmq_readl (dev, HMQ_OUT(i), MQUEUE_SLOT_STATUS);
-        width = 1 << (( slot_status >> 28) & 0xf);
-        entries = 1 << (( slot_status >> 2) & 0x3f);
-        hmq_writel(dev, HMQ_OUT(i), MQUEUE_CMD_PURGE, MQUEUE_SLOT_COMMAND);
+	slot_status = hmq_readl (dev, MQUEUE_BASE_OUT(i), MQUEUE_SLOT_STATUS);
+        width = 1 << ((slot_status & MQUEUE_SLOT_STATUS_LOG2_WIDTH_MASK) >> MQUEUE_SLOT_STATUS_LOG2_WIDTH_SHIFT);
+        entries = 1 << ((slot_status & MQUEUE_SLOT_STATUS_LOG2_ENTRIES_MASK) >> MQUEUE_SLOT_STATUS_LOG2_ENTRIES_SHIFT);
+        hmq_writel(dev, MQUEUE_BASE_OUT(i), MQUEUE_CMD_PURGE, MQUEUE_SLOT_COMMAND);
         DBG(" - out%d: width=%d, entries=%d\n", i, width, entries);
     }
     for(i =0 ; i<n_in; i++)
     {
-        slot_status =hmq_readl(dev, HMQ_IN(i), MQUEUE_SLOT_STATUS);
-        width = 1 << (( slot_status >> 28) & 0xf);
-        entries = 1 << (( slot_status >> 2) & 0x3f);
-        hmq_writel(dev, HMQ_IN(i), MQUEUE_CMD_PURGE, MQUEUE_SLOT_COMMAND);
+        slot_status =hmq_readl(dev, MQUEUE_BASE_IN(i), MQUEUE_SLOT_STATUS);
+        width = 1 << ((slot_status & MQUEUE_SLOT_STATUS_LOG2_WIDTH_MASK) >> MQUEUE_SLOT_STATUS_LOG2_WIDTH_SHIFT);
+        entries = 1 << ((slot_status & MQUEUE_SLOT_STATUS_LOG2_ENTRIES_MASK) >> MQUEUE_SLOT_STATUS_LOG2_ENTRIES_SHIFT);
+        hmq_writel(dev, MQUEUE_BASE_IN(i), MQUEUE_CMD_PURGE, MQUEUE_SLOT_COMMAND);
 	   DBG(" - in%d: width=%d, entries=%d\n", i, width, entries);
     }
     return 0;
@@ -156,20 +151,14 @@ int wrn_cpu_count( struct wrn_dev*  dev)
 int wrn_cpu_stop ( struct wrn_dev* dev, uint32_t mask )
 {
     uint32_t r = wrn_readl(dev, BASE_CPU_CSR + WRN_CPU_CSR_REG_RESET );
-    //DBG("cpu_stop: r %x mask %x csrbase %x\n", r, mask,  BASE_CPU_CSR +WRN_CPU_CSR_REG_RESET);
-    r |= mask;
-    //DBG("cpu_stop: r %x \n", r);
-    wrn_writel(dev, r, BASE_CPU_CSR + WRN_CPU_CSR_REG_RESET );
+    wrn_writel(dev, r | mask, BASE_CPU_CSR + WRN_CPU_CSR_REG_RESET );
     return 0;
 }
 
 int wrn_cpu_start ( struct wrn_dev * dev, uint32_t mask )
 {
     uint32_t r = wrn_readl(dev, BASE_CPU_CSR + WRN_CPU_CSR_REG_RESET );
-    //DBG("cpu_stop: r %x mask %x csrbase %x\n", r, mask,  BASE_CPU_CSR +WRN_CPU_CSR_REG_RESET);
-    r &= ~mask;
-    //DBG("cpu_start: r %x \n", r);
-    wrn_writel(dev, r, BASE_CPU_CSR + WRN_CPU_CSR_REG_RESET );
+    wrn_writel(dev, r & ~mask, BASE_CPU_CSR + WRN_CPU_CSR_REG_RESET );
     return 0;
 }
 
@@ -261,40 +250,31 @@ int wrn_cpu_load_file ( struct wrn_dev *dev, int cpu, const char *filename)
 }
 
 
-#define SLOT_OUT_MASK 0xffff
+//#define SLOT_OUT_MASK 0xffff
 
 static bool do_rx(struct wrn_dev *dev, wrn_message& msg, int& slot)
 {
-    uint32_t in_stat = hmq_readl(dev, HMQ_GCR, MQUEUE_GCR_SLOT_STATUS);
-    //uint32_t cnt = hmq_readl(dev, HMQ_GCR, MQUEUE_GCR_SLOT_COUNT);
+    uint32_t in_stat = hmq_readl(dev, MQUEUE_BASE_GCR, MQUEUE_GCR_SLOT_STATUS);
 
-
-    /*DBG("gcr %x\n", in_stat);
-    if(in_stat & 1)
-    {
-        DBG("Got!\n");
-    }*/
-    if(in_stat & SLOT_OUT_MASK)
+    if(in_stat & MQUEUE_GCR_SLOT_STATUS_OUT_MASK)
     {
     	int i, j;
     	for(i = 0; i < dev->hmq.n_out; i++)
     	{
     	    if (in_stat & (1<<i))
     	    {
-        		uint32_t slot_stat = hmq_readl (dev, HMQ_OUT(i), MQUEUE_SLOT_STATUS );
-        		int size = (slot_stat >> 16) & 0xff;
+    		uint32_t slot_stat = hmq_readl (dev, MQUEUE_BASE_OUT(i), MQUEUE_SLOT_STATUS );
+    		int size = (slot_stat & MQUEUE_SLOT_STATUS_MSG_SIZE_MASK) >> MQUEUE_SLOT_STATUS_MSG_SIZE_SHIFT;
                 msg.clear();
 
-      
-
-        		for(j=0;j<size;j++)
+    		for(j=0;j<size;j++)
                 {
-                    uint32_t rv = hmq_readl(dev, HMQ_OUT(i), MQUEUE_SLOT_DATA_START + j * 4);
+                    uint32_t rv = hmq_readl(dev, MQUEUE_BASE_OUT(i), MQUEUE_SLOT_DATA_START + j * 4);
                     msg.push_back(rv);
-                    //DBG("rv %x %x %c\n", MQUEUE_SLOT_DATA_START + j * 4, rv, (char) rv );
                 }
-        		slot = i;
-                hmq_writel(dev, HMQ_OUT(i), MQUEUE_CMD_DISCARD, MQUEUE_SLOT_COMMAND);
+
+    		slot = i;
+                hmq_writel(dev, MQUEUE_BASE_OUT(i), MQUEUE_CMD_DISCARD, MQUEUE_SLOT_COMMAND);
 
                 if (msg[0] == 0xdeadbeef)
                 {
@@ -313,27 +293,22 @@ static bool do_rx(struct wrn_dev *dev, wrn_message& msg, int& slot)
     return false;
 }
 
-//struct wrn_dev* wrn_open_by_fmc ( int device_id );
-//struct wrn_dev* wrn_open( const char *device );
 
 bool tx_ready(struct wrn_dev *dev, int slot)
 {
-    uint32_t slot_stat = hmq_readl (dev, HMQ_IN(slot), MQUEUE_SLOT_STATUS );
-  
+    uint32_t slot_stat = hmq_readl (dev, MQUEUE_BASE_IN(slot), MQUEUE_SLOT_STATUS );
     return !(slot_stat & MQUEUE_SLOT_STATUS_FULL);
 }
 
 void do_tx(struct wrn_dev *dev, const wrn_message& msg, int slot )
 {
-//    DBG("do_tx: slot %d size %d\n", slot, msg.size());
 
-    hmq_writel(dev, HMQ_IN(slot),  MQUEUE_CMD_CLAIM, MQUEUE_SLOT_COMMAND);
+    hmq_writel(dev, MQUEUE_BASE_IN(slot),  MQUEUE_CMD_CLAIM, MQUEUE_SLOT_COMMAND);
     for(int i=0;i<msg.size();i++)
     {
-//        DBG("%d: %x\n", i, msg[i]);
-        hmq_writel(dev, HMQ_IN(slot), msg[i], MQUEUE_SLOT_DATA_START + i * 4);
+        hmq_writel(dev, MQUEUE_BASE_IN(slot), msg[i], MQUEUE_SLOT_DATA_START + i * 4);
     }
-    hmq_writel(dev, HMQ_IN(slot), MQUEUE_CMD_READY, MQUEUE_SLOT_COMMAND);
+    hmq_writel(dev, MQUEUE_BASE_IN(slot), MQUEUE_CMD_READY, MQUEUE_SLOT_COMMAND);
 }
 
 
@@ -344,22 +319,17 @@ int update_mqueues( struct wrn_dev * dev )
     int slot;
     int rx_limit = 5;
     int got_sth = 0;
-    // outgoing path (from CPUs)
     while(do_rx (dev, msg, slot) && rx_limit)
     {
-    //    DBG("RxLim %d\n", rx_limit);
         rx_limit--;
         got_sth = 1;
-        //DBG("slot %d rx %d words\n", slot, msg.size());
         for (wrn_connmap::iterator i = dev->fds.begin(); i != dev->fds.end(); ++i)
         {
             wrn_buffer *buf = i->second->out;
 
             if( buf  && buf->slot == slot)
             {
-          //      DBG("-> queue to fd %d\n", i->first);
                 buf->lock( true );
-                //DBG("locked\n");
                 buf->process(msg);
                 buf->unlock();
 
@@ -377,7 +347,6 @@ int update_mqueues( struct wrn_dev * dev )
             {
                 buf->lock(true);
                 got_sth = 1;
-//                DBG("DoTX\n");
                 do_tx(dev, buf->pop(), buf->slot);
                 buf->unlock();
             }

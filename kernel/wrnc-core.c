@@ -885,6 +885,50 @@ irqreturn_t wrnc_irq_handler(int irq_core_base, void *arg)
 	return IRQ_HANDLED;
 }
 
+static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
+			  unsigned int is_input)
+{
+	struct fmc_device *fmc = to_fmc_dev(wrnc);
+	struct wrnc_hmq *hmq;
+	int err;
+
+	hmq = is_input ? &wrnc->hmq_in[slot] : &wrnc->hmq_out[slot];
+
+	hmq->index = slot;
+
+	err = wrnc_minor_get(&hmq->dev, WRNC_HMQ);
+	if (err)
+		return err;
+
+	err = dev_set_name(&hmq->dev, "wrnc-%04x-hmq-%c-%02d",
+			   fmc->device_id, is_input ? 'i':'o', hmq->index);
+	if (err)
+		return err;
+
+	init_waitqueue_head(&hmq->q_msg);
+	hmq->dev.class = &wrnc_cdev_class;
+	hmq->dev.parent = &wrnc->dev;
+	hmq->dev.groups = wrnc_hmq_groups;
+	hmq->dev.release = wrnc_hmq_release;
+	err = device_register(&hmq->dev);
+	if (err)
+		return err;
+
+	INIT_LIST_HEAD(&hmq->list_msg);
+	if (is_input) { /* CPU input */
+		hmq->flags |= WRNC_FLAG_HMQ_DIR;
+		hmq->base_sr = wrnc->base_hmq +	MQUEUE_BASE_IN(slot);
+	} else { /* CPU output */
+		hmq->base_sr = wrnc->base_hmq +	MQUEUE_BASE_OUT(slot);
+	}
+	spin_lock_init(&hmq->lock);
+	/* Flush the content of the slot */
+	fmc_writel(fmc, MQUEUE_CMD_PURGE,
+		   hmq->base_sr + MQUEUE_SLOT_COMMAND);
+
+	return 0;
+}
+
 /**
  * It initialize the WRNC device
  */
@@ -892,7 +936,7 @@ int wrnc_probe(struct fmc_device *fmc)
 {
 	struct wrnc_dev *wrnc;
 	int err, i;
-	uint32_t hmq_out, hmq_in, tmp;
+	uint32_t tmp;
 
 	pr_info("%s:%d\n", __func__, __LINE__);
 	/* Create a WRNC instance */
@@ -964,50 +1008,28 @@ int wrnc_probe(struct fmc_device *fmc)
 
 	/* Get and check the number of HMQ slots */
 	tmp = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_SLOT_COUNT);
-	hmq_in = tmp & MQUEUE_GCR_SLOT_COUNT_N_IN_MASK;
-	hmq_out = (tmp & MQUEUE_GCR_SLOT_COUNT_N_OUT_MASK) >> MQUEUE_GCR_SLOT_COUNT_N_OUT_SHIFT;
-	wrnc->n_hmq = hmq_in + hmq_out;
-	if (wrnc->n_hmq >= WRNC_MAX_HMQ_SLOT) {
-		dev_err(&fmc->dev, "wrnc: invalid number of HMQ slots (%d, in %d out %d)\n",
-			wrnc->n_hmq, hmq_in, hmq_out);
+        wrnc->n_hmq_in = tmp & MQUEUE_GCR_SLOT_COUNT_N_IN_MASK;
+        wrnc->n_hmq_out = (tmp & MQUEUE_GCR_SLOT_COUNT_N_OUT_MASK) >>
+		MQUEUE_GCR_SLOT_COUNT_N_OUT_SHIFT;
+	if (wrnc->n_hmq_in + wrnc->n_hmq_out >= WRNC_MAX_HMQ_SLOT) {
+		dev_err(&fmc->dev, "wrnc: invalid number of HMQ slots (in %d out %d)\n",
+			 wrnc->n_hmq_in, wrnc->n_hmq_out);
 	        err = -EINVAL;
 		goto out_n_slot;
 	}
-	dev_info(&fmc->dev, "Detected %d slots, %d input, %d output\n",
-		 wrnc->n_hmq, hmq_in, hmq_out);
+	dev_info(&fmc->dev, "Detected slots: %d input, %d output\n",
+		wrnc->n_hmq_in, wrnc->n_hmq_out);
 
 	/* Configure slots */
-	for (i = 0; i < wrnc->n_hmq; ++i) {
-		wrnc->hmq[i].index = i;
-
-		err = wrnc_minor_get(&wrnc->hmq[i].dev, WRNC_HMQ);
+	for (i = 0; i < wrnc->n_hmq_in; ++i) {
+		err = wrnc_probe_hmq(wrnc, i, 1);
 		if (err)
-			goto out_hmq;
-		err = dev_set_name(&wrnc->hmq[i].dev, "wrnc-%04x-hmq-%02d",
-				   fmc->device_id, wrnc->hmq[i].index);
+			goto out_hmq_in;
+	}
+	for (i = 0; i <  wrnc->n_hmq_out; ++i) {
+		err = wrnc_probe_hmq(wrnc, i, 0);
 		if (err)
-			goto out_hmq;
-		init_waitqueue_head(&wrnc->hmq[i].q_msg);
-		wrnc->hmq[i].dev.class = &wrnc_cdev_class;
-		wrnc->hmq[i].dev.parent = &wrnc->dev;
-		wrnc->hmq[i].dev.groups = wrnc_hmq_groups;
-		wrnc->hmq[i].dev.release = wrnc_hmq_release;
-		err = device_register(&wrnc->hmq[i].dev);
-		if (err)
-		        goto out_cpu;
-		INIT_LIST_HEAD(&wrnc->hmq[i].list_msg);
-		if (i < hmq_in) { /* CPU input */
-			wrnc->hmq[i].flags |= WRNC_FLAG_HMQ_DIR;
-			wrnc->hmq[i].base_sr = wrnc->base_hmq +
-				MQUEUE_BASE_IN(i);
-		} else { /* CPU output */
-			wrnc->hmq[i].base_sr = wrnc->base_hmq +
-				MQUEUE_BASE_OUT(i);
-		}
-		spin_lock_init(&wrnc->hmq[i].lock);
-		/* Flush the content of the slot */
-		fmc_writel(fmc, MQUEUE_CMD_PURGE,
-			   wrnc->hmq[i].base_sr + MQUEUE_SLOT_COMMAND);
+			goto out_hmq_out;
 	}
 
 	/*
@@ -1022,14 +1044,19 @@ int wrnc_probe(struct fmc_device *fmc)
 			"Cannot request IRQ 0x%x - we'll not receive/send messages\n",
 			fmc->irq);
 	}
-	fmc_writel(fmc, ((1 << wrnc->n_hmq) - 1),
-		   wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
+	tmp = (((1 << wrnc->n_hmq_in) - 1) << MQUEUE_GCR_IRQ_MASK_IN_SHIFT);
+	tmp |= (1 << wrnc->n_hmq_out) - 1;
+	//fmc_writel(fmc, tmp, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
 
 	return 0;
 
-out_hmq:
+out_hmq_out:
 	while (--i)
-		device_unregister(&wrnc->hmq[i].dev);
+		device_unregister(&wrnc->hmq_out[i].dev);
+	i = wrnc->n_hmq_out;
+out_hmq_in:
+	while (--i)
+		device_unregister(&wrnc->hmq_in[i].dev);
 out_n_slot:
 	i = wrnc->n_cpu;
 out_cpu:
@@ -1054,8 +1081,11 @@ int wrnc_remove(struct fmc_device *fmc)
 	for (i = 0; i < wrnc->n_cpu; ++i)
 		device_unregister(&wrnc->cpu[i].dev);
 
-	for (i = 0; i < wrnc->n_hmq; ++i)
-		device_unregister(&wrnc->hmq[i].dev);
+	for (i = 0; i < wrnc->n_hmq_in; ++i)
+		device_unregister(&wrnc->hmq_in[i].dev);
+
+	for (i = 0; i < wrnc->n_hmq_out; ++i)
+		device_unregister(&wrnc->hmq_out[i].dev);
 
 	/* FIXME cannot explain why, but without sleep the _kernel_ crash */
 	msleep(50);

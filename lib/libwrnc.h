@@ -269,9 +269,23 @@ extern struct wrnc_msg *wrnc_slot_receive(struct wrnc_dev *wrnc,
 					  unsigned int index);
 extern int wrnc_slot_send(struct wrnc_dev *wrnc, unsigned int index,
 			  struct wrnc_msg *msg);
+
+/**
+ * It sends a synchronous message. The slots are uni-directional, so you must
+ * specify where write the message and where the answer is expected.
+ * @param[in] wrnc device to use
+ * @param[in] index_in index of the input slot
+ * @param[in] index_out index of the output slot
+ * @param[in,out] msg it contains the message to be sent; the answer will
+ *                overwrite the content
+ * @param[in] timeout_ms ms to wait for an answer
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
 extern int wrnc_slot_send_and_receive_sync(struct wrnc_dev *wrnc,
-					   unsigned int index,
-					   struct wrnc_msg *msg);
+					   unsigned int index_in,
+					   unsigned int index_out,
+					   struct wrnc_msg *msg,
+					   unsigned int timeout_ms);
 /**
  * It is a wrapper of poll(2) for a wrnc slot device.
  * @param[in] wrnc device to use

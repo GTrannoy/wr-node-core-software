@@ -10,7 +10,7 @@
 #include "hw/mqueue.h"
 
 #define WRNC_MAX_CPU 8
-#define WRNC_MAX_HMQ_SLOT MAX_MQUEUE_SLOTS
+#define WRNC_MAX_HMQ_SLOT (MAX_MQUEUE_SLOTS * 2)
 #define WRNC_MAX_CARRIER 20
 #define WRNC_MAX_CPU_MINORS (WRNC_MAX_CPU * WRNC_MAX_CARRIER)
 #define WRNC_MAX_HMQ_MINORS (WRNC_MAX_HMQ_SLOT * WRNC_MAX_CARRIER)
@@ -76,8 +76,10 @@ struct wrnc_dev {
 	unsigned int n_cpu; /**< number of CPU in the FPGA bitstream */
 	struct wrnc_cpu cpu[WRNC_MAX_CPU];
 
-	unsigned int n_hmq; /**< number of Slots in the HMQ */
-	struct wrnc_hmq hmq[WRNC_MAX_HMQ_SLOT];
+	unsigned int n_hmq_in; /**< number of input slots in the HMQ */
+	unsigned int n_hmq_out; /**< number of output slots in the HMQ */
+	struct wrnc_hmq hmq_in[MAX_MQUEUE_SLOTS];
+	struct wrnc_hmq hmq_out[MAX_MQUEUE_SLOTS];
 	uint32_t base_core; /**< base address of the WRNC component */
 	uint32_t base_csr; /**< base address of the Shared Control Register */
 	uint32_t base_hmq; /**< base address of the HMQ */

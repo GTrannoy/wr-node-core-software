@@ -104,10 +104,13 @@ void wrnc_close(struct wrnc_dev *wrnc)
 		if (wdesc->fd_cpu[i])
 			close(wdesc->fd_cpu[i]);
 
-	for (i = 0; i < WRNC_MAX_HMQ; ++i)
-		if (wdesc->fd_hmq[i])
-			close(wdesc->fd_hmq[i]);
+	for (i = 0; i < WRNC_MAX_HMQ_SLOT; ++i)
+		if (wdesc->fd_hmq_in[i])
+			close(wdesc->fd_hmq_in[i]);
 
+	for (i = 0; i < WRNC_MAX_HMQ_SLOT; ++i)
+		if (wdesc->fd_hmq_in[i])
+			close(wdesc->fd_hmq_in[i]);
 	free(wdesc);
 }
 

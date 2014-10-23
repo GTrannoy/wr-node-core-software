@@ -966,7 +966,7 @@ int wrnc_probe(struct fmc_device *fmc)
 	hmq_in = tmp & MQUEUE_GCR_SLOT_COUNT_N_IN_MASK;
 	hmq_out = (tmp & MQUEUE_GCR_SLOT_COUNT_N_OUT_MASK) >> MQUEUE_GCR_SLOT_COUNT_N_OUT_SHIFT;
 	wrnc->n_hmq = hmq_in + hmq_out;
-	if (wrnc->n_hmq >= WRNC_MAX_HMQ_SLOT + 10000) {
+	if (wrnc->n_hmq >= WRNC_MAX_HMQ_SLOT) {
 		dev_err(&fmc->dev, "wrnc: invalid number of HMQ slots (%d, in %d out %d)\n",
 			wrnc->n_hmq, hmq_in, hmq_out);
 	        err = -EINVAL;
@@ -976,7 +976,7 @@ int wrnc_probe(struct fmc_device *fmc)
 		 wrnc->n_hmq, hmq_in, hmq_out);
 
 	/* Configure slots */
-	for (i = 0; i < wrnc->n_hmq && i < WRNC_MAX_HMQ_SLOT; ++i) { /* FIXME temporary untile explained why n_hmq is so wrong*/
+	for (i = 0; i < wrnc->n_hmq; ++i) {
 		wrnc->hmq[i].index = i;
 
 		err = wrnc_minor_get(&wrnc->hmq[i].dev, WRNC_HMQ);
@@ -1053,7 +1053,7 @@ int wrnc_remove(struct fmc_device *fmc)
 	for (i = 0; i < wrnc->n_cpu; ++i)
 		device_unregister(&wrnc->cpu[i].dev);
 
-	for (i = 0; i < wrnc->n_hmq && i < WRNC_MAX_HMQ_SLOT; ++i)
+	for (i = 0; i < wrnc->n_hmq; ++i)
 		device_unregister(&wrnc->hmq[i].dev);
 
 	/* FIXME cannot explain why, but without sleep the _kernel_ crash */

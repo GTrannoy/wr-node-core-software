@@ -948,8 +948,8 @@ int wrnc_probe(struct fmc_device *fmc)
 	/* FIXME use SDB - <base> + <CSR offset> */
 	wrnc->base_core = 0xC0000;
 	wrnc->base_csr = wrnc->base_core + 0x10000;
-	wrnc->base_hmq = wrnc->base_core + 0x00000;
-	wrnc->base_gcr = wrnc->base_hmq + 0x00000;
+	wrnc->base_hmq = wrnc->base_core + BASE_HMQ;
+	wrnc->base_gcr = wrnc->base_hmq + MQUEUE_BASE_GCR;
 
 	/* Register the device */
 	err = dev_set_name(&wrnc->dev,"wrnc-%04x", fmc->device_id);

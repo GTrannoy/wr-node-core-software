@@ -542,6 +542,7 @@ static const struct file_operations wrnc_cpu_fops = {
 	.open  = wrnc_cpu_simple_open,
 	.write  = wrnc_cpu_write,
 	.read = wrnc_cpu_read,
+	.llseek = generic_file_llseek,
 };
 
 static int wrnc_hmq_simple_open(struct inode *inode, struct file *file)

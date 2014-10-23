@@ -436,8 +436,8 @@ static int wrnc_cpu_firmware_dump(struct wrnc_cpu *cpu, void *fw_buf, size_t cou
 	fmc_writel(fmc, cpu->index, wrnc->base_csr + WRN_CPU_CSR_REG_CORE_SEL);
 
 	/* Dump the firmware */
-	for (i = offset; i < size; ++i) {
-		fmc_writel(fmc, i, wrnc->base_csr + WRN_CPU_CSR_REG_UADDR);
+	for (i = 0; i < size; ++i) {
+		fmc_writel(fmc, i + offset, wrnc->base_csr + WRN_CPU_CSR_REG_UADDR);
 		word = fmc_readl(fmc, wrnc->base_csr + WRN_CPU_CSR_REG_UDATA);
 		fw[i] = be32_to_cpu(word);
 	}

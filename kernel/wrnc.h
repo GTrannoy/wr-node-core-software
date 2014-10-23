@@ -76,7 +76,7 @@ struct wrnc_dev {
 
 	unsigned int n_hmq; /**< number of Slots in the HMQ */
 	struct wrnc_hmq hmq[WRNC_MAX_HMQ_SLOT];
-
+	uint32_t base_core; /**< base address of the WRNC component */
 	uint32_t base_csr; /**< base address of the Shared Control Register */
 	uint32_t base_hmq; /**< base address of the HMQ */
 	uint32_t base_gcr; /**< base address of the Global Control Register

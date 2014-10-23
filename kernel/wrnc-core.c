@@ -901,8 +901,9 @@ int wrnc_probe(struct fmc_device *fmc)
 	fmc_set_drvdata(fmc, wrnc);
 
 	/* FIXME use SDB - <base> + <CSR offset> */
-	wrnc->base_csr = 0xC0000 + 0x10000;
-	wrnc->base_hmq = 0x00000;
+	wrnc->base_core = 0xC0000;
+	wrnc->base_csr = wrnc->base_core + 0x10000;
+	wrnc->base_hmq = wrnc->base_core + 0x00000;
 	wrnc->base_gcr = wrnc->base_hmq + 0x00000;
 
 	/* Register the device */

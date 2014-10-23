@@ -963,8 +963,8 @@ int wrnc_probe(struct fmc_device *fmc)
 
 	/* Get and check the number of HMQ slots */
 	tmp = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_SLOT_COUNT);
-	hmq_in = tmp & 0xFF;
-	hmq_out = (tmp >> 8) & 0xFF;
+	hmq_in = tmp & MQUEUE_GCR_SLOT_COUNT_N_IN_MASK;
+	hmq_out = (tmp & MQUEUE_GCR_SLOT_COUNT_N_OUT_MASK) >> MQUEUE_GCR_SLOT_COUNT_N_OUT_SHIFT;
 	wrnc->n_hmq = hmq_in + hmq_out;
 	if (wrnc->n_hmq >= WRNC_MAX_HMQ_SLOT + 10000) {
 		dev_err(&fmc->dev, "wrnc: invalid number of HMQ slots (%d, in %d out %d)\n",
@@ -998,10 +998,10 @@ int wrnc_probe(struct fmc_device *fmc)
 		if (i < hmq_in) { /* CPU input */
 			wrnc->hmq[i].flags |= WRNC_FLAG_HMQ_DIR;
 			wrnc->hmq[i].base_sr = wrnc->base_hmq +
-				0x4000 + (0x400 * i); /* FIXME use SDB */
+				MQUEUE_BASE_IN(i);
 		} else { /* CPU output */
 			wrnc->hmq[i].base_sr = wrnc->base_hmq +
-				0x8000 + (0x400 * i); /* FIXME use SDB */
+				MQUEUE_BASE_OUT(i);
 		}
 		spin_lock_init(&wrnc->hmq[i].lock);
 		/* Flush the content of the slot */

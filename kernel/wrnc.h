@@ -7,8 +7,10 @@
 #ifndef __WRNC_H__
 #define __WRNC_H__
 
+#include "hw/mqueue.h"
+
 #define WRNC_MAX_CPU 8
-#define WRNC_MAX_HMQ_SLOT 32
+#define WRNC_MAX_HMQ_SLOT MAX_MQUEUE_SLOTS
 #define WRNC_MAX_CARRIER 20
 #define WRNC_MAX_CPU_MINORS (WRNC_MAX_CPU * WRNC_MAX_CARRIER)
 #define WRNC_MAX_HMQ_MINORS (WRNC_MAX_HMQ_SLOT * WRNC_MAX_CARRIER)

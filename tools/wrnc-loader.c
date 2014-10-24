@@ -28,7 +28,7 @@ static void help()
 
 int main(int argc, char *argv[])
 {
-	int cpu_index, err, dump = 0;
+	int cpu_index = 0, err, dump = 0;
 	uint32_t dev_id = 0;
 	char *file = NULL, c;
 	struct wrnc_dev *wrnc;
@@ -43,8 +43,10 @@ int main(int argc, char *argv[])
 			break;
 		case 'i':
 			sscanf(optarg, "%d", &cpu_index);
+			break;
 		case 'f':
 			file = optarg;
+			break;
 		case 'D':
 			sscanf(optarg, "0x%x", &dev_id);
 			break;

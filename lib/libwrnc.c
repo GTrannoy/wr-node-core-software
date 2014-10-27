@@ -9,11 +9,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
 #include <libgen.h>
 #include <errno.h>
-#include <stdio.h>
 #include <fcntl.h>
 #include <glob.h>
 

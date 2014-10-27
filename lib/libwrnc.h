@@ -10,31 +10,22 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <wrnc-user.h>
 
 struct wrnc_dev;
 
 #define WRNC_NAME_LEN 12
 #define WRNC_MAX_CARRIERS 20
 #define WRNC_MAX_CPU 8
-#define WRNC_MAX_HMQ 32
+#define WRNC_MAX_HMQ_SLOT 16
 
 #define WRNC_SYSFS_PATH_LEN 128
 #define WRNC_SYSFS_READ_LEN 32
 #define WRNC_DEVICE_PATH_LEN 64
 
-#define WRNC_MAX_PAYLOAD_SIZE 128
-
 enum wrnc_error_number {
 	EWRNC_INVAL_PARSE,
 	__EWRNC_MAX,
-};
-
-/**
- * Messages descriptor
- */
-struct wrnc_msg {
-	uint32_t datalen; /**< payload length*/
-	uint32_t data[WRNC_MAX_PAYLOAD_SIZE]; /**< payload */
 };
 
 enum wrnc_msg_filter_operation_type {

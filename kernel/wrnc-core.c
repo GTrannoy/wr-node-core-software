@@ -500,7 +500,8 @@ static int wrnc_cpu_firmware_dump(struct wrnc_cpu *cpu, void *fw_buf, size_t cou
 	int size, offset, i;
 
 	if (off + count > 8192 * 4) {
-		dev_err(&cpu->dev, "Cannot load firmware: size limit %d byte\n", 8192);
+		dev_err(&cpu->dev, "Cannot load firmware: size limit %d byte\n",
+			8192 * 4);
 		return -ENOMEM;
 	}
 

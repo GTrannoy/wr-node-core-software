@@ -25,6 +25,7 @@ static uint32_t count;
 static char wrnc_dev_list[WRNC_MAX_CARRIERS + 1][WRNC_NAME_LEN];
 static char *wrnc_error_str[] = {
 	"Cannot parse data from sysfs attribute",
+	"Invalid slot",
 	NULL,
 };
 

@@ -58,7 +58,7 @@ extern int wrnc_init();
 extern void wrnc_exit();
 
 /**
- * It returns the application identifier of the FPGA bitstream in use
+ * It returns the number of available WRNC
  * @return the number of WRNC available, 0 is also an error check errno to be sure
  */
 extern uint32_t wrnc_count();

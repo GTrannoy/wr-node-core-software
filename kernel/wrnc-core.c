@@ -632,35 +632,59 @@ static struct wrnc_msg *wrnc_message_pop(struct wrnc_hmq *hmq)
 static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 {
 	struct wrnc_msg_element *msgel;
-	struct wrnc_msg msg;
+	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
+	struct wrnc_msg_sync msg;
+	struct wrnc_hmq *hmq_out;
 	int err = 0;
 
-	/* Only one process at time can read the message queue */
+	/* Copy the message from user space*/
+	err = copy_from_user(&msg, uarg, sizeof(struct wrnc_msg_sync));
+	if (err)
+	        return err;
+
+	if (hmq->index != msg.index_in) {
+		dev_warn(&hmq->dev,
+			 "cannot enqueue messages on other slots\n");
+		return -EINVAL;
+	}
+	if (msg.index_out >= wrnc->n_hmq_out) {
+		dev_err(&hmq->dev, "un-existent slot %d\n", msg.index_out);
+		return -EINVAL;
+	}
+	hmq_out = &wrnc->hmq_out[msg.index_out];
+
+	/*
+	 * Wait until the message queue is empty so we can safely enqueue
+	 * the synchronous message. Then get the mutex to avoid other process
+	 * to write
+	 */
+	wait_event_interruptible(hmq->q_msg, list_empty(&hmq->list_msg));
 	mutex_lock(&hmq->mtx);
 
-	/* Copy the message from user space*/
-	err = copy_from_user(&msg, uarg, sizeof(struct wrnc_msg));
-	if (err)
-		return err;
+	/*
+	 * Wait for the synchronous answer. then get the mutex to avoit other
+	 * processes to read
+	 */
+	wait_event_interruptible(hmq_out->q_msg, !list_empty(&hmq_out->list_msg));
+	mutex_lock(&hmq_out->mtx);
 
 	/* Send the message */
-	wrnc_message_push(hmq, &msg);
-
-	/* Wait IRQ answer */
-	wait_event_interruptible(hmq->q_msg, !list_empty(&hmq->list_msg));
+	wrnc_message_push(hmq, &msg.msg);
 
 	/* We have at least one message in the buffer, return it */
-	spin_lock(&hmq->lock);
-	msgel = list_entry(hmq->list_msg.next, struct wrnc_msg_element, list);
+	spin_lock(&hmq_out->lock);
+	msgel = list_entry(hmq_out->list_msg.next, struct wrnc_msg_element, list);
 	list_del(&msgel->list);
-	spin_unlock(&hmq->lock);
+	spin_unlock(&hmq_out->lock);
+
+	mutex_unlock(&hmq_out->mtx);
+	mutex_unlock(&hmq->mtx);
 
 	/* Copy the answer message back to user space */
-	err = copy_to_user(uarg, msgel->msg, sizeof(struct wrnc_msg));
+        memcpy(&msg.msg, msgel->msg, sizeof(struct wrnc_msg));
+	err = copy_to_user(uarg, &msg, sizeof(struct wrnc_msg_sync));
 	kfree(msgel->msg);
 	kfree(msgel);
-
-	mutex_unlock(&hmq->mtx);
 
 	return err;
 }
@@ -857,28 +881,28 @@ irqreturn_t wrnc_irq_handler(int irq_core_base, void *arg)
 
 	pr_info("%s:%d\n", __func__, __LINE__);
 	/* Get the source of interrupt */
-        do {
-		status = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_SLOT_STATUS);
+	status = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_SLOT_STATUS);
+		wrnc->base_gcr + MQUEUE_GCR_SLOT_STATUS, status);
+dispatch_irq:
+        while (status && i < WRNC_MAX_HMQ_SLOT) {
 		++i;
-		if (!(status & (1 << i))) {
+		if (!(status & 0x1))
 			continue;
-		}
 
-		if (wrnc->hmq[i].flags & WRNC_FLAG_HMQ_DIR)
-			wrnc_irq_handler_input(&wrnc->hmq[i]);
+		if (i >= MAX_MQUEUE_SLOTS)
+			wrnc_irq_handler_input(&wrnc->hmq_in[i - MAX_MQUEUE_SLOTS]);
 		else
-			wrnc_irq_handler_output(&wrnc->hmq[i]);
+			wrnc_irq_handler_output(&wrnc->hmq_out[i]);
 
 		/* Clear handled interrupts */
-		status &= ~(1 << i);
-
-		/*
-		 * Reset index in order to check if in the mean while other
-		 * interrupts occurs
-		 */
-		if (i >= WRNC_MAX_HMQ_SLOT)
-			i = -1;
-	} while (status && i < WRNC_MAX_HMQ_SLOT);
+		status >>= 1;
+	}
+	/*
+	 * check if other interrupts occurs in the meanwhile
+	 */
+	status = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_SLOT_STATUS);
+	if (status)
+		goto dispatch_irq;
 
 	fmc->op->irq_ack(fmc);
 
@@ -1037,7 +1061,7 @@ int wrnc_probe(struct fmc_device *fmc)
 	 * now and start working.
 	 */
 	fmc->irq = 0xC0000;//fmc_find_sdb_device(fmc->sdb, 0xce42, 0x13, NULL);
-	err = fmc->op->irq_request(fmc, wrnc_irq_handler, dev_name(&wrnc->dev),
+	err = fmc->op->irq_request(fmc, wrnc_irq_handler, (char *)dev_name(&wrnc->dev),
 				   0 /*VIC is used */);
 	if (err) {
 		dev_err(&wrnc->dev,

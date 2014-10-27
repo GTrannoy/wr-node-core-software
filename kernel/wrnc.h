@@ -8,6 +8,7 @@
 #define __WRNC_H__
 
 #include "hw/mqueue.h"
+#include "wrnc-user.h"
 
 #define WRNC_MAX_CPU 8
 #define WRNC_MAX_HMQ_SLOT (MAX_MQUEUE_SLOTS * 2)
@@ -30,11 +31,6 @@ enum wrnc_dev_type {
 	WRNC_DEV,
 	WRNC_CPU,
 	WRNC_HMQ,
-};
-
-struct wrnc_msg {
-	uint32_t datalen;
-	uint32_t data[WRNC_MAX_PAYLOAD_SIZE];
 };
 
 struct wrnc_msg_element {
@@ -86,14 +82,5 @@ struct wrnc_dev {
 	uint32_t base_gcr; /**< base address of the Global Control Register
 			      for the HMQ */
 };
-
-
-enum ual_ioctl_commands {
-        WRNC_MSG_SYNC, /**< send a synchronous message */
-};
-
-#define WRNC_IOCTL_MAGIC 's'
-#define WRNC_IOCTL_MSG_SYNC _IOWR(WRNC_IOCTL_MAGIC, WRNC_MSG_SYNC, struct wrnc_msg)
-
 
 #endif

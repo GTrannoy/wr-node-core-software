@@ -169,12 +169,16 @@ static int wrnc_sysfs_printf(char *path, const char *fmt, ...)
 {
 	char buf[WRNC_SYSFS_READ_LEN];
 	va_list args;
+	int ret;
 
 	va_start(args, fmt);
 	vsnprintf(buf, WRNC_SYSFS_READ_LEN, fmt, args);
 	va_end(args);
 
-        return wrnc_sysfs_write(path, buf, WRNC_SYSFS_READ_LEN);
+        ret = wrnc_sysfs_write(path, buf, WRNC_SYSFS_READ_LEN);
+	if (ret == WRNC_SYSFS_READ_LEN)
+		return 0;
+	return -1;
 }
 
 
@@ -183,7 +187,7 @@ int wrnc_cpu_count(struct wrnc_dev *wrnc, uint32_t *n_cpu)
 	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	char path[WRNC_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN, "/sys/class/%s/n_cpu",
+	snprintf(path, WRNC_SYSFS_PATH_LEN, "/sys/class/wr-node-core/%s/n_cpu",
 		 wdesc->name);
 
 	return wrnc_sysfs_scanf(path, "%x", n_cpu);
@@ -195,7 +199,8 @@ int wrnc_app_id_get(struct wrnc_dev *wrnc, uint32_t *app_id)
 	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	char path[WRNC_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN, "/sys/class/%s/application_id",
+	snprintf(path, WRNC_SYSFS_PATH_LEN,
+		 "/sys/class/wr-node-core/%s/application_id",
 		 wdesc->name);
 
 	return wrnc_sysfs_scanf(path, "%x", app_id);
@@ -207,7 +212,7 @@ int wrnc_cpu_reset_get(struct wrnc_dev *wrnc, uint32_t *mask)
 	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	char path[WRNC_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN,  "/sys/class/%s/reset",
+	snprintf(path, WRNC_SYSFS_PATH_LEN, "/sys/class/wr-node-core/%s/reset_mask",
 		 wdesc->name);
 
 	return wrnc_sysfs_scanf(path, "%x", mask);
@@ -218,7 +223,7 @@ int wrnc_cpu_reset_set(struct wrnc_dev *wrnc, uint32_t mask)
 	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	char path[WRNC_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN,  "/sys/class/%s/reset",
+	snprintf(path, WRNC_SYSFS_PATH_LEN, "/sys/class/wr-node-core/%s/reset_mask",
 		 wdesc->name);
 
 	return wrnc_sysfs_printf(path, "%x", mask);
@@ -230,7 +235,7 @@ int wrnc_cpu_run_get(struct wrnc_dev *wrnc, uint32_t *mask)
 	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	char path[WRNC_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN,  "/sys/class/%s/enable",
+	snprintf(path, WRNC_SYSFS_PATH_LEN, "/sys/class/wr-node-core/%s/enable_mask",
 		 wdesc->name);
 
 	return wrnc_sysfs_scanf(path, "%x", mask);
@@ -242,7 +247,7 @@ int wrnc_cpu_run_set(struct wrnc_dev *wrnc, uint32_t mask)
 	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	char path[WRNC_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN,  "/sys/class/%s/enable",
+	snprintf(path, WRNC_SYSFS_PATH_LEN, "/sys/class/wr-node-core/%s/enable_mask",
 		 wdesc->name);
 
 	return wrnc_sysfs_printf(path, "%x", mask);

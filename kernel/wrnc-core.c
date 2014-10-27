@@ -617,10 +617,10 @@ static struct wrnc_msg *wrnc_message_pop(struct wrnc_hmq *hmq)
 	spin_unlock_irqrestore(&hmq->lock, flags);
 
 	if (msg->data[0] == 0xdeadbeef) {
-	        for (i = 0; i < 128; i++) {
+	        for (i = 0; i < 128 - 1; i++) {
 			str[i] = msg->data[i + 1];
 		}
-		str[i] = '\0';
+		str[i] = 0;
 		dev_err(&hmq->dev, "Cannot retrieve message: %s\n", str);
 		kfree(msg);
 		msg = NULL;

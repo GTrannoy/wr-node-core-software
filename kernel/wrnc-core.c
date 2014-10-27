@@ -275,12 +275,88 @@ static ssize_t wrnc_show_n_cpu(struct device *dev,
 }
 
 
+/**
+ * It returns the current enable status of the CPU
+ */
+static ssize_t wrnc_show_enable_mask(struct device *dev,
+				struct device_attribute *attr,
+				char *buf)
+{
+	struct wrnc_dev *wrnc = to_wrnc_dev(dev);
+	struct fmc_device *fmc = to_fmc_dev(wrnc);
+	uint32_t reg_val;
+
+	reg_val = fmc_readl(fmc, wrnc->base_csr + WRN_CPU_CSR_REG_ENABLE);
+
+	return sprintf(buf, "0x%04x\n", reg_val);
+}
+
+/**
+ * It enable or disable the CPU
+ */
+static ssize_t wrnc_store_enable_mask(struct device *dev,
+				 struct device_attribute *attr,
+				 const char *buf, size_t count)
+{
+	struct wrnc_dev *wrnc = to_wrnc_dev(dev);
+	struct fmc_device *fmc = to_fmc_dev(wrnc);
+	long val;
+
+	if (strict_strtol(buf, 16, &val))
+		return -EINVAL;
+
+	fmc_writel(fmc, val, wrnc->base_csr + WRN_CPU_CSR_REG_ENABLE);
+
+	return count;
+}
+
+/**
+ * It returns the running status of the CPU
+ */
+static ssize_t wrnc_show_reset_mask(struct device *dev,
+			       struct device_attribute *attr,
+			       char *buf)
+{
+	struct wrnc_dev *wrnc = to_wrnc_dev(dev);
+	struct fmc_device *fmc = to_fmc_dev(wrnc);
+	uint32_t reg_val;
+
+	reg_val = fmc_readl(fmc, wrnc->base_csr + WRN_CPU_CSR_REG_RESET);
+
+	return sprintf(buf, "0x%04x\n", reg_val);
+}
+
+/**
+ * It run or pause the CPU
+ */
+static ssize_t wrnc_store_reset_mask(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	struct wrnc_dev *wrnc = to_wrnc_dev(dev);
+	struct fmc_device *fmc = to_fmc_dev(wrnc);
+	long val;
+
+	if (strict_strtol(buf, 16, &val))
+		return -EINVAL;
+
+	fmc_writel(fmc, val, wrnc->base_csr + WRN_CPU_CSR_REG_RESET);
+
+	return count;
+}
+
 DEVICE_ATTR(application_id, S_IRUGO, wrnc_show_app_id, NULL);
 DEVICE_ATTR(n_cpu, S_IRUGO, wrnc_show_n_cpu, NULL);
+DEVICE_ATTR(enable_mask, (S_IRUGO | S_IWUSR),
+	    wrnc_show_enable_mask, wrnc_store_enable_mask);
+DEVICE_ATTR(reset_mask, (S_IRUGO | S_IWUSR),
+	    wrnc_show_reset_mask, wrnc_store_reset_mask);
 
 static struct attribute *wrnc_dev_attr[] = {
 	&dev_attr_application_id.attr,
 	&dev_attr_n_cpu.attr,
+	&dev_attr_enable_mask.attr,
+	&dev_attr_reset_mask.attr,
 	NULL,
 };
 

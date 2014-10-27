@@ -25,6 +25,8 @@ struct wrnc_dev;
 
 enum wrnc_error_number {
 	EWRNC_INVAL_PARSE,
+	EWRNC_INVAL_SLOT, /**< invalid slot */
+	EWRNC_SYNC_TO, /**< */
 	__EWRNC_MAX,
 };
 

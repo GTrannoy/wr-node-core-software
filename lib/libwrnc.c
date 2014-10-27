@@ -6,6 +6,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -355,4 +356,64 @@ int wrnc_cpu_dump_application_file(struct wrnc_dev *wrnc,
 	fclose(f);
 
 	return i;
+}
+
+/**
+ * It opens an hmq slot
+ * @param[in] wdesc device to use
+ * @param[in] index index of the slot to open
+ * @param[in] dir direction of the slot (1 input, 0 output)
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+static int wrnc_hmq_open(struct wrnc_desc *wdesc, unsigned int index,
+			 unsigned int dir)
+{
+	char path[64];
+	int *fd;
+
+	if (index >= WRNC_MAX_HMQ_SLOT) {
+		errno = EWRNC_INVAL_SLOT;
+		return -1;
+	}
+
+	fd = dir ? wdesc->fd_hmq_in : wdesc->fd_hmq_out;
+
+	if (!fd[index]) {
+		snprintf(path, 64, "/dev/%s-hmq-%c-%02d",
+			 wdesc->name, (dir ? 'i' : 'o'), index);
+		fd[index] = open(path, O_WRONLY);
+		if (fd[index])
+			return -1;
+	}
+
+	return 0;
+}
+
+
+int wrnc_slot_send_and_receive_sync(struct wrnc_dev *wrnc,
+				    unsigned int index_in,
+				    unsigned int index_out,
+				    struct wrnc_msg *msg,
+				    unsigned int timeout_ms)
+{
+	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
+	struct wrnc_msg_sync smsg;
+	int err;
+
+	smsg.index_in = index_in;
+	smsg.index_out = index_out;
+	smsg.timeout_ms = timeout_ms;
+	memcpy(&smsg.msg, msg, sizeof(struct wrnc_msg));
+
+	err = wrnc_hmq_open(wdesc, smsg.index_in, 1);
+	if (err)
+		return err;
+
+	err = ioctl(wdesc->fd_hmq_in[smsg.index_in],
+		    WRNC_IOCTL_MSG_SYNC, &smsg);
+	if (err)
+		return -1;
+       memcpy(msg, &smsg.msg, sizeof(struct wrnc_msg));
+
+	return 0;
 }

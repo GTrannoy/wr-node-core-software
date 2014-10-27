@@ -79,7 +79,7 @@ extern struct wrnc_dev *wrnc_open(const char *device);
  * It opens a wrnc device using its FMC device_id
  * @param[in] device_id FMC device id of the device to use
  */
-static struct wrnc_dev *wrnc_open_by_fmc(uint32_t device_id)
+static inline struct wrnc_dev *wrnc_open_by_fmc(uint32_t device_id)
 {
 	char name[12];
 
@@ -91,7 +91,7 @@ static struct wrnc_dev *wrnc_open_by_fmc(uint32_t device_id)
  * It opens a wrnc device using its Logical Unit Number
  * @param[in] lun Logical Unit Number of the device to use
  */
-static struct wrnc_dev *wrnc_open_by_lun(unsigned int lun)
+static inline struct wrnc_dev *wrnc_open_by_lun(unsigned int lun)
 {
 	char name[12];
 	uint32_t dev_id;
@@ -207,7 +207,7 @@ extern int wrnc_cpu_run_get(struct wrnc_dev *wrnc, uint32_t *mask);
  * @param[in] index CPU to enable
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-static int wrnc_cpu_enable(struct wrnc_dev *wrnc, unsigned int index)
+static inline int wrnc_cpu_enable(struct wrnc_dev *wrnc, unsigned int index)
 {
 	uint32_t tmp;
 
@@ -221,7 +221,7 @@ static int wrnc_cpu_enable(struct wrnc_dev *wrnc, unsigned int index)
  * @param[in] index CPU to enable
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-static int wrnc_cpu_disable(struct wrnc_dev *wrnc, unsigned int index)
+static inline int wrnc_cpu_disable(struct wrnc_dev *wrnc, unsigned int index)
 {
 	uint32_t tmp;
 
@@ -234,7 +234,7 @@ static int wrnc_cpu_disable(struct wrnc_dev *wrnc, unsigned int index)
  * @param[in] wrnc device to use
  * @param[in] index cpu to start
  */
-static int wrnc_cpu_start(struct wrnc_dev *wrnc, unsigned int index)
+static inline int wrnc_cpu_start(struct wrnc_dev *wrnc, unsigned int index)
 {
 	uint32_t tmp;
 
@@ -247,7 +247,7 @@ static int wrnc_cpu_start(struct wrnc_dev *wrnc, unsigned int index)
  * @param[in] wrnc device to use
  * @param[in] index cpu to stop
  */
-static int wrnc_cpu_stop(struct wrnc_dev *wrnc, unsigned int index)
+static inline int wrnc_cpu_stop(struct wrnc_dev *wrnc, unsigned int index)
 {
 	uint32_t tmp;
 

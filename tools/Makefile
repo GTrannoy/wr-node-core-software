@@ -5,9 +5,8 @@
 
 DESTDIR ?= /usr/local
 
-CFLAGS += -Wall -g -ggdb -I$(LIBWRNC) $(EXTRACFLAGS)
-LDFLAGS += -L$(LIBWRNC) -lwrnc
-
+CFLAGS += -Wall -ggdb -I$(WRNC)/lib -I$(WRNC)/kernel $(EXTRACFLAGS)
+LDLIBS += -L$(WRNC)/lib -lwrnc
 PROGS := wrnc-count
 PROGS += lswrnc
 PROGS += wrnc-loader
@@ -18,8 +17,8 @@ install:
 	install -d $(DESTDIR)/bin
 	install -D $(PROGS) $(DESTDIR)/bin
 
-%: %.c $(LIBWRNC)/libwrnc.a
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+%: %.c $(WRNC)/libwrnc.a
+	$(CC) $(CFLAGS) $^ -o $@ $(LDLIBS)
 
 # make nothing for modules_install, but avoid errors
 modules_install:

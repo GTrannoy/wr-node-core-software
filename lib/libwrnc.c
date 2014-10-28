@@ -84,12 +84,20 @@ char (*wrnc_list())[WRNC_NAME_LEN]
 struct wrnc_dev *wrnc_open(const char *device)
 {
 	struct wrnc_desc *wrnc;
+	int i;
 
 	wrnc = malloc(sizeof(struct wrnc_desc));
 	if (!wrnc)
 		return NULL;
 
 	strncpy(wrnc->name, device, WRNC_NAME_LEN);
+
+	for (i = 0; i < WRNC_MAX_CPU; ++i)
+		wrnc->fd_cpu[i] = -1;
+        for (i = 0; i < WRNC_MAX_HMQ_SLOT; ++i)
+		wrnc->fd_hmq_in[i] = -1;
+        for (i = 0; i < WRNC_MAX_HMQ_SLOT; ++i)
+		wrnc->fd_hmq_out[i] = -1;
 
 	return (struct wrnc_dev *)wrnc;
 }
@@ -103,15 +111,15 @@ void wrnc_close(struct wrnc_dev *wrnc)
 		close(wdesc->fd_dev);
 
 	for (i = 0; i < WRNC_MAX_CPU; ++i)
-		if (wdesc->fd_cpu[i])
+		if (wdesc->fd_cpu[i] < 0)
 			close(wdesc->fd_cpu[i]);
 
 	for (i = 0; i < WRNC_MAX_HMQ_SLOT; ++i)
-		if (wdesc->fd_hmq_in[i])
+		if (wdesc->fd_hmq_in[i] < 0)
 			close(wdesc->fd_hmq_in[i]);
 
 	for (i = 0; i < WRNC_MAX_HMQ_SLOT; ++i)
-		if (wdesc->fd_hmq_in[i])
+		if (wdesc->fd_hmq_in[i] < 0 )
 			close(wdesc->fd_hmq_in[i]);
 	free(wdesc);
 }
@@ -384,11 +392,11 @@ static int wrnc_hmq_open(struct wrnc_desc *wdesc, unsigned int index,
 
 	fd = dir ? wdesc->fd_hmq_in : wdesc->fd_hmq_out;
 
-	if (!fd[index]) {
+	if (fd[index] < 0) {
 		snprintf(path, 64, "/dev/%s-hmq-%c-%02d",
 			 wdesc->name, (dir ? 'i' : 'o'), index);
 		fd[index] = open(path, O_WRONLY);
-		if (fd[index])
+		if (fd[index] < 0)
 			return -1;
 	}
 

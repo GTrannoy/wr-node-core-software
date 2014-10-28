@@ -395,7 +395,7 @@ static int wrnc_hmq_open(struct wrnc_desc *wdesc, unsigned int index,
 	if (fd[index] < 0) {
 		snprintf(path, 64, "/dev/%s-hmq-%c-%02d",
 			 wdesc->name, (dir ? 'i' : 'o'), index);
-		fd[index] = open(path, O_WRONLY);
+		fd[index] = open(path, (dir ? O_WRONLY : O_RDONLY));
 		if (fd[index] < 0)
 			return -1;
 	}

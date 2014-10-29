@@ -2,7 +2,7 @@
 .PHONY: all clean modules install modules_install clean_all
 .PHONY: gitmodules prereq prereq_install prereq_install_warn prereq_clean
 
-DIRS = kernel lib tools
+DIRS = kernel lib tools applications
 
 all clean modules install modules_install: gitmodules
 	@if echo $@ | grep -q install; then $(MAKE) prereq_install_warn; fi
@@ -32,6 +32,8 @@ export SVEC_SW
 SUBMOD = $(FMC_BUS) $(SVEC_SW)
 LIBWRNC= $(CURDIR)/lib
 export LIBWRNC
+WRNC=$(CURDIR)
+export WRNC
 
 prereq:
 	for d in $(SUBMOD); do $(MAKE) -C $$d || exit 1; done

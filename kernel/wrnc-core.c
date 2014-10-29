@@ -891,7 +891,7 @@ static void wrnc_irq_handler_input(struct wrnc_hmq *hmq)
 	if (list_empty(&hmq->list_msg)) {
 		/* We don't have nothing to send, disable the interrupts */
 		mask = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
-		mask &= ~(1 << hmq->index);
+		mask &= ~(1 << hmq->index + MAX_MQUEUE_SLOTS);
 		fmc_writel(fmc, mask, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
 		spin_unlock_irqrestore(&hmq->lock, flags);
 		return;

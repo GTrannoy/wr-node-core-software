@@ -20,6 +20,9 @@ enum wrtd_error_list {
 	EWRTD_INVALD_ANSWER_ACK = 3276,
 	EWRTD_INVALD_ANSWER_STATE,
 	EWRTD_INVALD_BINARY,
+	EWRTD_INVALD_DEAD_TIME,
+	EWRTD_INVALID_TRIG_ID,
+	EWRTD_INVALID_CHANNEL,
 	__EWRTD_MAX_ERROR_NUMBER,
 };
 
@@ -178,6 +181,16 @@ extern int wrtd_in_trigger_assign(struct wrtd_node *dev, unsigned int input,
 					  struct wrtd_trig_id *trig_id);
 
 /**
+ * It un-assign the trigger on an input channel. It is just an helper that
+ * internally use wrtd_in_trigger_unassign()
+ */
+static inline int wrtd_in_trigger_unassign(struct wrtd_node *dev,
+					   unsigned int input)
+{
+	return wrtd_in_trigger_assign(dev, input, NULL);
+}
+
+/**
  * Set trigger mode for a given WRTD input. Note that the input must be armed
  * by calling wrtd_in_arm() at least once before it can send triggers.
  *
@@ -202,6 +215,14 @@ extern int wrtd_in_trigger_mode_set(struct wrtd_node *dev, unsigned int input,
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 extern int wrtd_in_arm(struct wrtd_node *dev, unsigned int input, int armed);
+
+/**
+ * Disarm the WRTD input. It is just an helper that internally use wrtd_in_arm()
+ */
+static inline int wrtd_in_disarm(struct wrtd_node *dev, unsigned int input, int armed)
+{
+	return wrtd_in_arm(dev, input, 0);
+}
 
 /**
  * Log every trigger pulse sent out to the network. Each log message contains

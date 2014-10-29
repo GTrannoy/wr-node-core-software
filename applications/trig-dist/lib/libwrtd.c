@@ -10,6 +10,19 @@
 #include <libwrnc.h>
 #include "libwrtd-internal.h"
 
+static struct wr_timestamp picos_to_ts( uint64_t p )
+{
+	struct wr_timestamp t;
+
+	t.seconds = p / (1000ULL * 1000ULL * 1000ULL * 1000ULL);
+	p %= (1000ULL * 1000ULL * 1000ULL * 1000ULL);
+	t.ticks = p / 8000;
+	p %= 8000;
+	t.bins = p * 4096 / 8000;
+
+	return t;
+}
+
 static void unbag_ts(uint32_t *buf, int offset, struct wr_timestamp *ts)
 {
     ts->seconds = buf[offset];
@@ -23,7 +36,11 @@ static const uint32_t application_id[] = {
 
 static const char *wrtd_errors[] = {
 	"Received an invalid answer from white-rabbit-node-code CPU",
+	"Cannot read channel state",
 	"You are using an invalid binary",
+	"Invalid dead time value",
+	"Invalid trigger identifier",
+	"Invalid channel number",
 };
 
 const char *wrtd_strerror(int err)
@@ -132,6 +149,16 @@ static inline int wrtd_send_and_receive_sync(struct wrtd_desc *wrtd, struct wrnc
 					       WRTD_DEFAULT_TIMEOUT);
 }
 
+static inline int wrtd_validate_acknowledge(struct wrnc_msg *msg)
+{
+	if (msg->datalen != 2 || msg->data[0] != WRTD_REP_ACK_ID) {
+		errno = EWRTD_INVALD_ANSWER_ACK;
+		return -1;
+	}
+
+	return 0;
+}
+
 int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 		      struct wrtd_input_state *state)
 {
@@ -139,8 +166,13 @@ int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 	struct wrnc_msg msg;
 	int err;
 
-  	if (input >= WRTD_IN_MAX || state == NULL) {
-		errno = -EINVAL;
+  	if (input >= WRTD_IN_MAX) {
+		errno = EWRTD_INVALID_CHANNEL;
+		return -1;
+	}
+
+	if (state == NULL) {
+		errno = ENOMEM;
 		return -1;
 	}
 
@@ -191,7 +223,7 @@ int wrtd_in_enable(struct wrtd_node *dev, unsigned int input, int enable)
 	int err;
 
 	if (input >= WRTD_IN_MAX) {
-		errno = -EINVAL;
+		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
 
@@ -207,10 +239,209 @@ int wrtd_in_enable(struct wrtd_node *dev, unsigned int input, int enable)
 	if (err)
 		return err;
 
-	if (msg.datalen != 2 || msg.data[0] != WRTD_REP_ACK_ID) {
-		errno = EWRTD_INVALD_ANSWER_ACK;
+	return wrtd_validate_acknowledge(&msg);
+}
+
+int wrtd_in_dead_time_set(struct wrtd_node *dev, unsigned int input,
+				 uint64_t dead_time_ps)
+{
+  	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrnc_msg msg;
+	int err, dead_time_cycles;
+
+	if (input >= WRTD_IN_MAX) {
+		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
 
-	return 0;
+	dead_time_cycles = dead_time_ps / 16000;
+	if(dead_time_cycles < 5000 || dead_time_cycles > 10000000 ) {
+		errno = EWRTD_INVALD_DEAD_TIME;
+		return -1;
+	}
+
+	/* Build the message */
+	msg.datalen = 4;
+	msg.data[0] = WRTD_CMD_TDC_CHAN_SET_DEAD_TIME;
+	msg.data[1] = 0;
+	msg.data[2] = input;
+	msg.data[3] = dead_time_cycles;
+
+	/* Send the message and get answer */
+	err = wrtd_send_and_receive_sync(wrtd, &msg);
+	if (err)
+		return err;
+
+	return wrtd_validate_acknowledge(&msg);
+}
+
+int wrtd_in_delay_set(struct wrtd_node *dev, unsigned int input,
+				 uint64_t delay_ps)
+{
+  	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wr_timestamp t;
+	struct wrnc_msg msg;
+	int err;
+
+	if (input >= WRTD_IN_MAX) {
+		errno = EWRTD_INVALID_CHANNEL;
+		return -1;
+	}
+
+        t = picos_to_ts(delay_ps);
+
+	/* Build the message */
+	msg.datalen = 6;
+	msg.data[0] = WRTD_CMD_TDC_CHAN_SET_DELAY;
+	msg.data[1] = 0;
+	msg.data[2] = input;
+	msg.data[3] = t.seconds;
+	msg.data[4] = t.ticks;
+	msg.data[5] = t.bins;
+
+	/* Send the message and get answer */
+	err = wrtd_send_and_receive_sync(wrtd, &msg);
+	if (err)
+		return err;
+
+	return wrtd_validate_acknowledge(&msg);
+}
+
+
+int wrtd_in_trigger_mode_set(struct wrtd_node *dev, unsigned int input,
+				    enum wrtd_trigger_mode mode)
+{
+    	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrnc_msg msg;
+	int err;
+
+	if (input >= WRTD_IN_MAX) {
+		errno = EWRTD_INVALID_CHANNEL;
+		return -1;
+	}
+
+	/* Build the message */
+	msg.datalen = 4;
+	msg.data[0] = WRTD_CMD_TDC_CHAN_SET_MODE;
+	msg.data[1] = 0;
+	msg.data[2] = input;
+	msg.data[3] = mode;
+
+	/* Send the message and get answer */
+	err = wrtd_send_and_receive_sync(wrtd, &msg);
+	if (err)
+		return err;
+
+	return wrtd_validate_acknowledge(&msg);
+}
+
+int wrtd_in_trigger_assign(struct wrtd_node *dev, unsigned int input,
+					  struct wrtd_trig_id *trig_id)
+{
+   	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrnc_msg msg;
+	int err;
+
+	if (input >= WRTD_IN_MAX) {
+		errno = EWRTD_INVALID_CHANNEL;
+		return -1;
+	}
+
+	/* Build the message */
+	msg.datalen = 7;
+	msg.data[0] = WRTD_CMD_TDC_CHAN_ASSIGN_TRIGGER;
+	msg.data[1] = 0;
+	msg.data[2] = input;
+	/* '? :' should be optimized by the compiler */
+	msg.data[3] = trig_id ? 1 : 0;
+	msg.data[4] = trig_id ? trig_id->system : 0;
+	msg.data[5] = trig_id ? trig_id->source_port : 0;
+	msg.data[6] = trig_id ? trig_id->trigger : 0;
+
+	/* Send the message and get answer */
+	err = wrtd_send_and_receive_sync(wrtd, &msg);
+	if (err)
+		return err;
+
+	return wrtd_validate_acknowledge(&msg);
+}
+
+
+int wrtd_in_arm(struct wrtd_node *dev, unsigned int input, int armed)
+{
+   	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrnc_msg msg;
+	int err;
+
+	if (input >= WRTD_IN_MAX) {
+		errno = EWRTD_INVALID_CHANNEL;
+		return -1;
+	}
+
+	/* Build the message */
+	msg.datalen = 4;
+	msg.data[0] = WRTD_CMD_TDC_CHAN_ARM;
+	msg.data[1] = 0;
+	msg.data[2] = input;
+	msg.data[3] = !!armed;
+
+	/* Send the message and get answer */
+	err = wrtd_send_and_receive_sync(wrtd, &msg);
+	if (err)
+		return err;
+
+	return wrtd_validate_acknowledge(&msg);
+}
+
+int wrtd_in_counters_reset(struct wrtd_node *dev, unsigned int input)
+{
+   	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrnc_msg msg;
+	int err;
+
+	if (input >= WRTD_IN_MAX) {
+		errno = EWRTD_INVALID_CHANNEL;
+		return -1;
+	}
+
+	/* Build the message */
+	msg.datalen = 3;
+	msg.data[0] = WRTD_CMD_TDC_CHAN_RESET_COUNTERS;
+	msg.data[1] = 0;
+	msg.data[2] = input;
+
+	/* Send the message and get answer */
+	err = wrtd_send_and_receive_sync(wrtd, &msg);
+	if (err)
+		return err;
+
+	return wrtd_validate_acknowledge(&msg);
+}
+
+int wrtd_in_trigger_software(struct wrtd_node *dev,
+			     struct wrtd_trigger_entry *trigger)
+{
+   	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrnc_msg msg;
+	uint32_t *buf = (uint32_t *)trigger;
+	int err, i;
+
+	if (trigger == NULL) {
+		errno = EWRTD_INVALID_TRIG_ID;
+		return -1;
+	}
+
+	/* Build the message */
+	msg.datalen = 2 + (sizeof(struct wrtd_trigger_entry) / 4);
+	msg.data[0] = WRTD_CMD_TDC_SOFTWARE_TRIGGER;
+	msg.data[1] = 0;
+	for (i = 2; i < msg.datalen; ++i)
+		msg.data[i] = buf[i - 2];
+
+	/* Send the message and get answer */
+	err = wrtd_send_and_receive_sync(wrtd, &msg);
+	if (err)
+		return err;
+
+	return wrtd_validate_acknowledge(&msg);
 }

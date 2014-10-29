@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2014 CERN (www.cern.ch)
  * Author: Federico Vaga <federico.vaga@cern.ch>
+ * Author: Tomasz Wlostowski <tomasz.wlostowski@cern.ch>
  * License: GPL v3
  */
 
@@ -19,7 +20,24 @@ static int wrtd_cmd_enable(struct wrtd_node *wrtd, int input,
 			   int argc, char *argv[]);
 static int wrtd_cmd_disable(struct wrtd_node *wrtd, int input,
 			    int argc, char *argv[]);
-
+static int wrtd_cmd_set_dead_time(struct wrtd_node *wrtd, int input,
+				  int argc, char *argv[]);
+static int wrtd_cmd_set_delay(struct wrtd_node *wrtd, int input,
+			      int argc, char *argv[]);
+static int wrtd_cmd_set_mode(struct wrtd_node *wrtd, int input,
+			     int argc, char *argv[]);
+static int wrtd_cmd_assign(struct wrtd_node *wrtd, int input,
+			   int argc, char *argv[]);
+static int wrtd_cmd_unassign(struct wrtd_node *wrtd, int input,
+			     int argc, char *argv[]);
+static int wrtd_cmd_arm(struct wrtd_node *wrtd, int input,
+			int argc, char *argv[]);
+static int wrtd_cmd_disarm(struct wrtd_node *wrtd, int input,
+			   int argc, char *argv[]);
+static int wrtd_cmd_reset(struct wrtd_node *wrtd, int input,
+			  int argc, char *argv[]);
+static int wrtd_cmd_sw_trigger(struct wrtd_node *wrtd, int input,
+			  int argc, char *argv[]);
 
 struct wrtd_commands {
 	const char *name;
@@ -32,16 +50,15 @@ static struct wrtd_commands cmds[] = {
 	{ "state", "shows input state", wrtd_cmd_state },
 	{ "enable", "enable the input", wrtd_cmd_enable },
 	{ "disable", "disable the input", wrtd_cmd_disable },
-	/*{ "assign", "assigns a trigger", wrtd_cmd_assign },
-	{ "unassign", "un-assigns the currently assigned trigger", wrtd_cmd_unassign },
-	{ "delay", "sets the input delay", wrtd_cmd_set_delay },
 	{ "deadtime", "sets the dead time", wrtd_cmd_set_dead_time },
+	{ "delay", "sets the input delay", wrtd_cmd_set_delay },
 	{ "mode", "sets triggering mode", wrtd_cmd_set_mode },
+	{ "assign", "assigns a trigger", wrtd_cmd_assign },
+	{ "unassign", "un-assigns the currently assigned trigger", wrtd_cmd_unassign },
 	{ "arm", "arms the input", wrtd_cmd_arm },
 	{ "disarm", "disarms the input", wrtd_cmd_disarm },
-	{ "reset", "resets statistics counters", wrtd_cmd_reset_counters },
+	{ "reset", "resets statistics counters", wrtd_cmd_reset },
 	{ "swtrig", "sends a software trigger", wrtd_cmd_sw_trigger },
-	{ "state", "shows input state", wrtd_cmd_state },*/
 	{ NULL }
 };
 
@@ -152,6 +169,43 @@ uint64_t ts_to_picos ( struct wr_timestamp ts )
             + (uint64_t) ts.bins * 8000LL / 4096LL;
 }
 
+int parse_delay (char *dly, uint64_t *delay_ps)
+{
+    int l = strlen(dly);
+    char last;
+    uint64_t mult;
+    double d;
+
+    if(!l)
+	return -1;
+
+    last = dly[l-1];
+    mult=1;
+
+    switch(last)
+    {
+	case 'u': mult = 1000ULL * 1000; l--; break;
+	case 'm': mult = 1000ULL * 1000 * 1000; l--; break;
+	case 'n': mult = 1000ULL; l--; break;
+	case 'p': mult = 1; l--; break;
+	default: mult = 1; break;
+    }
+
+    dly[l] = 0;
+
+    if( sscanf(dly, "%lf", &d) != 1)
+	return -1;
+
+    *delay_ps = (uint64_t) (d * (double) mult);
+
+    return 0;
+}
+
+int parse_trigger_id(const char *str, struct wrtd_trig_id *id)
+{
+    return (sscanf(str,"%i:%i:%i", &id->system, &id->source_port, &id->trigger) == 3 ? 0 : -1);
+}
+
 void dump_input_state(struct wrtd_input_state *state)
 {
 	char tmp[1024], tmp2[1024];
@@ -190,7 +244,7 @@ void dump_input_state(struct wrtd_input_state *state)
 		       tmp, tmp2, state->last_sent.seq);
 	}
 
-	printf(" - Dead time:             %d ns\n",
+	printf(" - Dead time:             %ld ns\n",
 	       ts_to_picos( state->dead_time ) / 1000 );
 
 	decode_log_level(tmp,state->log_level);
@@ -199,7 +253,7 @@ void dump_input_state(struct wrtd_input_state *state)
 }
 
 static int wrtd_cmd_state(struct wrtd_node *wrtd, int input,
-			    int argc, char *argv[])
+			  int argc, char *argv[])
 {
 	struct wrtd_input_state state;
 	int err;
@@ -216,15 +270,111 @@ static int wrtd_cmd_enable(struct wrtd_node *wrtd, int input,
 	return wrtd_in_enable(wrtd, input, 1);
 }
 static int wrtd_cmd_disable(struct wrtd_node *wrtd, int input,
-			   int argc, char *argv[])
+			    int argc, char *argv[])
 {
 	return wrtd_in_enable(wrtd, input, 0);
+}
+
+static int wrtd_cmd_set_dead_time(struct wrtd_node *wrtd, int input,
+				  int argc, char *argv[])
+{
+	uint64_t dtime = 0;
+
+	if (argc != 1 || argv[0] == NULL) {
+		fprintf(stderr, "Missing deadtime value\n");
+		return -1;
+	}
+	parse_delay(argv[0], &dtime);
+
+	return wrtd_in_dead_time_set(wrtd, input, dtime);
+}
+
+static int wrtd_cmd_set_delay(struct wrtd_node *wrtd, int input,
+			      int argc, char *argv[])
+{
+	uint64_t dtime = 0;
+
+	if (argc != 1 || argv[0] == NULL) {
+		fprintf(stderr, "Missing deadtime value\n");
+		return -1;
+	}
+	parse_delay(argv[0], &dtime);
+
+	return wrtd_in_delay_set(wrtd, input, dtime);
+}
+
+static int wrtd_cmd_set_mode(struct wrtd_node *wrtd, int input,
+				  int argc, char *argv[])
+{
+	enum wrtd_trigger_mode mode;
+
+	if (argc != 1 || argv[0] == NULL) {
+		fprintf(stderr, "Missing deadtime value\n");
+		return -1;
+	}
+        if (!strcmp("auto", argv[0])) {
+		mode = WRTD_TRIGGER_MODE_AUTO;
+	} else if (!strcmp("single", argv[0])) {
+		mode = WRTD_TRIGGER_MODE_SINGLE;
+	} else {
+		fprintf(stderr, "Invalid trigger mode '%s'\n", argv[0]);
+		return -1;
+	}
+
+	return wrtd_in_trigger_mode_set(wrtd, input, mode);
+}
+
+int wrtd_cmd_assign(struct wrtd_node *wrtd, int input,
+		    int argc, char *argv[])
+{
+	struct wrtd_trig_id trig_id;
+	int ret;
+
+	if (argc != 1 || argv[0] == NULL) {
+		fprintf(stderr, "Missing deadtime value\n");
+		return -1;
+	}
+
+	ret = parse_trigger_id(argv[0], &trig_id);
+	if (ret < 0)
+		return -1;
+
+	return wrtd_in_trigger_assign(wrtd, input, &trig_id);
+}
+
+int wrtd_cmd_unassign(struct wrtd_node *wrtd, int input,
+		      int argc, char *argv[])
+{
+	return wrtd_in_trigger_unassign(wrtd, input);
+}
+
+int wrtd_cmd_arm(struct wrtd_node *wrtd, int input,
+		    int argc, char *argv[])
+{
+	return wrtd_in_arm(wrtd, input, 1);
+}
+
+int wrtd_cmd_disarm(struct wrtd_node *wrtd, int input,
+		      int argc, char *argv[])
+{
+	return wrtd_in_arm(wrtd, input, 0);
+}
+
+static int wrtd_cmd_reset(struct wrtd_node *wrtd, int input,
+			  int argc, char *argv[])
+{
+	return wrtd_in_counters_reset(wrtd, input);
+}
+
+static int wrtd_cmd_sw_trigger(struct wrtd_node *wrtd, int input,
+			  int argc, char *argv[])
+{
+	return wrtd_in_trigger_software(wrtd, input);
 }
 
 int main(int argc, char *argv[])
 {
 	struct wrtd_node *wrtd;
-	struct wrnc_dev *wrnc;
 	uint32_t dev_id = 0;
 	char *cmd, c;
 	int err = 0, i, chan = -1;
@@ -263,8 +413,8 @@ int main(int argc, char *argv[])
 
 	for (i = 0; cmds[i].handler; i++) {
  		if(!strcmp(cmds[i].name, cmd)) {
-			err = cmds[i].handler(wrtd, chan, argc - optind - 1,
-					 argv + optind + 1);
+			err = cmds[i].handler(wrtd, chan, argc - optind,
+					      argv + optind);
 		   if (err)
 			   break;
  		}

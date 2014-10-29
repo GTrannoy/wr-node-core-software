@@ -1,0 +1,20 @@
+PROJECT_NAME           = "White Rabbit Trigger Distribution - Software"
+PROJECT_NUMBER         = $(GIT_VERSION)
+PROJECT_BRIEF          = $(BRIEF)
+PROJECT_LOGO           =
+OUTPUT_DIRECTORY       = $(OUTPUT)
+CREATE_SUBDIRS         = YES
+TAB_SIZE               = 8
+OPTIMIZE_OUTPUT_FOR_C  = YES
+
+EXTRACT_STATIC         = YES
+CASE_SENSE_NAMES       = YES
+
+WARN_NO_PARAMDOC       = YES
+
+INPUT                  = ../lib
+RECURSIVE              = YES
+EXCLUDE                = $(EXCLUDE_FILES)
+
+GENERATE_HTML          = YES
+GENERATE_LATEX         = YES

@@ -41,8 +41,15 @@ static const char *wrtd_errors[] = {
 	"Invalid dead time value",
 	"Invalid trigger identifier",
 	"Invalid channel number",
+	"Function not yet implemented",
 };
 
+
+/**
+ * It returns the error message associated to a given error code
+ * @param[in] err the error code
+ * @return an error message
+ */
 const char *wrtd_strerror(int err)
 {
 	if (err < EWRTD_INVALD_ANSWER_ACK || err >= __EWRTD_MAX_ERROR_NUMBER)
@@ -51,6 +58,12 @@ const char *wrtd_strerror(int err)
 	return wrtd_errors[err - EWRTD_INVALD_ANSWER_ACK];
 }
 
+
+/**
+ * It initializes this library. It must be called before doing anything else.
+ * This library is based on the libwrnc, so internally, this function also
+ * run wrnc_init() in order to initialize the WRNC library.
+ */
 int wrtd_init()
 {
 	int err;
@@ -62,11 +75,22 @@ int wrtd_init()
 	return 0;
 }
 
+/**
+ * It release all the library resources. It must be called when
+ * you stop to use this library.
+ */
 void wrtd_exit()
 {
 	wrnc_exit();
 }
 
+
+/**
+ * Open a WRTD node device using LUN
+ * @param[in] device_id FMC device identificator
+ * @return It returns an anonymous wrtd_node structure on success.
+ *         On error, NULL is returned, and errno is set appropriately.
+ */
 struct wrtd_node *wrtd_open_by_fmc(uint32_t device_id)
 {
 	struct wrtd_desc *wrtd;
@@ -86,6 +110,28 @@ out:
 	return NULL;
 }
 
+/**
+ * Open a WRTD node device using LUN
+ * @param[in] lun an integer argument to select the device or
+ *            negative number to take the first one found.
+ * @return It returns an anonymous wrtd_node structure on success.
+ *         On error, NULL is returned, and errno is set appropriately.
+ */
+struct wrtd_node *wrtd_open_by_lun(int lun)
+{
+	char name[12];
+	uint32_t dev_id;
+
+	snprintf(name, 12, "wrnc.%d", lun);
+	/*TODO convert to FMC */
+	return wrtd_open_by_fmc(dev_id);
+}
+
+
+/**
+ * Close a LIST node device.
+ * @param[in] dev pointer to open node device.
+ */
 void wrtd_close(struct wrtd_node *dev)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
@@ -95,6 +141,12 @@ void wrtd_close(struct wrtd_node *dev)
 	dev = NULL;
 }
 
+
+/**
+ * It returns the white-rabbit node-core token
+ * @param[in] dev trig-dist device to use
+ * @return the wrnc token
+ */
 struct wrnc_dev *wrtd_get_wrnc_dev(struct wrtd_node *dev)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
@@ -102,6 +154,13 @@ struct wrnc_dev *wrtd_get_wrnc_dev(struct wrtd_node *dev)
 	return (struct wrnc_dev *)wrtd->wrnc;
 }
 
+
+/**
+ * It load a set of real-time applications for TDC and FD
+ * @param[in] dev wrtd device to use
+ * @param[in] rt_tdc path to the TDC application
+ * @param[in] rt_fd path to the Fine Delay application
+ */
 int wrtd_load_application(struct wrtd_node *dev, char *rt_tdc,
 			  char *rt_fd)
 {
@@ -159,6 +218,14 @@ static inline int wrtd_validate_acknowledge(struct wrnc_msg *msg)
 	return 0;
 }
 
+
+/**
+ * It retreives the current status of a given input channel
+ * @param[in] dev pointer to open node device.
+ * @param[in] input channel to use
+ * @param[out] state the current state of a channel
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
 int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 		      struct wrtd_input_state *state)
 {
@@ -216,6 +283,14 @@ int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 	return 0;
 }
 
+
+/**
+ * Hardware enable/disable a WRTD input channel.
+ * @param[in] dev pointer to open node device.
+ * @param[in] input index of the trigger input to enable
+ * @param[in] enable non-0 enables the input, 0 disables it.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
 int wrtd_in_enable(struct wrtd_node *dev, unsigned int input, int enable)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
@@ -242,6 +317,14 @@ int wrtd_in_enable(struct wrtd_node *dev, unsigned int input, int enable)
 	return wrtd_validate_acknowledge(&msg);
 }
 
+
+/**
+ * Set the dead time (the minimum gap between input pulses, below which
+ * the TDC ignores the subsequent pulses; limits maximum input pulse rate,
+ * 16 ns granularity)
+ * @param[in] dev pointer to open node device.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
 int wrtd_in_dead_time_set(struct wrtd_node *dev, unsigned int input,
 				 uint64_t dead_time_ps)
 {
@@ -275,6 +358,27 @@ int wrtd_in_dead_time_set(struct wrtd_node *dev, unsigned int input,
 	return wrtd_validate_acknowledge(&msg);
 }
 
+
+/**
+ * Get the dead time (the minimum gap between input pulses, below which
+ * the TDC ignores the subsequent pulses; limits maximum input pulse rate,
+ * 16 ns granularity)
+ * @param[in] dev pointer to open node device.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_in_dead_time_get(struct wrtd_node *dev, unsigned int input,
+				 uint64_t *dead_time_ps)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+
+
+/**
+ * Set the offset (for compensating cable delays), in 10 ps steps.
+ * @param[in] dev pointer to open node device.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
 int wrtd_in_delay_set(struct wrtd_node *dev, unsigned int input,
 				 uint64_t delay_ps)
 {
@@ -308,6 +412,31 @@ int wrtd_in_delay_set(struct wrtd_node *dev, unsigned int input,
 }
 
 
+/**
+ * Get the offset (for compensating cable delays), in 10 ps steps.
+ * @param[in] dev pointer to open node device.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_in_delay_get(struct wrtd_node *dev, unsigned int input,
+			     uint64_t *delay_ps)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+
+/**
+ * Set trigger mode for a given WRTD input. Note that the input must be armed
+ * by calling wrtd_in_arm() at least once before it can send triggers.
+ *
+ * The mode can be single shot or continuous. Single shot means the input will
+ * trigger on the first incoming pulse and will ignore the subsequent pulses
+ * until re-armed.
+ *
+ * @param[in] dev pointer to open node device.
+ * @param[in] input index of the trigger input
+ * @param[in] mode triggering mode.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
 int wrtd_in_trigger_mode_set(struct wrtd_node *dev, unsigned int input,
 				    enum wrtd_trigger_mode mode)
 {
@@ -335,6 +464,17 @@ int wrtd_in_trigger_mode_set(struct wrtd_node *dev, unsigned int input,
 	return wrtd_validate_acknowledge(&msg);
 }
 
+
+/**
+ * Assign (unassign) a trigger ID to a given WRTD input. Passing a NULL trig_id
+ * un-assigns the current trigger (the input will be tagging pulses and
+ * logging them, but they will not be sent as triggers to the WR network).
+ * @param[in] dev pointer to open node device.
+ * @param[in] input index of the trigger input to assign trigger to.
+ * @param[in] trig_id the trigger to be sent upon reception of a pulse on the
+ *            given input.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
 int wrtd_in_trigger_assign(struct wrtd_node *dev, unsigned int input,
 					  struct wrtd_trig_id *trig_id)
 {
@@ -367,6 +507,25 @@ int wrtd_in_trigger_assign(struct wrtd_node *dev, unsigned int input,
 }
 
 
+/**
+ * It un-assign the trigger on an input channel. It is just an helper that
+ * internally use wrtd_in_trigger_unassign()
+ */
+int wrtd_in_trigger_unassign(struct wrtd_node *dev,
+					   unsigned int input)
+{
+	return wrtd_in_trigger_assign(dev, input, NULL);
+}
+
+
+/**
+ * Arm (disarm) a WRTD input for triggering. By arming the input, you are making
+ * it ready to accept/send triggers
+ * @param[in] dev pointer to open node device.
+ * @param[in] input index of the trigger input
+ * @param[in] armed 1 arms the input, 0 disarms the input.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
 int wrtd_in_arm(struct wrtd_node *dev, unsigned int input, int armed)
 {
    	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
@@ -393,6 +552,21 @@ int wrtd_in_arm(struct wrtd_node *dev, unsigned int input, int armed)
 	return wrtd_validate_acknowledge(&msg);
 }
 
+
+/**
+ * Disarm the WRTD input. It is just an helper that internally use wrtd_in_arm()
+ */
+int wrtd_in_disarm(struct wrtd_node *dev, unsigned int input, int armed)
+{
+	return wrtd_in_arm(dev, input, 0);
+}
+
+
+
+/**
+ * @param[in] dev pointer to open node device.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
 int wrtd_in_counters_reset(struct wrtd_node *dev, unsigned int input)
 {
    	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
@@ -418,6 +592,12 @@ int wrtd_in_counters_reset(struct wrtd_node *dev, unsigned int input)
 	return wrtd_validate_acknowledge(&msg);
 }
 
+
+/**
+ * Software-trigger the input at a given TAI value
+ * @param[in] dev pointer to open node device.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
 int wrtd_in_trigger_software(struct wrtd_node *dev,
 			     struct wrtd_trigger_entry *trigger)
 {
@@ -445,3 +625,267 @@ int wrtd_in_trigger_software(struct wrtd_node *dev,
 
 	return wrtd_validate_acknowledge(&msg);
 }
+
+
+/**
+ * Log every trigger pulse sent out to the network. Each log message contains
+ * the input number, sequence ID, trigger ID, trigger counter (since arm) and
+ * origin timestamp.
+ * @param[in] dev pointer to open node device.
+ * @param[out] log
+ * @param[in] flags
+ * @param[in] input_mask
+ * @param[in] count
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_in_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
+			      int flags, int input_mask, int count)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+
+
+/**
+ * Check the enable status on a trigger input.
+ * @param[in] dev pointer to open node device.
+ * @param[in] input index of the trigger input to enable
+ * @param[in] enable 1 enables the input, 0 disables it.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_in_is_enabled(struct wrtd_node *dev, unsigned int input)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+
+
+/**
+ * Get/set the Sequence ID counter (counting up at every pulse)
+ * @param[in] dev pointer to open node device.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_in_seq_counter_set(struct wrtd_node *dev, unsigned int input)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+
+
+/**
+ * @param[in] dev pointer to open node device.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_in_timebase_offset_set(struct wrtd_node *dev, unsigned int input,
+				uint64_t offset)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+
+
+/**
+ * @param[in] dev pointer to open node device.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
+			  uint32_t log_level)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+
+
+
+
+
+
+
+/**
+ * @param[in] dev pointer to open node device.
+ * @param[in] output channel to use
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+extern int wrtd_out_enable(struct wrtd_node *dev, unsigned int output,
+			   int enable)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+
+
+/**
+ * @param[in] dev pointer to open node device.
+ * @param[in] output channel to use
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+extern int wrtd_out_dead_time_set(struct wrtd_node *dev, unsigned int output,
+				  uint64_t dead_time_ps)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+
+
+/**
+ * @param[in] dev pointer to open node device.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+extern int wrtd_out_trig_assign(struct wrtd_node *dev,
+				struct wrtd_trigger_handle *handle,
+				int output, struct wrtd_trig_id *trig,
+				struct wrtd_trig_id *condition)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+
+
+/**
+ * @param[in] dev pointer to open node device.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+extern int wrtd_out_trig_remove (struct wrtd_node *dev,
+				 struct wrtd_trigger_handle *handle)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+
+
+/**
+ * @param[in] dev pointer to open node device.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+extern int wrtd_out_trig_get_all (struct wrtd_node *dev, unsigned int output,
+				  struct wrtd_output_trigger_state *triggers,
+				  int max_count)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+
+
+/**
+ * @param[in] dev pointer to open node device.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+extern int wrtd_out_trig_set_delay(struct wrtd_node *dev,
+				   struct wrtd_trigger_handle *handle,
+				   uint64_t delay_ps)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+
+
+/**
+ * @param[in] dev pointer to open node device.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+extern int wrtd_out_trig_set_condition_delay(struct wrtd_node *dev,
+					     struct wrtd_trigger_handle *handle,
+					     uint64_t delay_ps)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+
+
+/**
+ * @param[in] dev pointer to open node device.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+extern int wrtd_out_trig_get_state(struct wrtd_node *dev,
+				   struct wrtd_trigger_handle *handle,
+				   struct wrtd_output_trigger_state *state)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+
+
+/**
+ * @param[in] dev pointer to open node device.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+extern int wrtd_out_trig_enable(struct wrtd_node *dev,
+				struct wrtd_trigger_handle *handle, int enable)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+
+
+/**
+ * @param[in] dev pointer to open node device.
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+extern int wrtd_out_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
+			     int flags, unsigned int output_mask, int count)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+
+/**
+ * @param[in] dev pointer to open node device.
+ * @param[in] output channel to use
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+extern int wrtd_out_set_log_level(struct wrtd_node *dev, unsigned int output,
+				  uint32_t log_level)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+
+/**
+ * @param[in] dev pointer to open node device.
+ * @param[in] output channel to use
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+extern int wrtd_out_set_trigger_mode(struct wrtd_node *dev,
+				     unsigned int output, int mode)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+
+
+/**
+ * @param[in] dev pointer to open node device.
+ * @param[in] output channel to use
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+extern int wrtd_out_arm(struct wrtd_node *dev, unsigned int ouput, int armed)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+//int wrtd_out_get_state(struct wrtd_node *dev, unsigned int input, int armed);
+
+
+/**
+ * @param[in] dev pointer to open node device.
+ * @param[in] output channel to use
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+extern int wrtd_out_reset_counters(struct wrtd_node *dev, unsigned int output)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+
+
+/**
+ * @param[in] dev pointer to open node device.
+ * @param[in] output channel to use
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+extern int wrtd_out_check_triggered(struct wrtd_node *dev, unsigned int output)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+//int wrtd_out_wait_trigger(struct wrtd_node*, int output_mask, struct wrtd_trig_id *id);

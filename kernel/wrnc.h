@@ -81,6 +81,7 @@ struct wrnc_dev {
 	uint32_t base_hmq; /**< base address of the HMQ */
 	uint32_t base_gcr; /**< base address of the Global Control Register
 			      for the HMQ */
+	uint32_t irq_mask; /**< IRQ mask in use */
 };
 
 #endif

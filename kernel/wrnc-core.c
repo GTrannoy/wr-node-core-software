@@ -660,12 +660,15 @@ static void wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
 	int i;
 
 	spin_lock_irqsave(&hmq->lock, flags);
+	/* Get the slot in order to write into it */
 	fmc_writel(fmc, MQUEUE_CMD_CLAIM, hmq->base_sr + MQUEUE_SLOT_COMMAND);
+	/* Write data into the slot */
 	for (i = 0; i < msg->datalen; ++i) {
 		fmc_writel(fmc, msg->data[i],
 			   hmq->base_sr + MQUEUE_SLOT_DATA_START + i * 4);
 	}
-	fmc_writel(fmc, MQUEUE_CMD_CLAIM, hmq->base_sr + MQUEUE_SLOT_COMMAND);
+	/* The slot is ready to be sent to the CPU */
+	fmc_writel(fmc, MQUEUE_CMD_READY, hmq->base_sr + MQUEUE_SLOT_COMMAND);
 	spin_unlock_irqrestore(&hmq->lock, flags);
 }
 
@@ -680,25 +683,28 @@ static struct wrnc_msg *wrnc_message_pop(struct wrnc_hmq *hmq)
 	int i;
 
 	msg = kmalloc(sizeof(struct wrnc_msg), GFP_KERNEL);
-	if (msg)
+	if (!msg)
 		return ERR_PTR(-ENOMEM);
 
 	spin_lock_irqsave(&hmq->lock, flags);
+	/* Get information about the incoming slot */
 	status = fmc_readl(fmc, hmq->base_sr + MQUEUE_SLOT_STATUS);
-	msg->datalen = (status >> 16) & 0xFF;
+	msg->datalen = (status & MQUEUE_SLOT_STATUS_MSG_SIZE_MASK);
+	msg->datalen >>= MQUEUE_SLOT_STATUS_MSG_SIZE_SHIFT;
+	/* Read data from the slot */
 	for (i = 0; i < msg->datalen; ++i) {
 		msg->data[i] = fmc_readl(fmc,
 				hmq->base_sr + MQUEUE_SLOT_DATA_START + i * 4);
 	}
+	/* Discard the slot content */
 	fmc_writel(fmc, MQUEUE_CMD_DISCARD, hmq->base_sr + MQUEUE_SLOT_COMMAND);
 	spin_unlock_irqrestore(&hmq->lock, flags);
-
 	if (msg->data[0] == 0xdeadbeef) {
-	        for (i = 0; i < 128 - 1; i++) {
+	        for (i = 0; i < 128 - 1 && i < msg->datalen; i++) {
 			str[i] = msg->data[i + 1];
 		}
-		str[i] = 0;
-		dev_err(&hmq->dev, "Cannot retrieve message: %s\n", str);
+		str[msg->datalen - 1] = 0;
+		dev_info(&hmq->dev, "Debug: %s\n", str);
 		kfree(msg);
 		msg = NULL;
 	}
@@ -739,15 +745,16 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	mutex_lock(&hmq->mtx);
 
 	/*
-	 * Wait for the synchronous answer. then get the mutex to avoit other
-	 * processes to read
+	 * Wait for the CPU-out queue is empty. Then get the mutex to avoit other
+	 * processes to read our synchronous answer
 	 */
-	wait_event_interruptible(hmq_out->q_msg, !list_empty(&hmq_out->list_msg));
+	wait_event_interruptible(hmq_out->q_msg, list_empty(&hmq_out->list_msg));
 	mutex_lock(&hmq_out->mtx);
 
 	/* Send the message */
 	wrnc_message_push(hmq, &msg.msg);
-
+	/* Wait our synchronous answer */
+	wait_event_interruptible(hmq_out->q_msg, !list_empty(&hmq_out->list_msg));
 	/* We have at least one message in the buffer, return it */
 	spin_lock(&hmq_out->lock);
 	msgel = list_entry(hmq_out->list_msg.next, struct wrnc_msg_element, list);
@@ -894,6 +901,9 @@ static void wrnc_irq_handler_input(struct wrnc_hmq *hmq)
 		mask &= ~(1 << hmq->index + MAX_MQUEUE_SLOTS);
 		fmc_writel(fmc, mask, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
 		spin_unlock_irqrestore(&hmq->lock, flags);
+
+		/* Wake up processes waiting for this */
+		wake_up_interruptible(&hmq->q_msg);
 		return;
 	}
 
@@ -959,6 +969,7 @@ irqreturn_t wrnc_irq_handler(int irq_core_base, void *arg)
 	pr_info("%s:%d\n", __func__, __LINE__);
 	/* Get the source of interrupt */
 	status = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_SLOT_STATUS);
+	status &= wrnc->irq_mask;
 dispatch_irq:
 	i = -1;
         while (status && i < WRNC_MAX_HMQ_SLOT) {
@@ -980,6 +991,7 @@ dispatch_irq:
 	 * check if other interrupts occurs in the meanwhile
 	 */
 	status = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_SLOT_STATUS);
+	status &= wrnc->irq_mask;
 	if (status)
 		goto dispatch_irq;
 
@@ -1153,11 +1165,11 @@ int wrnc_probe(struct fmc_device *fmc)
 	 * going to use only synchronous messages
 	 */
 	if (0)
-		tmp = (((1 << wrnc->n_hmq_in) - 1) << MQUEUE_GCR_IRQ_MASK_IN_SHIFT);
+	        wrnc->irq_mask = (((1 << wrnc->n_hmq_in) - 1) << MQUEUE_GCR_IRQ_MASK_IN_SHIFT);
 	else
-		tmp = 0;
-	tmp |= (1 << wrnc->n_hmq_out) - 1;
-	fmc_writel(fmc, tmp, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
+	        wrnc->irq_mask = 0;
+        wrnc->irq_mask |= (1 << wrnc->n_hmq_out) - 1;
+	fmc_writel(fmc, wrnc->irq_mask, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
         tmp = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
 
 	return 0;

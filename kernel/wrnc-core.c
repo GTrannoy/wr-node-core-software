@@ -954,17 +954,19 @@ irqreturn_t wrnc_irq_handler(int irq_core_base, void *arg)
 	struct fmc_device *fmc = arg;
 	struct wrnc_dev *wrnc = fmc_get_drvdata(fmc);
 	uint32_t status;
-	int i = -1;
+	int i;
 
 	pr_info("%s:%d\n", __func__, __LINE__);
 	/* Get the source of interrupt */
 	status = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_SLOT_STATUS);
-		wrnc->base_gcr + MQUEUE_GCR_SLOT_STATUS, status);
 dispatch_irq:
+	i = -1;
         while (status && i < WRNC_MAX_HMQ_SLOT) {
 		++i;
-		if (!(status & 0x1))
+		if (!(status & 0x1)) {
+			status >>= 1;
 			continue;
+		}
 
 		if (i >= MAX_MQUEUE_SLOTS)
 			wrnc_irq_handler_input(&wrnc->hmq_in[i - MAX_MQUEUE_SLOTS]);
@@ -1145,9 +1147,18 @@ int wrnc_probe(struct fmc_device *fmc)
 			"Cannot request IRQ 0x%x - we'll not receive/send messages\n",
 			fmc->irq);
 	}
-	tmp = (((1 << wrnc->n_hmq_in) - 1) << MQUEUE_GCR_IRQ_MASK_IN_SHIFT);
+
+	/*
+	 * Don't raise interrupts on output for the time being. we are
+	 * going to use only synchronous messages
+	 */
+	if (0)
+		tmp = (((1 << wrnc->n_hmq_in) - 1) << MQUEUE_GCR_IRQ_MASK_IN_SHIFT);
+	else
+		tmp = 0;
 	tmp |= (1 << wrnc->n_hmq_out) - 1;
-	//fmc_writel(fmc, tmp, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
+	fmc_writel(fmc, tmp, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
+        tmp = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
 
 	return 0;
 
@@ -1177,6 +1188,7 @@ int wrnc_remove(struct fmc_device *fmc)
 	int i;
 
 	fmc_writel(fmc, 0x0, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
+	fmc->irq = 0xC0000;
 	fmc->op->irq_free(fmc);
 
 	for (i = 0; i < wrnc->n_cpu; ++i)

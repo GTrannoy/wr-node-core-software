@@ -6,7 +6,7 @@
 LIB = libwrnc.a
 LOBJ := libwrnc.o
 
-CFLAGS += -Wall -ggdb -O2 $(EXTRACFLAGS)
+CFLAGS += -Wall -ggdb -O2 -I. -I../kernel $(EXTRACFLAGS)
 LDFLAGS = -L. -lwrnc
 
 

@@ -214,7 +214,7 @@ static inline int wrnc_cpu_enable(struct wrnc_dev *wrnc, unsigned int index)
 	uint32_t tmp;
 
 	wrnc_cpu_reset_get(wrnc, &tmp);
-	return wrnc_cpu_reset_set(wrnc, tmp | (1 << index));
+	return wrnc_cpu_reset_set(wrnc, tmp & ~(1 << index));
 }
 
 /**
@@ -228,7 +228,7 @@ static inline int wrnc_cpu_disable(struct wrnc_dev *wrnc, unsigned int index)
 	uint32_t tmp;
 
 	wrnc_cpu_reset_get(wrnc, &tmp);
-	return wrnc_cpu_reset_set(wrnc, tmp & ~(1 << index));
+	return wrnc_cpu_reset_set(wrnc, tmp | (1 << index));
 }
 
 /**

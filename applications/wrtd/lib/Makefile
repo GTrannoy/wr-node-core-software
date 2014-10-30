@@ -6,7 +6,10 @@
 WRNC := ../../../
 
 LIB = libwrtd.a
-LOBJ := libwrtd.o
+LOBJ := libwrtd-internal.o
+LOBJ += libwrtd-common.o
+LOBJ += libwrtd-input.o
+LOBJ += libwrtd-output.o
 LOBJ += $(WRNC)/lib/libwrnc.o
 
 CFLAGS += -Wall -ggdb -O2 -I. -I../common -I$(WRNC)/lib -I$(WRNC)/kernel $(EXTRACFLAGS)

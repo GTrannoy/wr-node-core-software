@@ -16,6 +16,9 @@ struct wrtd_node;
 
 #define WRTD_DEFAULT_TIMEOUT	1000
 
+/**
+ * White Rabbit Trigger Distribution errors
+ */
 enum wrtd_error_list {
 	EWRTD_INVALD_ANSWER_ACK = 3276,
 	EWRTD_INVALD_ANSWER_STATE,
@@ -24,6 +27,9 @@ enum wrtd_error_list {
 	EWRTD_INVALID_TRIG_ID,
 	EWRTD_INVALID_CHANNEL,
 	EWRTD_NO_IMPLEMENTATION,
+	EWRTD_INVALD_ANSWER_TRIG,
+	EWRTD_INVALD_ANSWER_HASH,
+	EWRTD_INVALD_ANSWER_HASH_CONT,
 	__EWRTD_MAX_ERROR_NUMBER,
 };
 
@@ -85,7 +91,7 @@ struct wrtd_output_state {
 };
 
 /**
- * @file lbwrtd.c
+ * @file libwrtd-common.c
  */
 extern const char *wrtd_strerror(int err);
 extern int wrtd_init();
@@ -96,56 +102,71 @@ extern void wrtd_close(struct wrtd_node *dev);
 extern struct wrnc_dev *wrtd_get_wrnc_dev(struct wrtd_node *dev);
 extern int wrtd_load_application(struct wrtd_node *dev, char *rt_tdc,
 					 char *rt_fd);
-extern int wrtd_in_enable(struct wrtd_node *dev, unsigned int input, int enable);
-extern int wrtd_in_is_enabled(struct wrtd_node *dev, unsigned int input);
 
+/**
+ * @file libwrtd-input.c
+ */
+extern int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
+			     struct wrtd_input_state *state);
+extern int wrtd_in_enable(struct wrtd_node *dev, unsigned int input, int enable);
 extern int wrtd_in_trigger_assign(struct wrtd_node *dev, unsigned int input,
 					  struct wrtd_trig_id *trig_id);
 extern int wrtd_in_trigger_unassign(struct wrtd_node *dev, unsigned int input);
 extern int wrtd_in_trigger_mode_set(struct wrtd_node *dev, unsigned int input,
 				    enum wrtd_trigger_mode mode);
-extern int wrtd_in_arm(struct wrtd_node *dev, unsigned int input, int armed);
-extern int wrtd_in_disarm(struct wrtd_node *dev, unsigned int input, int armed);
-
-extern int wrtd_in_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
-			      int flags, int input_mask, int count);
 extern int wrtd_in_trigger_software(struct wrtd_node *dev,
 			     struct wrtd_trigger_entry *trigger);
-
+extern int wrtd_in_arm(struct wrtd_node *dev, unsigned int input, int armed);
+extern int wrtd_in_disarm(struct wrtd_node *dev, unsigned int input, int armed);
+extern int wrtd_in_dead_time_set(struct wrtd_node *dev, unsigned int input,
+				 uint64_t dead_time_ps);
 extern int wrtd_in_delay_set(struct wrtd_node *dev, unsigned int input,
 			     uint64_t delay_ps);
+extern int wrtd_in_timebase_offset_set(struct wrtd_node *dev,
+				       unsigned int input, uint64_t offset);
+extern int wrtd_in_counters_reset(struct wrtd_node *dev, unsigned int input);
+extern int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
+				 uint32_t log_level);
+extern int wrtd_in_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
+			      int flags, int input_mask, int count);
+
+
+/* TODO implements the following prototypes */
+extern int wrtd_in_is_enabled(struct wrtd_node *dev, unsigned int input);
+extern int wrtd_in_dead_time_get(struct wrtd_node *dev, unsigned int input,
+				 uint64_t *dead_time_ps);
 extern int wrtd_in_delay_get(struct wrtd_node *dev, unsigned int input,
 			     uint64_t *delay_ps);
 extern int wrtd_in_seq_counter_set (struct wrtd_node *dev, unsigned int input);
-extern int wrtd_in_dead_time_set(struct wrtd_node *dev, unsigned int input,
-				 uint64_t dead_time_ps);
-extern int wrtd_in_dead_time_get(struct wrtd_node *dev, unsigned int input,
-				 uint64_t *dead_time_ps);
-extern int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
-			     struct wrtd_input_state *state);
-extern int wrtd_in_counters_reset(struct wrtd_node *dev, unsigned int input);
-extern int wrtd_in_timebase_offset_set(struct wrtd_node *dev,
-				       unsigned int input, uint64_t offset);
-extern int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
-				 uint32_t log_level);
 
+/**
+ * @file libwrtd-output.c
+ */
+extern int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
+			     struct wrtd_output_state *state);
 extern int wrtd_out_enable(struct wrtd_node *dev, unsigned int output,
 			   int enable);
-extern int wrtd_out_dead_time_set(struct wrtd_node *dev, unsigned int output,
-				  uint64_t dead_time_ps);
 extern int wrtd_out_trig_assign(struct wrtd_node *dev,
 				struct wrtd_trigger_handle *handle,
 				int output, struct wrtd_trig_id *trig,
 				struct wrtd_trig_id *condition);
-extern int wrtd_out_trig_remove (struct wrtd_node *dev,
-				 struct wrtd_trigger_handle *handle);
+extern int wrtd_out_trig_unassign(struct wrtd_node *dev,
+				  struct wrtd_trigger_handle *handle);
 extern int wrtd_out_trig_get_all (struct wrtd_node *dev, unsigned int output,
 				  struct wrtd_output_trigger_state *triggers,
 				  int max_count);
-extern int wrtd_out_trig_set_delay(struct wrtd_node *dev,
+extern int wrtd_out_trig_get_by_index(struct wrtd_node *dev, unsigned int index,
+			       unsigned int output,
+			       struct wrtd_output_trigger_state *trigger);
+extern int wrtd_out_trig_delay_set(struct wrtd_node *dev,
 				   struct wrtd_trigger_handle *handle,
 				   uint64_t delay_ps);
-extern int wrtd_out_trig_set_condition_delay(struct wrtd_node *dev,
+
+
+extern int wrtd_out_dead_time_set(struct wrtd_node *dev, unsigned int output,
+				  uint64_t dead_time_ps);
+/* TODO implements the following prototypes */
+extern int wrtd_out_trig_condition_delay_set(struct wrtd_node *dev,
 					     struct wrtd_trigger_handle *handle,
 					     uint64_t delay_ps);
 extern int wrtd_out_trig_get_state(struct wrtd_node *dev,
@@ -160,9 +181,9 @@ extern int wrtd_out_set_log_level(struct wrtd_node *dev, unsigned int output,
 extern int wrtd_out_set_trigger_mode(struct wrtd_node *dev,
 				     unsigned int output, int mode);
 extern int wrtd_out_arm(struct wrtd_node *dev, unsigned int input, int armed);
-//int wrtd_out_get_state(struct wrtd_node *dev, unsigned int input, int armed);
 extern int wrtd_out_reset_counters(struct wrtd_node *dev, unsigned int output);
 extern int wrtd_out_check_triggered(struct wrtd_node *dev, unsigned int output);
 //int wrtd_out_wait_trigger(struct wrtd_node*, int output_mask, struct wrtd_trig_id *id);
+
 
 #endif

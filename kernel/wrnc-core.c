@@ -478,9 +478,9 @@ static int wrnc_cpu_firmware_load(struct wrnc_cpu *cpu, void *fw_buf, size_t cou
 	}
 
 	/* Load the firmware */
-	for (i = offset; i < size; ++i) {
+	for (i = 0; i < size; ++i) {
 		word = cpu_to_be32(fw[i]);
-		fmc_writel(fmc, i, wrnc->base_csr + WRN_CPU_CSR_REG_UADDR);
+		fmc_writel(fmc, i + offset, wrnc->base_csr + WRN_CPU_CSR_REG_UADDR);
 		fmc_writel(fmc, word, wrnc->base_csr + WRN_CPU_CSR_REG_UDATA);
 		word_rb = fmc_readl(fmc, wrnc->base_csr + WRN_CPU_CSR_REG_UDATA);
 		if (word != word_rb) {

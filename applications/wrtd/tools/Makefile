@@ -5,11 +5,12 @@
 
 DESTDIR ?= /usr/local
 
-CFLAGS += -Wall -ggdb -I../common -I$(WRNC)/lib -I$(WRNC)/kernel -I../lib $(EXTRACFLAGS)
+CFLAGS += -Wall -ggdb -I. -I../common -I$(WRNC)/lib -I$(WRNC)/kernel -I../lib $(EXTRACFLAGS)
 LDLIBS += -L../lib -lwrtd -L$(WRNC)/lib -lwrnc
 
 PROGS := wrtd-boot
 PROGS += wrtd-tdc-config
+PROGS += wrtd-fd-config
 
 all: $(PROGS)
 
@@ -17,8 +18,10 @@ install:
 	install -d $(DESTDIR)/bin
 	install -D $(PROGS) $(DESTDIR)/bin
 
-%: %.c ../lib/libwrtd.a
+%: %.c ../lib/libwrtd.a wrtd-inout-common.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS) -o $@
+wrtd-inout-common.o: wrtd-inout-common.c
+	$(CC) -c $(CFLAGS) $^ -o $@
 
 # make nothing for modules_install, but avoid errors
 modules_install:

@@ -55,7 +55,7 @@ static int wrtd_out_trig_get(struct wrtd_node *dev, unsigned int output,
 		return err;
 
 	/* Valdiate the answer */
-	if (msg.datalen != 11 || msg.data[0] != WRTD_REP_HASH_ENTRY) {
+	if (msg.datalen != 17 || msg.data[0] != WRTD_REP_HASH_ENTRY) {
 		errno = EWRTD_INVALD_ANSWER_HASH;
 		return -1;
 	}
@@ -135,7 +135,7 @@ int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 
 	/* Send the message and get answer */
 	err = wrtd_out_send_and_receive_sync(wrtd, &msg);
-        if (msg.datalen != 29 || msg.data[0] != WRTD_REP_STATE) {
+        if (msg.datalen != 28 || msg.data[0] != WRTD_REP_STATE) {
 		errno = EWRTD_INVALD_ANSWER_STATE;
 		return -1;
 	}

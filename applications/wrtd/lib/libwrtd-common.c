@@ -167,7 +167,7 @@ int wrtd_load_application(struct wrtd_node *dev, char *rt_tdc,
 	err = wrnc_cpu_load_application_file(wrtd->wrnc, WRTD_CPU_TDC, rt_tdc);
 	if (err)
 		return err;
-	err = wrnc_cpu_load_application_file(wrtd->wrnc, WRTD_CPU_FD, rt_tdc);
+	err = wrnc_cpu_load_application_file(wrtd->wrnc, WRTD_CPU_FD, rt_fd);
 	if (err)
 		return err;
 

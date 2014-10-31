@@ -70,6 +70,8 @@ int main(int argc, char *argv[])
 	}
 
 	/* Load the application into the WRNC CPUs */
+	fprintf(stdout, "Programming on TDC: %s\n", tdc);
+	fprintf(stdout, "Programming on  FD: %s\n", fd);
 	err =  wrtd_load_application(wrtd, tdc, fd);
 	if (err) {
 		fprintf(stderr, "Cannot program binary to WRNC: %s\n",
@@ -80,6 +82,7 @@ int main(int argc, char *argv[])
 	/* Get the WRNC token */
 	wrnc = wrtd_get_wrnc_dev(wrtd);
 
+	fprintf(stdout, "Reboot applications\n", tdc);
 	/* Enable TDC and FD CPUs */
 	err = wrnc_cpu_enable(wrnc, 0);
 	if (err)

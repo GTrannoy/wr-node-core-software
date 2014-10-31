@@ -741,29 +741,36 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	 * the synchronous message. Then get the mutex to avoid other process
 	 * to write
 	 */
-	wait_event_interruptible(hmq->q_msg, list_empty(&hmq->list_msg));
+	to = wait_event_interruptible(hmq->q_msg, list_empty(&hmq->list_msg));
+	if (unlikely(to < 0))
+	        goto out;
 	mutex_lock(&hmq->mtx);
 
 	/*
 	 * Wait for the CPU-out queue is empty. Then get the mutex to avoit other
 	 * processes to read our synchronous answer
 	 */
-	wait_event_interruptible(hmq_out->q_msg, list_empty(&hmq_out->list_msg));
+	to = wait_event_interruptible(hmq_out->q_msg, list_empty(&hmq_out->list_msg));
+	if (unlikely(to < 0))
+	        goto out_out;
 	mutex_lock(&hmq_out->mtx);
 
 	/* Send the message */
 	wrnc_message_push(hmq, &msg.msg);
 
-	/* Wait our synchronous answer. It must be available in less then 5ms */
+	/*
+	 * Wait our synchronous answer. If after 1000ms we don't receive an answer,
+	 * something is seriously broken
+	 */
 	to = wait_event_interruptible_timeout(hmq_out->q_msg,
 					      !list_empty(&hmq_out->list_msg),
-					      msecs_to_jiffies(5));
+					      msecs_to_jiffies(1000));
 	if (unlikely(to <= 0)) {
 		if (to == 0)
 			dev_err(&hmq->dev,
 				 "The real time application is taking too much time to answer. Something is broken\n");
 		memset(&msg.msg, 0, sizeof(struct wrnc_msg));
-		goto out;
+		goto out_sync;
 	}
 	/* We have at least one message in the buffer, return it */
 	spin_lock(&hmq_out->lock);
@@ -776,10 +783,11 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	kfree(msgel->msg);
 	kfree(msgel);
 
-out:
+out_sync:
 	mutex_unlock(&hmq_out->mtx);
+out_out:
 	mutex_unlock(&hmq->mtx);
-
+out:
         return copy_to_user(uarg, &msg, sizeof(struct wrnc_msg_sync));
 }
 

@@ -682,6 +682,12 @@ main()
 
     int loops =0;    
 
+    /* reset Fine Delay */
+    dp_writel( (0xdead << 16) | 0x0, 0x0);
+    delay(1000);
+    dp_writel( (0xdead << 16) | 0x3, 0x0);
+    delay(1000);
+
     pp_printf("RT_FD firmware initialized.");
 
     

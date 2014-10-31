@@ -718,7 +718,7 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
 	struct wrnc_msg_sync msg;
 	struct wrnc_hmq *hmq_out;
-	int err = 0;
+	int err = 0, to;
 
 	/* Copy the message from user space*/
 	err = copy_from_user(&msg, uarg, sizeof(struct wrnc_msg_sync));
@@ -753,24 +753,34 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 
 	/* Send the message */
 	wrnc_message_push(hmq, &msg.msg);
-	/* Wait our synchronous answer */
-	wait_event_interruptible(hmq_out->q_msg, !list_empty(&hmq_out->list_msg));
+
+	/* Wait our synchronous answer. It must be available in less then 5ms */
+	to = wait_event_interruptible_timeout(hmq_out->q_msg,
+					      !list_empty(&hmq_out->list_msg),
+					      msecs_to_jiffies(5));
+	if (unlikely(to <= 0)) {
+		if (to == 0)
+			dev_err(&hmq->dev,
+				 "The real time application is taking too much time to answer. Something is broken\n");
+		memset(&msg.msg, 0, sizeof(struct wrnc_msg));
+		goto out;
+	}
 	/* We have at least one message in the buffer, return it */
 	spin_lock(&hmq_out->lock);
 	msgel = list_entry(hmq_out->list_msg.next, struct wrnc_msg_element, list);
 	list_del(&msgel->list);
 	spin_unlock(&hmq_out->lock);
 
-	mutex_unlock(&hmq_out->mtx);
-	mutex_unlock(&hmq->mtx);
-
 	/* Copy the answer message back to user space */
         memcpy(&msg.msg, msgel->msg, sizeof(struct wrnc_msg));
-	err = copy_to_user(uarg, &msg, sizeof(struct wrnc_msg_sync));
 	kfree(msgel->msg);
 	kfree(msgel);
 
-	return err;
+out:
+	mutex_unlock(&hmq_out->mtx);
+	mutex_unlock(&hmq->mtx);
+
+        return copy_to_user(uarg, &msg, sizeof(struct wrnc_msg_sync));
 }
 
 static long wrnc_hmq_ioctl(struct file *f, unsigned int cmd, unsigned long arg)

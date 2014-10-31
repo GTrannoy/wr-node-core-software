@@ -9,8 +9,8 @@ CFLAGS += -Wall -ggdb -I. -I../common -I$(WRNC)/lib -I$(WRNC)/kernel -I../lib $(
 LDLIBS += -L../lib -lwrtd -L$(WRNC)/lib -lwrnc
 
 PROGS := wrtd-boot
-PROGS += wrtd-tdc-config
-PROGS += wrtd-fd-config
+PROGS += wrtd-in-config
+PROGS += wrtd-out-config
 
 all: $(PROGS)
 

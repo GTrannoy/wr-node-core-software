@@ -694,3 +694,33 @@ int wrnc_cpu_disable(struct wrnc_dev *wrnc, unsigned int index)
 	wrnc_cpu_reset_get(wrnc, &tmp);
 	return wrnc_cpu_reset_set(wrnc, tmp | (1 << index));
 }
+
+
+/**
+ * It returns a message from an output message queue slot.
+ * The user of this function is in charge to release the memory.
+ * @param[in] wrnc device to use
+ * @param[in] index CPU to enable
+ */
+struct wrnc_msg *wrnc_slot_receive(struct wrnc_dev *wrnc, unsigned int index)
+{
+	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
+	struct wrnc_msg *msg;
+	int err, n;
+
+	err = wrnc_hmq_open(wdesc, index, 0);
+	if (err)
+		return err;
+
+	msg = malloc(sizeof(struct wrnc_msg));
+	if (!msg)
+		return NULL;
+
+	n = read(wdesc->fd_hmq_out[index], msg, sizeof(struct wrnc_msg));
+	if (n != sizeof(struct wrnc_msg)) {
+		free(msg);
+		return NULL;
+	}
+
+	return msg;
+}

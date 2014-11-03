@@ -141,6 +141,7 @@ void init_outputs()
 	int i;
 
 	for (i = 0; i < FD_NUM_CHANNELS; i++) {
+		memset(&outputs[i], 0, sizeof(struct lrt_output));
 		outputs[i].base_addr = 0x100 + i * 0x100;
 		outputs[i].index = i;
 		outputs[i].idle = 1;

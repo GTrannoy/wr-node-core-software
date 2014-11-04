@@ -651,7 +651,7 @@ void init()
 
 main()
 {
-	rt_set_debug_slot(FD_OUT_SLOT_CONTROL);
+	rt_set_debug_slot(FD_OUT_SLOT_LOGGING);
 	init();
 
 	gpio_set(24);

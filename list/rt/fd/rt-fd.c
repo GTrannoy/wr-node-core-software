@@ -688,6 +688,10 @@ main()
     dp_writel( (0xdead << 16) | 0x3, 0x0);
     delay(1000);
 
+    pp_printf("RT_FD locking WR");
+    /* Lock to white-rabbit */
+    dp_writel((1 << 1), 0xC);
+
     pp_printf("RT_FD firmware initialized.");
 
     

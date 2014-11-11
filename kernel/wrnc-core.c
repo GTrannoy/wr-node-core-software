@@ -6,6 +6,7 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
@@ -28,6 +29,9 @@
 
 #include "wrnc.h"
 
+static int hmq_max_msg = 32;
+module_param_named(max_slot_msg, hmq_max_msg, int, 0444);
+MODULE_PARM_DESC(max_slot_msg, "Maximum number of messages to keep in memory.");
 
 static int wrnc_dev_uevent(struct device *dev, struct kobj_uevent_env *env)
 {
@@ -769,6 +773,7 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	spin_lock(&hmq_out->lock);
 	msgel = list_entry(hmq_out->list_msg.next, struct wrnc_msg_element, list);
 	list_del(&msgel->list);
+	hmq_out->count--;
 	spin_unlock(&hmq_out->lock);
 
 	/* Copy the answer message back to user space */
@@ -848,6 +853,7 @@ static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 		spin_lock(&hmq->lock);
 		msgel = list_entry(hmq->list_msg.next, struct wrnc_msg_element, list);
 		list_del(&msgel->list);
+		hmq->count--;
 		spin_unlock(&hmq->lock);
 
 		count = i * sizeof(struct wrnc_msg);
@@ -917,6 +923,7 @@ static void wrnc_irq_handler_input(struct wrnc_hmq *hmq)
 	/* Retrieve and send the first message */
         msgel = list_entry(hmq->list_msg.next, struct wrnc_msg_element, list);
 	list_del(&msgel->list);
+	hmq->count--;
 	wrnc_message_push(hmq, msgel->msg);
 
 	spin_unlock_irqrestore(&hmq->lock, flags);
@@ -952,6 +959,12 @@ static void wrnc_irq_handler_output(struct wrnc_hmq *hmq)
 	/* We have a valid message, store it */
 	spin_lock_irqsave(&hmq->lock, flags);
 	list_add_tail(&msgel->list, &hmq->list_msg);
+	hmq->count++;
+	if (unlikely(hmq->count > hmq_max_msg)) {
+		/* Remove the oldest message */
+		list_del(&msgel->list);
+		hmq->count--;
+	}
 	spin_unlock_irqrestore(&hmq->lock, flags);
 
 	/* Wake up processes waiting for this */
@@ -1045,6 +1058,8 @@ static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
 	/* Flush the content of the slot */
 	fmc_writel(fmc, MQUEUE_CMD_PURGE,
 		   hmq->base_sr + MQUEUE_SLOT_COMMAND);
+
+	hmq->count = 0;
 
 	return 0;
 }

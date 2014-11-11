@@ -48,6 +48,7 @@ struct wrnc_hmq {
 			  cpu point of view */
 	uint32_t base_sr; /**< base address of the slot register */
 	struct list_head list_msg; /**< list of messages */
+	unsigned int count; /**< number of messages */
 	struct spinlock lock;
 	struct mutex mtx;
 	wait_queue_head_t q_msg; /**< wait queue for synchronous messages */

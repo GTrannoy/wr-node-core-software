@@ -556,7 +556,6 @@ static ssize_t wrnc_cpu_write(struct file *f, const char __user *buf,
 	void *lbuf;
 	int err;
 
-	pr_info("%s:%d %d %d\n", __func__, __LINE__, count, *offp);
 	if (!count)
 		return -EINVAL;
 
@@ -573,7 +572,6 @@ static ssize_t wrnc_cpu_write(struct file *f, const char __user *buf,
 		goto out_load;
 
 	*offp += count;
-	pr_info("%s:%d %d %d\n", __func__, __LINE__, count, *offp);
 
 out_load:
 out_cpy:
@@ -591,7 +589,6 @@ static ssize_t wrnc_cpu_read(struct file *f, char __user *buf,
 	void *lbuf;
 	int err;
 
-	pr_info("%s:%d %d %d\n", __func__, __LINE__, count, *offp);
 	lbuf = vmalloc(count);
 	if (!lbuf)
 		return -ENOMEM;
@@ -606,7 +603,6 @@ static ssize_t wrnc_cpu_read(struct file *f, char __user *buf,
 	}
 
 	*offp += count;
-	pr_info("%s:%d %d %d\n", __func__, __LINE__, count, *offp);
 
 out_cpy:
 out_dmp:
@@ -626,8 +622,6 @@ static int wrnc_hmq_simple_open(struct inode *inode, struct file *file)
 {
 	int m = iminor(inode);
 
-	pr_info("%s:%d\n", __func__, __LINE__);
-
 	file->private_data = to_wrnc_hmq(minors[m]);
 
 	return 0;
@@ -638,7 +632,6 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 {
 	struct wrnc_hmq *hmq = f->private_data;
 
-	pr_info("%s:%d\n", __func__, __LINE__);
 	if (!(hmq->flags & WRNC_FLAG_HMQ_DIR)) {
 		dev_err(&hmq->dev, "cannot write on an output queue\n");
 		return -EFAULT;
@@ -797,7 +790,6 @@ static long wrnc_hmq_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 	void __user *uarg = (void __user *)arg;
 	int err = 0;
 
-	pr_info("%s:%d\n", __func__, __LINE__);
 	/* Check type and command number */
 	if (_IOC_TYPE(cmd) != WRNC_IOCTL_MAGIC)
 		return -ENOTTY;
@@ -833,12 +825,11 @@ static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 	struct wrnc_msg_element *msgel;
 	unsigned int i, n;
 
-	pr_info("%s:%d\n", __func__, __LINE__);
 	if (hmq->flags & WRNC_FLAG_HMQ_DIR) {
 		dev_err(&hmq->dev, "cannot read from an input queue\n");
 		return -EFAULT;
 	}
-	pr_info("%s:%d\n", __func__, __LINE__);
+
 	if (count % sizeof(struct wrnc_msg)) {
 		dev_err(&hmq->dev, "we can read only entire messages\n");
 		return -EINVAL;
@@ -876,7 +867,6 @@ static unsigned int wrnc_hmq_poll(struct file *f, struct poll_table_struct *w)
 	struct wrnc_hmq *hmq = f->private_data;
 	unsigned int ret = 0;
 
-	pr_info("%s:%d\n", __func__, __LINE__);
 	poll_wait(f, &hmq->q_msg, w);
 
 	/* check if there are interrupts to notify */
@@ -911,7 +901,6 @@ static void wrnc_irq_handler_input(struct wrnc_hmq *hmq)
 	unsigned long flags;
 	uint32_t mask;
 
-	pr_info("%s:%d\n", __func__, __LINE__);
 	spin_lock_irqsave(&hmq->lock, flags);
 	if (list_empty(&hmq->list_msg)) {
 		/* We don't have nothing to send, disable the interrupts */
@@ -946,7 +935,6 @@ static void wrnc_irq_handler_output(struct wrnc_hmq *hmq)
 	struct wrnc_msg_element *msgel;
 	unsigned long flags;
 
-	pr_info("%s:%d\n", __func__, __LINE__);
 	/* Allocate space for the incoming message */
 	msgel = kmalloc(sizeof(struct wrnc_msg_element), GFP_KERNEL);
 	if (!msgel) {
@@ -984,7 +972,6 @@ irqreturn_t wrnc_irq_handler(int irq_core_base, void *arg)
 	uint32_t status;
 	int i;
 
-	pr_info("%s:%d\n", __func__, __LINE__);
 	/* Get the source of interrupt */
 	status = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_SLOT_STATUS);
 	status &= wrnc->irq_mask;
@@ -1071,7 +1058,6 @@ int wrnc_probe(struct fmc_device *fmc)
 	int err, i;
 	uint32_t tmp;
 
-	pr_info("%s:%d\n", __func__, __LINE__);
 	/* Create a WRNC instance */
 	wrnc = devm_kzalloc(&fmc->dev, sizeof(struct wrnc_dev), GFP_KERNEL);
 	if (!wrnc)
@@ -1259,7 +1245,6 @@ static int wrnc_init(void)
 {
 	int err, i;
 
-	pr_info("%s:%d\n", __func__, __LINE__);
 	for (i = 0; i < WRNC_MAX_CPU_MINORS; ++i) {
 		minors[i] = NULL;
 	}
@@ -1318,7 +1303,6 @@ out_all:
 
 static void wrnc_exit(void)
 {
-	pr_info("%s:%d\n", __func__, __LINE__);
 	fmc_driver_unregister(&wrnc_dev_drv);
 	cdev_del(&cdev_cpu);
 	unregister_chrdev_region(basedev,

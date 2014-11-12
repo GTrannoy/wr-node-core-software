@@ -847,9 +847,10 @@ static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 		hmq->count--;
 		spin_unlock(&hmq->lock);
 
-		count = i * sizeof(struct wrnc_msg);
 		if (copy_to_user(buf + count, msgel->msg, sizeof(struct wrnc_msg)))
 			return -EFAULT;
+
+		count = (i + 1) * sizeof(struct wrnc_msg);
 		kfree(msgel->msg);
 		kfree(msgel);
 	}

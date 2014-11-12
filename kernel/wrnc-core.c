@@ -696,15 +696,6 @@ static struct wrnc_msg *wrnc_message_pop(struct wrnc_hmq *hmq)
 	/* Discard the slot content */
 	fmc_writel(fmc, MQUEUE_CMD_DISCARD, hmq->base_sr + MQUEUE_SLOT_COMMAND);
 	spin_unlock_irqrestore(&hmq->lock, flags);
-	if (msg->data[0] == 0xdeadbeef) {
-	        for (i = 0; i < 128 - 1 && i < msg->datalen; i++) {
-			str[i] = msg->data[i + 1];
-		}
-		str[msg->datalen - 1] = 0;
-		dev_info(&hmq->dev, "Debug: %s\n", str);
-		kfree(msg);
-		msg = NULL;
-	}
 
 	return msg;
 }

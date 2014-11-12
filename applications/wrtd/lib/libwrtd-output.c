@@ -215,10 +215,11 @@ extern int wrtd_out_trig_assign(struct wrtd_node *dev,
 	msg.data[0] = WRTD_CMD_FD_CHAN_ASSIGN_TRIGGER;
 	msg.data[1] = 0;
 	msg.data[2] = output;
-	msg.data[3] = condition ? 1 : 0;
-	msg.data[4] = trig->system;
-	msg.data[5] = trig->source_port;
-	msg.data[6] = trig->trigger;
+	msg.data[3] = trig->system;
+	msg.data[4] = trig->source_port;
+	msg.data[5] = trig->trigger;
+	msg.data[6] = condition ? 1 : 0;
+
 	if (condition) {
 		msg.data[7] = condition->system;
 		msg.data[8] = condition->source_port;

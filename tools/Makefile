@@ -10,6 +10,7 @@ LDLIBS += -L$(WRNC)/lib -lwrnc
 PROGS := wrnc-count
 PROGS += lswrnc
 PROGS += wrnc-loader
+PROGS += wrnc-messages
 
 all: $(PROGS)
 

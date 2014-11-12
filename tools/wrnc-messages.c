@@ -33,6 +33,7 @@ static void help()
 	exit(1);
 }
 
+
 /**
  * It retreives a message from a given slots and it prints its content
  * @param[in] wrnc device to use
@@ -44,18 +45,10 @@ static int dump_message(struct wrnc_dev *wrnc, unsigned int slot_index)
 	char str[128];
 	int j;
 
-	errno = 0;
 	/* Retreive message */
 	wmsg = wrnc_slot_receive(wrnc, slot_index);
-	if (!wmsg) {
-		if (errno) {
-			fprintf(stderr,
-				"Cannot receive from slot %d: %s\n",
-				slot_index, strerror(errno));
-		        exit(1);
-		}
-		return;
-	}
+	if (!wmsg)
+		return -1;
 
 	/* Print message */
 	switch (wmsg->data[0]) {
@@ -71,6 +64,8 @@ static int dump_message(struct wrnc_dev *wrnc, unsigned int slot_index)
 	}
 
 	free(wmsg);
+
+	return 0;
 }
 
 #define MAX_DEV 4
@@ -80,6 +75,7 @@ int main(int argc, char *argv[])
 	unsigned int n = 0, i = 0, j, si = 0, di = 0, cnt = 0;
 	unsigned int slot_index[MAX_DEV][MAX_SLOT];
 	uint32_t dev_id[MAX_DEV];
+	int err;
 	char c;
 	struct wrnc_dev *wrnc[MAX_DEV];
 
@@ -128,7 +124,13 @@ int main(int argc, char *argv[])
 	while((n == 0 || cnt < n) && (di > 0 && si > 0)) {
 		for (i = 0; i < di; i++) {
 			for (j = 0; j < si; j++) {
-				dump_message(wrnc[i], slot_index[i][j]);
+				err = dump_message(wrnc[i], slot_index[i][j]);
+				if (err) {
+					fprintf(stderr,
+						"Cannot receive from slot %d: %s\n",
+						slot_index, strerror(errno));
+					goto out;
+				}
 				cnt++;
 				if (n > 0 && n < cnt)
 					goto out;

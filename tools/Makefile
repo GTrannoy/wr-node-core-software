@@ -11,6 +11,7 @@ PROGS := wrnc-count
 PROGS += lswrnc
 PROGS += wrnc-loader
 PROGS += wrnc-messages
+PROGS += wrnc-cpu-restart
 
 all: $(PROGS)
 

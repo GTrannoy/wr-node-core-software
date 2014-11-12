@@ -45,10 +45,12 @@ static int dump_message(struct wrnc_dev *wrnc, unsigned int slot_index)
 	char str[128];
 	int j;
 
-	/* Retreive message */
+	fprintf(stdout, "    slot-%d :", slot_index);
 	wmsg = wrnc_slot_receive(wrnc, slot_index);
-	if (!wmsg)
+	if (!wmsg) {
+		fprintf(stdout, " error : %s\n", wrnc_strerror(errno));
 		return -1;
+	}
 
 	/* Print message */
 	switch (wmsg->data[0]) {
@@ -56,10 +58,10 @@ static int dump_message(struct wrnc_dev *wrnc, unsigned int slot_index)
 		for (j = 0; j < 128 - 1 && j < wmsg->datalen; ++j)
 			str[j] = wmsg->data[j + 1];
 		str[j - 1] = '\0';
-		fprintf(stdout, "slot-%d : %s\n", slot_index, str);
+		fprintf(stdout, " %s\n", str);
 		break;
 	default:
-		fprintf(stdout, "slot-%d : unknown message\n", slot_index);
+		fprintf(stdout, " unknown message\n");
 		break;
 	}
 
@@ -72,8 +74,8 @@ static int dump_message(struct wrnc_dev *wrnc, unsigned int slot_index)
 #define MAX_SLOT 32
 int main(int argc, char *argv[])
 {
-	unsigned int n = 0, i = 0, j, si = 0, di = 0, cnt = 0;
-	unsigned int slot_index[MAX_DEV][MAX_SLOT];
+	unsigned int n = 0, i = 0, j, di = 0, cnt = 0;
+	unsigned int slot_index[MAX_DEV][MAX_SLOT], idx_valid[MAX_DEV];
 	uint32_t dev_id[MAX_DEV];
 	int err;
 	char c;
@@ -82,6 +84,9 @@ int main(int argc, char *argv[])
 
 	atexit(wrnc_exit);
 
+	for (i = 0; i < MAX_SLOT; i++)
+		idx_valid[i] = 0;
+
 	while ((c = getopt (argc, argv, "hi:D:n:")) != -1) {
 		switch (c) {
 		default:
@@ -89,10 +94,11 @@ int main(int argc, char *argv[])
 			break;
 		case 'i':
 		/* Save slot index for each device id */
-			if (si >= MAX_SLOT && di > 0)
+			if (di > 0 && idx_valid[di - 1] >= MAX_SLOT)
 				break;
-			sscanf(optarg, "%d", &slot_index[di - 1][si]);
-			si++;
+			sscanf(optarg, "%d",
+			       &slot_index[di - 1][idx_valid[di - 1]]);
+			idx_valid[di - 1]++;
 			break;
 		case 'D':
 		/* Save device ids to use */
@@ -100,7 +106,6 @@ int main(int argc, char *argv[])
 				break;
 			sscanf(optarg, "0x%x", &dev_id[di]);
 			di++;
-			si = 0;
 			break;
 		case 'n':
 		/* Number of total messages to dump */
@@ -121,16 +126,14 @@ int main(int argc, char *argv[])
 	}
 
 	/* Get messages from all devices slots */
-	while((n == 0 || cnt < n) && (di > 0 && si > 0)) {
+	while((n == 0 || cnt < n) && (di > 0 && idx_valid[0] > 0)) {
 		for (i = 0; i < di; i++) {
-			for (j = 0; j < si; j++) {
+			fprintf(stdout, "device 0x%04x\n", dev_id[i]);
+			for (j = 0; j < idx_valid[i]; j++) {
 				err = dump_message(wrnc[i], slot_index[i][j]);
-				if (err) {
-					fprintf(stderr,
-						"Cannot receive from slot %d: %s\n",
-						slot_index, strerror(errno));
+				if (err)
 					goto out;
-				}
+
 				cnt++;
 				if (n > 0 && n < cnt)
 					goto out;

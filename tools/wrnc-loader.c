@@ -15,7 +15,7 @@
 static void help()
 {
 	fprintf(stderr, "\n");
-	fprintf(stderr, "wrnc-loader -D 0x<hex-number> -i <number> -f <path>\n\n");
+	fprintf(stderr, "wrnc-loader -D 0x<hex-number> -i <number> -f <path> [options]\n\n");
 	fprintf(stderr, "It loads (or dumps) an application to a WRNC internal CPU\n\n");
 	fprintf(stderr, "-D   WRNC device identificator\n");
 	fprintf(stderr, "-i   CPU index\n");
@@ -75,6 +75,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (dump) {
+		/* Read the CPU application memory content to a given file */
 		err = wrnc_cpu_dump_application_file(wrnc, cpu_index, file);
 		if (err) {
 			fprintf(stderr,
@@ -82,7 +83,8 @@ int main(int argc, char *argv[])
 				cpu_index,
 				wrnc_strerror(errno));
 		}
-	}else {
+	} else {
+		/* Write the content of a given file to the CPU application memory */
 		err = wrnc_cpu_load_application_file(wrnc, cpu_index, file);
 		if (err) {
 			fprintf(stderr,

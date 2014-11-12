@@ -15,23 +15,37 @@
 static void help()
 {
 	fprintf(stderr, "\n");
-	fprintf(stderr, "wrnc-messages-dump -D 0x<hex-number> -i <number> [options]\n\n");
-	fprintf(stderr, "It dumps all messages from a given slot\n\n");
-	fprintf(stderr, "-D   WRNC device identificator\n");
+	fprintf(stderr, "wrnc-messages -D 0x<hex-number> -i <number> [options]\n\n");
+	fprintf(stderr, "It dumps all messages from a given set slots\n\n");
+	fprintf(stderr, "-D   WRNC device identificator in hexadecimal format\n");
 	fprintf(stderr, "-i   slot index\n");
-	fprintf(stderr, "-n   number of message to read. The default is 0 (infinite)\n");
+	fprintf(stderr, "-n   number of total messages to read. The default is 0 (infinite)\n");
+	fprintf(stderr, "-h   show this help\n");
 	fprintf(stderr, "\n");
+	fprintf(stderr,
+		"You can dump from several devices slots, so the arguments '-D' and '-i' may");
+	fprintf(stderr,
+		" appear several times. The argument '-i' refers to the previous device id declared\n\n");
+	fprintf(stderr,
+		"e.g. Dumping messagges from slots 2 and 3 of devices 0x0400 and 0x0380\n\n");
+	fprintf(stderr,
+		"        wrnc-messages -D 0x0380 -i 2 -i 3 -D 0x0400 -i 2 -i 3\n\n");
 	exit(1);
 }
 
-
-void dump_message(struct wrnc_dev *wrnc, unsigned int slot_index)
+/**
+ * It retreives a message from a given slots and it prints its content
+ * @param[in] wrnc device to use
+ * @param[in] slot_index index of the slot to read
+ */
+static int dump_message(struct wrnc_dev *wrnc, unsigned int slot_index)
 {
 	struct wrnc_msg *wmsg;
 	char str[128];
 	int j;
 
 	errno = 0;
+	/* Retreive message */
 	wmsg = wrnc_slot_receive(wrnc, slot_index);
 	if (!wmsg) {
 		if (errno) {
@@ -43,6 +57,7 @@ void dump_message(struct wrnc_dev *wrnc, unsigned int slot_index)
 		return;
 	}
 
+	/* Print message */
 	switch (wmsg->data[0]) {
         case 0xdeadbeef:
 		for (j = 0; j < 128 - 1 && j < wmsg->datalen; ++j)
@@ -77,12 +92,14 @@ int main(int argc, char *argv[])
 			help();
 			break;
 		case 'i':
+		/* Save slot index for each device id */
 			if (si >= MAX_SLOT && di > 0)
 				break;
 			sscanf(optarg, "%d", &slot_index[di - 1][si]);
 			si++;
 			break;
 		case 'D':
+		/* Save device ids to use */
 			if (di >= MAX_DEV)
 				break;
 			sscanf(optarg, "0x%x", &dev_id[di]);
@@ -90,6 +107,7 @@ int main(int argc, char *argv[])
 			si = 0;
 			break;
 		case 'n':
+		/* Number of total messages to dump */
 			sscanf(optarg, "%d", &n);
 			break;
 		}
@@ -106,7 +124,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	/* Get messages */
+	/* Get messages from all devices slots */
 	while((n == 0 || cnt < n) && (di > 0 && si > 0)) {
 		for (i = 0; i < di; i++) {
 			for (j = 0; j < si; j++) {

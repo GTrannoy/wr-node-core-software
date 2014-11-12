@@ -710,7 +710,7 @@ struct wrnc_msg *wrnc_slot_receive(struct wrnc_dev *wrnc, unsigned int index)
 
 	err = wrnc_hmq_open(wdesc, index, 0);
 	if (err)
-		return err;
+		return NULL;
 
 	msg = malloc(sizeof(struct wrnc_msg));
 	if (!msg)

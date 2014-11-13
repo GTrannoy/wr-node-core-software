@@ -6,7 +6,7 @@
 DESTDIR ?= /usr/local
 
 CFLAGS += -Wall -ggdb -I$(WRNC)/lib -I$(WRNC)/kernel $(EXTRACFLAGS)
-LDLIBS += -L$(WRNC)/lib -lwrnc
+LDLIBS += -L$(WRNC)/lib -lwrnc -lpthread
 PROGS := wrnc-count
 PROGS += lswrnc
 PROGS += wrnc-loader

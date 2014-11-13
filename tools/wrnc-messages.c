@@ -11,6 +11,15 @@
 #include <errno.h>
 #include <libwrnc.h>
 #include <getopt.h>
+#include <pthread.h>
+
+
+#define MAX_DEV 4
+#define MAX_SLOT 32
+
+static unsigned int slot_index[MAX_DEV][MAX_SLOT], idx_valid[MAX_DEV], cnt, n;
+static uint32_t dev_id[MAX_DEV];
+static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 
 static void help()
 {
@@ -45,7 +54,9 @@ static int dump_message(struct wrnc_dev *wrnc, unsigned int slot_index)
 	char str[128];
 	int j;
 
-	fprintf(stdout, "    slot-%d :", slot_index);
+	fprintf(stdout, "    ");
+
+	fprintf(stdout, "%s-hmq-i-%02d :", wrnc_name_get(wrnc), slot_index);
 	wmsg = wrnc_slot_receive(wrnc, slot_index);
 	if (!wmsg) {
 		fprintf(stdout, " error : %s\n", wrnc_strerror(errno));
@@ -70,17 +81,69 @@ static int dump_message(struct wrnc_dev *wrnc, unsigned int slot_index)
 	return 0;
 }
 
-#define MAX_DEV 4
-#define MAX_SLOT 32
+/**
+ * pthread for each device. It dumps messages from slots
+ * @param[in] arg a pointer to the device index
+ */
+void *dump_thread(void *arg)
+{
+	unsigned long idx = (unsigned long)arg, i;
+	struct pollfd p[MAX_SLOT];
+	struct wrnc_dev *wrnc;
+	int ret, err;
+
+	/* Open the device */
+	wrnc = wrnc_open_by_fmc(dev_id[idx]);
+	if (!wrnc) {
+		fprintf(stderr, "Cannot open WRNC: %s\n", wrnc_strerror(errno));
+	        pthread_exit(NULL);
+	}
+
+	/* Build the polling structures */
+	for (i = 0; i < idx_valid[idx]; ++i) {
+		p[i].fd = slot_index[idx][i];
+		p[i].events = POLLIN | POLLERR;
+	}
+
+	/* Start dumping messages */
+	while (n == 0 || n > cnt) {
+		/* Polling slots */
+		ret = wrnc_slot_poll(wrnc, p, idx_valid[idx], 10000);
+		switch (ret) {
+		default:
+			/* Dump from the slot */
+			for (i = 0; i < idx_valid[idx]; ++i) {
+				if (!(p[i].revents & POLLIN))
+					continue;
+				err = dump_message(wrnc, p[i].fd);
+				if (err)
+					continue;
+				pthread_mutex_lock(&mtx);
+				cnt++;
+				pthread_mutex_unlock(&mtx);
+			}
+			break;
+		case 0:
+			/* timeout */
+			break;
+		case -1:
+			/* error */
+			pthread_exit(NULL);
+			break;
+		}
+	}
+
+	wrnc_close(wrnc);
+	return NULL;
+}
+
+
 int main(int argc, char *argv[])
 {
-	unsigned int n = 0, i = 0, j, di = 0, cnt = 0;
-	unsigned int slot_index[MAX_DEV][MAX_SLOT], idx_valid[MAX_DEV];
-	uint32_t dev_id[MAX_DEV];
+	unsigned int i, di = 0;
+	pthread_t tid[MAX_DEV];
 	int err;
 	char c;
-	struct wrnc_dev *wrnc[MAX_DEV];
-
 
 	atexit(wrnc_exit);
 
@@ -116,35 +179,16 @@ int main(int argc, char *argv[])
 
 	wrnc_init();
 
-	/* Open all devices */
+	/* Run dumping on in parallel from several devices */
 	for (i = 0; i < di; i++) {
-		wrnc[i] = wrnc_open_by_fmc(dev_id[i]);
-		if (!wrnc[i]) {
-			fprintf(stderr, "Cannot open WRNC: %s\n", wrnc_strerror(errno));
-			exit(1);
-		}
+	        err = pthread_create(&tid[i], NULL, dump_thread, (void *)i);
+		if (err)
+			fprintf(stderr, "Cannot create 'dump_thread' instance %d: %s\n",
+				i, strerror(errno));
 	}
 
-	/* Get messages from all devices slots */
-	while((n == 0 || cnt < n) && (di > 0 && idx_valid[0] > 0)) {
-		for (i = 0; i < di; i++) {
-			fprintf(stdout, "device 0x%04x\n", dev_id[i]);
-			for (j = 0; j < idx_valid[i]; j++) {
-				err = dump_message(wrnc[i], slot_index[i][j]);
-				if (err)
-					goto out;
-
-				cnt++;
-				if (n > 0 && n < cnt)
-					goto out;
-			}
-		}
-	}
-
-out:
-	/* Close all devices */
+	/* Wait for the threads to finish */
 	for (i = 0; i < di; i++)
-		wrnc_close(wrnc[i]);
-
+		pthread_join(tid[i], NULL);
 	exit(0);
 }

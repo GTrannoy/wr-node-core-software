@@ -12,6 +12,7 @@
 #include <libwrnc.h>
 #include <getopt.h>
 #include <pthread.h>
+#include <time.h>
 
 
 #define MAX_DEV 4
@@ -20,6 +21,7 @@
 static unsigned int slot_index[MAX_DEV][MAX_SLOT], idx_valid[MAX_DEV], cnt, n;
 static uint32_t dev_id[MAX_DEV];
 static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+static int timestamp = 0;
 
 static void help()
 {
@@ -29,6 +31,7 @@ static void help()
 	fprintf(stderr, "-D   WRNC device identificator in hexadecimal format\n");
 	fprintf(stderr, "-i   slot index\n");
 	fprintf(stderr, "-n   number of total messages to read. The default is 0 (infinite)\n");
+	fprintf(stderr, "-t   print message timestamp\n");
 	fprintf(stderr, "-h   show this help\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr,
@@ -51,11 +54,17 @@ static void help()
 static int dump_message(struct wrnc_dev *wrnc, unsigned int slot_index)
 {
 	struct wrnc_msg *wmsg;
-	char str[128];
+        time_t tm;
+	char str[128], stime[64];
+	struct tm *gm;
 	int j;
 
-	fprintf(stdout, "    ");
-
+	if (timestamp) {
+		tm = time(NULL);
+		gm = gmtime(&tm);
+		strftime(stime, 64,"%T", gm);
+		fprintf(stdout, "[%s] ", stime);
+	}
 	fprintf(stdout, "%s-hmq-i-%02d :", wrnc_name_get(wrnc), slot_index);
 	wmsg = wrnc_slot_receive(wrnc, slot_index);
 	if (!wmsg) {
@@ -150,7 +159,7 @@ int main(int argc, char *argv[])
 	for (i = 0; i < MAX_SLOT; i++)
 		idx_valid[i] = 0;
 
-	while ((c = getopt (argc, argv, "hi:D:n:")) != -1) {
+	while ((c = getopt (argc, argv, "hi:D:n:t")) != -1) {
 		switch (c) {
 		default:
 			help();
@@ -173,6 +182,9 @@ int main(int argc, char *argv[])
 		case 'n':
 		/* Number of total messages to dump */
 			sscanf(optarg, "%d", &n);
+			break;
+		case 't':
+			timestamp = 1;
 			break;
 		}
 	}

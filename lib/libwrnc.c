@@ -769,3 +769,16 @@ int wrnc_slot_fd_get(struct wrnc_dev *wrnc, unsigned int is_input,
 
 	return fd[index];
 }
+
+
+/**
+ * It returns the name of the device
+ * @param[in] wrnc the device
+ * @return the string representing the name of the device
+ */
+char *wrnc_name_get(struct wrnc_dev *wrnc)
+{
+	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
+
+	return wdesc->name;
+}

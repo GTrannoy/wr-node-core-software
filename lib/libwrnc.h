@@ -70,7 +70,7 @@ extern struct wrnc_dev *wrnc_open(const char *device);
 extern struct wrnc_dev *wrnc_open_by_fmc(uint32_t device_id);
 extern struct wrnc_dev *wrnc_open_by_lun(unsigned int lun);
 extern void wrnc_close(struct wrnc_dev *wrnc);
-
+extern char *wrnc_name_get(struct wrnc_dev *wrnc);
 extern int wrnc_app_id_get(struct wrnc_dev *wrnc, uint32_t *app_id);
 
 extern int wrnc_cpu_load_application_raw(struct wrnc_dev *wrnc,

@@ -2,11 +2,14 @@
 .PHONY: all clean modules install modules_install clean_all
 .PHONY: gitmodules prereq prereq_install prereq_install_warn prereq_clean
 
-DIRS = kernel lib tools applications doc
+DIRS = kernel lib tools applications
 
 all clean modules install modules_install: gitmodules
 	@if echo $@ | grep -q install; then $(MAKE) prereq_install_warn; fi
 	for d in $(DIRS); do $(MAKE) -C $$d $@ || exit 1; done
+doc:
+	$(MAKE) -C doc clean
+	$(MAKE) -C doc all
 
 all modules: prereq
 

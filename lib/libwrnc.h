@@ -14,6 +14,7 @@ extern "C" {
 
 #include <stdint.h>
 #include <stdio.h>
+#include <poll.h>
 #include <wrnc-user.h>
 
 struct wrnc_dev;
@@ -106,8 +107,10 @@ extern int wrnc_slot_send_and_receive_sync(struct wrnc_dev *wrnc,
 					   unsigned int index_out,
 					   struct wrnc_msg *msg,
 					   unsigned int timeout_ms);
-extern int wrnc_slot_poll(struct wrnc_dev *wrnc, unsigned int index,
-			  short *revent, int timeout);
+extern int wrnc_slot_poll(struct wrnc_dev *wrnc, struct pollfd *p, nfds_t nfds,
+			  int timeout);
+extern int wrnc_slot_fd_get(struct wrnc_dev *wrnc, unsigned int is_input,
+			    unsigned int index);
 extern int wrnc_smem_read(struct wrnc_dev *wrnc, uint32_t addr, uint32_t *data);
 extern int wrnc_smem_write(struct wrnc_dev *wrnc, uint32_t addr, uint32_t data);
 extern int wrnc_bind(struct wrnc_dev *wrnc, struct wrnc_msg_filter *flt,

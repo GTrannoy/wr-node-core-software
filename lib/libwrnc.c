@@ -106,7 +106,7 @@ char (*wrnc_list())[WRNC_NAME_LEN]
 
 /**
  * It opens a wrnc device using a string descriptor. The descriptor correspond
- * is the char device name of the white-rabbit node-core.
+ * to the char device name of the white-rabbit node-core.
  * @param[in] device description of the device to open
  * @return the WRNC token, NULL on error and errno is appropriately set
  */
@@ -584,16 +584,42 @@ int wrnc_slot_send_and_receive_sync(struct wrnc_dev *wrnc,
 /**
  * It is a wrapper of poll(2) for a wrnc slot device.
  * @param[in] wrnc device to use
- * @param[in] index slot to poll
- * @param[out] revent returned events by poll
- * @param[in] timeout timeout in ms
- * @return 0 on success, -1 otherwise and errno is set appropriately
+ * @param[in] p see poll(2), instead of the real FD use the slot index
+ * @param[in] nfds see poll(2).
+ * @param[in] timeout see poll(2)
+ * @return see poll(2)
  */
-extern int wrnc_slot_poll(struct wrnc_dev *wrnc, unsigned int index,
-			  short *revent, int timeout)
+int wrnc_slot_poll(struct wrnc_dev *wrnc, struct pollfd *p, nfds_t nfds,
+		   int timeout)
 {
-	errno = EWRNC_NO_IMPLEMENTATION;
-	return -1;
+	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
+	struct pollfd lp[nfds];
+	int ret, i, index;
+
+	/* Copy requested events and retrieve fd */
+	for (i = 0; i < nfds; ++i) {
+		lp[i].events = p[i].events;
+		index = p[i].fd;
+		if (p[i].events & POLLIN) {
+			wrnc_hmq_open(wdesc, index, 0);
+			lp[i].fd = wdesc->fd_hmq_out[index];
+		}
+		if (p[i].events & POLLOUT) {
+			wrnc_hmq_open(wdesc, index, 1);
+			lp[i].fd = wdesc->fd_hmq_in[index];
+		}
+	}
+
+
+
+        ret = poll(&lp, nfds, timeout);
+
+	/* Copy back the return events */
+	for (i = 0; i < nfds; i++)
+		p[i].revents = lp[i].revents;
+
+
+	return ret;
 }
 
 /**
@@ -723,4 +749,23 @@ struct wrnc_msg *wrnc_slot_receive(struct wrnc_dev *wrnc, unsigned int index)
 	}
 
 	return msg;
+}
+
+
+/**
+ * It retreives the file descriptor of a slot
+ * @param[in] wrnc device to use
+ * @param[in] is_input direction of the slot, 1 for input, 0 for output
+ * @param[in] index slot to retreive
+ * @return the file descriptor number, -1 if the slot is not yet open
+ */
+int wrnc_slot_fd_get(struct wrnc_dev *wrnc, unsigned int is_input,
+			    unsigned int index)
+{
+	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
+	int *fd;
+
+	fd = is_input ? wdesc->fd_hmq_in : wdesc->fd_hmq_out;
+
+	return fd[index];
 }

@@ -4,7 +4,5 @@
 
 DIRS = wrtd
 
-export WRNC
-
 all clean modules install modules_install doc: gitmodules
 	for d in $(DIRS); do $(MAKE) -C $$d $@ || exit 1; done

@@ -3,7 +3,7 @@
 # build a particular environment.
 -include Makefile.specific
 
-WRNC := ../../../
+WRNC ?= ../../../
 
 LIB = libwrtd.a
 LOBJ := libwrtd-internal.o

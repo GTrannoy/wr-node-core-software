@@ -4,6 +4,7 @@
 -include Makefile.specific
 
 DESTDIR ?= /usr/local
+WRNC ?= ../
 
 CFLAGS += -Wall -ggdb -I$(WRNC)/lib -I$(WRNC)/kernel $(EXTRACFLAGS)
 LDLIBS += -L$(WRNC)/lib -lwrnc -lpthread

@@ -32,7 +32,6 @@ struct wrnc_dev;
 enum wrnc_error_number {
 	EWRNC_INVAL_PARSE = 83630, /**< cannot parse data from sysfs */
 	EWRNC_INVAL_SLOT, /**< invalid slot */
-	EWRNC_SYNC_TO, /**< */
 	EWRNC_NO_IMPLEMENTATION, /**< a prototype is not implemented */
 	__EWRNC_MAX,
 };

@@ -31,6 +31,12 @@ static char *wrnc_error_str[] = {
 	NULL,
 };
 
+
+/**
+ * It returns a string messages corresponding to a given error code
+ * @param[in] err error code
+ * @return a message error
+ */
 char *wrnc_strerror(int err)
 {
 	if (err < EWRNC_INVAL_PARSE || err > __EWRNC_MAX)
@@ -42,6 +48,7 @@ char *wrnc_strerror(int err)
 /**
  * It initializes the WRNC library. It must be called before doing
  * anything else
+ * @return 0 on success, otherwise -1 and errno is appropriately set
  */
 int wrnc_init()
 {
@@ -190,6 +197,9 @@ void wrnc_close(struct wrnc_dev *wrnc)
 	free(wdesc);
 }
 
+/**
+ * Generic function that reads from a sysfs attribute
+ */
 static int wrnc_sysfs_read(char *path, void *buf, size_t len)
 {
 	int fd, i;
@@ -203,6 +213,10 @@ static int wrnc_sysfs_read(char *path, void *buf, size_t len)
 	return i;
 }
 
+
+/**
+ * Generic function that writes to a sysfs attribute
+ */
 static int wrnc_sysfs_write(char *path, void *buf, size_t len)
 {
 	int fd, i;
@@ -216,6 +230,9 @@ static int wrnc_sysfs_write(char *path, void *buf, size_t len)
 	return i;
 }
 
+/**
+ * Generic function that parse a string from a sysfs attribute
+ */
 static int wrnc_sysfs_scanf(char *path, const char *fmt, ...)
 {
 	char buf[WRNC_SYSFS_READ_LEN];
@@ -239,6 +256,10 @@ static int wrnc_sysfs_scanf(char *path, const char *fmt, ...)
 	return 0;
 }
 
+
+/**
+ * Generic function that build a string to be written in a sysfs attribute
+ */
 static int wrnc_sysfs_printf(char *path, const char *fmt, ...)
 {
 	char buf[WRNC_SYSFS_READ_LEN];

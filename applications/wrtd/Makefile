@@ -6,7 +6,3 @@ DIRS = lib tools
 
 all clean modules install modules_install: gitmodules
 	for d in $(DIRS); do $(MAKE) -C $$d $@ || exit 1; done
-
-doc:
-	$(MAKE) -C doc clean
-	$(MAKE) -C doc all

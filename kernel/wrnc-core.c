@@ -761,7 +761,6 @@ static struct wrnc_msg *wrnc_message_pop(struct wrnc_hmq *hmq)
 	struct wrnc_msg *msg;
 	unsigned long flags;
 	uint32_t status;
-	char str[128];
 	int i;
 
 	msg = kmalloc(sizeof(struct wrnc_msg), GFP_KERNEL);
@@ -1011,7 +1010,7 @@ static void wrnc_irq_handler_input(struct wrnc_hmq *hmq)
 	if (list_empty(&hmq->list_msg)) {
 		/* We don't have nothing to send, disable the interrupts */
 		mask = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
-		mask &= ~(1 << hmq->index + MAX_MQUEUE_SLOTS);
+		mask &= ~((1 << hmq->index) + MAX_MQUEUE_SLOTS);
 		fmc_writel(fmc, mask, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
 		spin_unlock_irqrestore(&hmq->lock, flags);
 

@@ -22,7 +22,7 @@
 #include "libwrnc-internal.h"
 
 static uint32_t count;
-static char wrnc_dev_list[WRNC_MAX_CARRIERS + 1][WRNC_NAME_LEN];
+static char wrnc_dev_list[WRNC_MAX_CARRIER + 1][WRNC_NAME_LEN];
 static char *wrnc_error_str[] = {
 	"Cannot parse data from sysfs attribute",
 	"Invalid slot",
@@ -57,7 +57,7 @@ int wrnc_init()
 	for (i = 0; i < count; ++i)
 		strncpy(wrnc_dev_list[i], basename(g.gl_pathv[i]),
 			WRNC_NAME_LEN);
-	for (i = count; i < WRNC_MAX_CARRIERS; ++i)
+	for (i = count; i < WRNC_MAX_CARRIER; ++i)
 		wrnc_dev_list[i][0] = '\0';
 
 	return 0;
@@ -72,7 +72,7 @@ void wrnc_exit()
 {
 	int i;
 
-	for (i = 0; i < WRNC_MAX_CARRIERS; ++i)
+	for (i = 0; i < WRNC_MAX_CARRIER; ++i)
 		wrnc_dev_list[i][0] = '\0';
 }
 
@@ -95,10 +95,10 @@ char (*wrnc_list())[WRNC_NAME_LEN]
 {
 	char *list;
 
-	list = malloc((WRNC_MAX_CARRIERS + 1) * WRNC_NAME_LEN);
+	list = malloc((WRNC_MAX_CARRIER + 1) * WRNC_NAME_LEN);
 	if (!list)
 		return NULL;
-	memcpy(list, wrnc_dev_list, (WRNC_MAX_CARRIERS + 1) * WRNC_NAME_LEN);
+	memcpy(list, wrnc_dev_list, (WRNC_MAX_CARRIER + 1) * WRNC_NAME_LEN);
 
 	return (char (*)[WRNC_NAME_LEN])list;
 }
@@ -123,9 +123,9 @@ struct wrnc_dev *wrnc_open(const char *device)
 
 	for (i = 0; i < WRNC_MAX_CPU; ++i)
 		wrnc->fd_cpu[i] = -1;
-        for (i = 0; i < WRNC_MAX_HMQ_SLOT; ++i)
+        for (i = 0; i < WRNC_MAX_HMQ_SLOT / 2; ++i)
 		wrnc->fd_hmq_in[i] = -1;
-        for (i = 0; i < WRNC_MAX_HMQ_SLOT; ++i)
+        for (i = 0; i < WRNC_MAX_HMQ_SLOT / 2; ++i)
 		wrnc->fd_hmq_out[i] = -1;
 
 	return (struct wrnc_dev *)wrnc;
@@ -158,7 +158,6 @@ struct wrnc_dev *wrnc_open_by_fmc(uint32_t device_id)
 struct wrnc_dev *wrnc_open_by_lun(unsigned int lun)
 {
 	char name[12];
-	uint32_t dev_id;
 
 	snprintf(name, 12, "wrnc.%d", lun);
 	return wrnc_open(name);
@@ -181,11 +180,11 @@ void wrnc_close(struct wrnc_dev *wrnc)
 		if (wdesc->fd_cpu[i] < 0)
 			close(wdesc->fd_cpu[i]);
 
-	for (i = 0; i < WRNC_MAX_HMQ_SLOT; ++i)
+	for (i = 0; i < WRNC_MAX_HMQ_SLOT / 2; ++i)
 		if (wdesc->fd_hmq_in[i] < 0)
 			close(wdesc->fd_hmq_in[i]);
 
-	for (i = 0; i < WRNC_MAX_HMQ_SLOT; ++i)
+	for (i = 0; i < WRNC_MAX_HMQ_SLOT / 2; ++i)
 		if (wdesc->fd_hmq_in[i] < 0 )
 			close(wdesc->fd_hmq_in[i]);
 	free(wdesc);
@@ -522,7 +521,7 @@ static int wrnc_hmq_open(struct wrnc_desc *wdesc, unsigned int index,
 	char path[64];
 	int *fd;
 
-	if (index >= WRNC_MAX_HMQ_SLOT) {
+	if (index >= WRNC_MAX_HMQ_SLOT / 2) {
 		errno = EWRNC_INVAL_SLOT;
 		return -1;
 	}
@@ -612,7 +611,7 @@ int wrnc_slot_poll(struct wrnc_dev *wrnc, struct pollfd *p, nfds_t nfds,
 
 
 
-        ret = poll(&lp, nfds, timeout);
+        ret = poll(lp, nfds, timeout);
 
 	/* Copy back the return events */
 	for (i = 0; i < nfds; i++)

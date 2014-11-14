@@ -20,9 +20,6 @@ extern "C" {
 struct wrnc_dev;
 
 #define WRNC_NAME_LEN 12
-#define WRNC_MAX_CARRIERS 20
-#define WRNC_MAX_CPU 8
-#define WRNC_MAX_HMQ_SLOT 16
 
 #define WRNC_SYSFS_PATH_LEN 128
 #define WRNC_SYSFS_READ_LEN 32

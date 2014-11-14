@@ -29,9 +29,9 @@
 
 #include "wrnc.h"
 
-static int hmq_max_msg = 32;
+static int hmq_max_msg = 32; /**< Maximum number of messages in driver queue */
 module_param_named(max_slot_msg, hmq_max_msg, int, 0444);
-MODULE_PARM_DESC(max_slot_msg, "Maximum number of messages to keep in memory.");
+MODULE_PARM_DESC(max_slot_msg, "Maximum number of messages in driver queue.");
 
 static int wrnc_dev_uevent(struct device *dev, struct kobj_uevent_env *env)
 {
@@ -60,6 +60,10 @@ static struct device *minors[WRNC_MAX_MINORS];
 
 static struct cdev cdev_hmq;
 
+
+/**
+ * It return the first available char device minor for a given type.
+ */
 static int wrnc_minor_get(struct device *dev, enum wrnc_dev_type type)
 {
 	int i, start, end;
@@ -91,6 +95,10 @@ static int wrnc_minor_get(struct device *dev, enum wrnc_dev_type type)
 	return -1;
 }
 
+
+/**
+ * It releases the char device minor is use by a given device
+ */
 static void wrnc_minor_put(struct device *dev)
 {
 	int i;
@@ -102,6 +110,13 @@ static void wrnc_minor_put(struct device *dev)
 		}
 	}
 }
+
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * * * * SYSFS * * * * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 /**
  * Set the reset bit of the CPUs according to the mask
@@ -129,10 +144,50 @@ static void wrnc_cpu_reset_clr(struct wrnc_dev *wrnc, uint8_t mask)
 	fmc_writel(fmc, reg_val, wrnc->base_csr + WRN_CPU_CSR_REG_RESET);
 }
 
+/**
+ * It returns the running status of the CPU
+ */
+static ssize_t wrnc_show_reset(struct device *dev,
+			       struct device_attribute *attr,
+			       char *buf)
+{
+	struct wrnc_cpu *cpu = to_wrnc_cpu(dev);
+	struct wrnc_dev *wrnc = to_wrnc_dev(dev->parent);
+	struct fmc_device *fmc = to_fmc_dev(wrnc);
+	uint32_t reg_val;
+
+	reg_val = fmc_readl(fmc, wrnc->base_csr + WRN_CPU_CSR_REG_RESET);
+
+	return sprintf(buf, "%d\n", !!(reg_val & (1 << cpu->index)));
+}
+
+/**
+ * It run or pause the CPU
+ */
+static ssize_t wrnc_store_reset(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	struct wrnc_cpu *cpu = to_wrnc_cpu(dev);
+	struct wrnc_dev *wrnc = to_wrnc_dev(dev->parent);
+	long val;
+
+	if (strict_strtol(buf, 0, &val))
+		return -EINVAL;
+
+	if (val)
+	        wrnc_cpu_reset_set(wrnc, (1 << cpu->index));
+	else
+	        wrnc_cpu_reset_clr(wrnc, (1 << cpu->index));
+
+	return count;
+}
+
+
 
 /**
  * Set the reset bit of the CPUs according to the mask
- * Note that for the CPU 1 means pause
+ * NOTE : for the CPU 1 means pause
  */
 static void wrnc_cpu_enable_set(struct wrnc_dev *wrnc, uint8_t mask)
 {
@@ -146,7 +201,7 @@ static void wrnc_cpu_enable_set(struct wrnc_dev *wrnc, uint8_t mask)
 
 /**
  * Clear the reset bit of the CPUs according to the mask
- * Note that for the CPU 0 means run
+ * NOTE : for the CPU 0 means run
  */
 static void wrnc_cpu_enable_clr(struct wrnc_dev *wrnc, uint8_t mask)
 {
@@ -197,44 +252,6 @@ static ssize_t wrnc_store_enable(struct device *dev,
 	return count;
 }
 
-/**
- * It returns the running status of the CPU
- */
-static ssize_t wrnc_show_reset(struct device *dev,
-			       struct device_attribute *attr,
-			       char *buf)
-{
-	struct wrnc_cpu *cpu = to_wrnc_cpu(dev);
-	struct wrnc_dev *wrnc = to_wrnc_dev(dev->parent);
-	struct fmc_device *fmc = to_fmc_dev(wrnc);
-	uint32_t reg_val;
-
-	reg_val = fmc_readl(fmc, wrnc->base_csr + WRN_CPU_CSR_REG_RESET);
-
-	return sprintf(buf, "%d\n", !!(reg_val & (1 << cpu->index)));
-}
-
-/**
- * It run or pause the CPU
- */
-static ssize_t wrnc_store_reset(struct device *dev,
-				struct device_attribute *attr,
-				const char *buf, size_t count)
-{
-	struct wrnc_cpu *cpu = to_wrnc_cpu(dev);
-	struct wrnc_dev *wrnc = to_wrnc_dev(dev->parent);
-	long val;
-
-	if (strict_strtol(buf, 0, &val))
-		return -EINVAL;
-
-	if (val)
-	        wrnc_cpu_reset_set(wrnc, (1 << cpu->index));
-	else
-	        wrnc_cpu_reset_clr(wrnc, (1 << cpu->index));
-
-	return count;
-}
 
 DEVICE_ATTR(enable, (S_IRUGO | S_IWUSR), wrnc_show_enable, wrnc_store_enable);
 DEVICE_ATTR(reset, (S_IRUGO | S_IWUSR), wrnc_show_reset, wrnc_store_reset);
@@ -270,8 +287,8 @@ static ssize_t wrnc_show_app_id(struct device *dev,
  * It returns the number of CPU in the FPGA
  */
 static ssize_t wrnc_show_n_cpu(struct device *dev,
-				struct device_attribute *attr,
-				char *buf)
+			       struct device_attribute *attr,
+			       char *buf)
 {
 	struct wrnc_dev *wrnc = to_wrnc_dev(dev);
 
@@ -283,8 +300,8 @@ static ssize_t wrnc_show_n_cpu(struct device *dev,
  * It returns the current enable status of the CPU
  */
 static ssize_t wrnc_show_enable_mask(struct device *dev,
-				struct device_attribute *attr,
-				char *buf)
+				     struct device_attribute *attr,
+				     char *buf)
 {
 	struct wrnc_dev *wrnc = to_wrnc_dev(dev);
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
@@ -299,8 +316,8 @@ static ssize_t wrnc_show_enable_mask(struct device *dev,
  * It enable or disable the CPU
  */
 static ssize_t wrnc_store_enable_mask(struct device *dev,
-				 struct device_attribute *attr,
-				 const char *buf, size_t count)
+				      struct device_attribute *attr,
+				      const char *buf, size_t count)
 {
 	struct wrnc_dev *wrnc = to_wrnc_dev(dev);
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
@@ -318,8 +335,8 @@ static ssize_t wrnc_store_enable_mask(struct device *dev,
  * It returns the running status of the CPU
  */
 static ssize_t wrnc_show_reset_mask(struct device *dev,
-			       struct device_attribute *attr,
-			       char *buf)
+				    struct device_attribute *attr,
+				    char *buf)
 {
 	struct wrnc_dev *wrnc = to_wrnc_dev(dev);
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
@@ -334,8 +351,8 @@ static ssize_t wrnc_show_reset_mask(struct device *dev,
  * It run or pause the CPU
  */
 static ssize_t wrnc_store_reset_mask(struct device *dev,
-				struct device_attribute *attr,
-				const char *buf, size_t count)
+				     struct device_attribute *attr,
+				     const char *buf, size_t count)
 {
 	struct wrnc_dev *wrnc = to_wrnc_dev(dev);
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
@@ -373,9 +390,14 @@ static const struct attribute_group *wrnc_dev_groups[] = {
 	NULL,
 };
 
+
+
+/**
+ * It return 1 if the message quque slot is full
+ */
 static ssize_t wrnc_show_full(struct device *dev,
-				struct device_attribute *attr,
-				char *buf)
+			      struct device_attribute *attr,
+			      char *buf)
 {
 	struct wrnc_hmq *hmq = to_wrnc_hmq(dev);
 	struct wrnc_dev *wrnc = to_wrnc_dev(dev->parent);
@@ -386,9 +408,14 @@ static ssize_t wrnc_show_full(struct device *dev,
 
 	return sprintf(buf, "%d\n", !!(status & 0x1));
 }
+
+
+/**
+ * It return 1 if the message quque slot is empty
+ */
 static ssize_t wrnc_show_empty(struct device *dev,
-				struct device_attribute *attr,
-				char *buf)
+			       struct device_attribute *attr,
+			       char *buf)
 {
 	struct wrnc_hmq *hmq = to_wrnc_hmq(dev);
 	struct wrnc_dev *wrnc = to_wrnc_dev(dev->parent);
@@ -399,9 +426,14 @@ static ssize_t wrnc_show_empty(struct device *dev,
 
 	return sprintf(buf, "%d\n", !!(status & 0x2));
 }
+
+
+/**
+ * It returns the number of messages in the WRNC queue
+ */
 static ssize_t wrnc_show_count(struct device *dev,
-				struct device_attribute *attr,
-				char *buf)
+			       struct device_attribute *attr,
+			       char *buf)
 {
 	struct wrnc_hmq *hmq = to_wrnc_hmq(dev);
 	struct wrnc_dev *wrnc = to_wrnc_dev(dev->parent);
@@ -412,6 +444,7 @@ static ssize_t wrnc_show_count(struct device *dev,
 
 	return sprintf(buf, "%d\n", ((status >> 2) & 0xFF));
 }
+
 
 DEVICE_ATTR(full, S_IRUGO, wrnc_show_full, NULL);
 DEVICE_ATTR(empty, S_IRUGO, wrnc_show_empty, NULL);
@@ -434,17 +467,47 @@ static const struct attribute_group *wrnc_hmq_groups[] = {
 };
 
 
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * * DEV CHAR DEVICE * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+/**
+ * Things to do after device release
+ */
 static void wrnc_dev_release(struct device *dev)
 {
 
 }
 
-static void wrnc_cpu_release(struct device *dev)
+
+/**
+ * Open the char device on the top of the hierarchy
+ */
+static int wrnc_dev_simple_open(struct inode *inode, struct file *file)
 {
-	//wrnc_minor_put(dev);
+	int m = iminor(inode);
+
+	file->private_data = to_wrnc_dev(minors[m]);
+
+	return 0;
 }
 
-static void wrnc_hmq_release(struct device *dev)
+static const struct file_operations wrnc_dev_fops = {
+	.owner = THIS_MODULE,
+	.open  = wrnc_dev_simple_open,
+};
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * * CPU CHAR DEVICE * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+/**
+ * Things to do after CPU device release
+ */
+static void wrnc_cpu_release(struct device *dev)
 {
 	//wrnc_minor_put(dev);
 }
@@ -453,7 +516,8 @@ static void wrnc_hmq_release(struct device *dev)
 /**
  * It loads a given application into the CPU memory
  */
-static int wrnc_cpu_firmware_load(struct wrnc_cpu *cpu, void *fw_buf, size_t count, loff_t off)
+static int wrnc_cpu_firmware_load(struct wrnc_cpu *cpu, void *fw_buf,
+				  size_t count, loff_t off)
 {
 	struct wrnc_dev *wrnc = to_wrnc_dev(cpu->dev.parent);
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
@@ -461,7 +525,9 @@ static int wrnc_cpu_firmware_load(struct wrnc_cpu *cpu, void *fw_buf, size_t cou
 	int size, offset, i;
 
 	if (off + count > 8192 * 4) {
-		dev_err(&cpu->dev, "Cannot load firmware: size limit %d byte\n", 8192);
+		dev_err(&cpu->dev,
+			"Cannot load firmware: size limit %d byte\n",
+			8192);
 		return -ENOMEM;
 	}
 
@@ -484,9 +550,11 @@ static int wrnc_cpu_firmware_load(struct wrnc_cpu *cpu, void *fw_buf, size_t cou
 	/* Load the firmware */
 	for (i = 0; i < size; ++i) {
 		word = cpu_to_be32(fw[i]);
-		fmc_writel(fmc, i + offset, wrnc->base_csr + WRN_CPU_CSR_REG_UADDR);
+		fmc_writel(fmc, i + offset,
+			   wrnc->base_csr + WRN_CPU_CSR_REG_UADDR);
 		fmc_writel(fmc, word, wrnc->base_csr + WRN_CPU_CSR_REG_UDATA);
-		word_rb = fmc_readl(fmc, wrnc->base_csr + WRN_CPU_CSR_REG_UDATA);
+		word_rb = fmc_readl(fmc,
+				    wrnc->base_csr + WRN_CPU_CSR_REG_UDATA);
 		if (word != word_rb) {
 			dev_err(&cpu->dev, "failed to load firmware\n");
 		        return -EFAULT;
@@ -496,7 +564,8 @@ static int wrnc_cpu_firmware_load(struct wrnc_cpu *cpu, void *fw_buf, size_t cou
 	return 0;
 }
 
-static int wrnc_cpu_firmware_dump(struct wrnc_cpu *cpu, void *fw_buf, size_t count, loff_t off)
+static int wrnc_cpu_firmware_dump(struct wrnc_cpu *cpu, void *fw_buf,
+				  size_t count, loff_t off)
 {
 	struct wrnc_dev *wrnc = to_wrnc_dev(cpu->dev.parent);
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
@@ -518,27 +587,14 @@ static int wrnc_cpu_firmware_dump(struct wrnc_cpu *cpu, void *fw_buf, size_t cou
 
 	/* Dump the firmware */
 	for (i = 0; i < size; ++i) {
-		fmc_writel(fmc, i + offset, wrnc->base_csr + WRN_CPU_CSR_REG_UADDR);
+		fmc_writel(fmc, i + offset,
+			   wrnc->base_csr + WRN_CPU_CSR_REG_UADDR);
 		word = fmc_readl(fmc, wrnc->base_csr + WRN_CPU_CSR_REG_UDATA);
 		fw[i] = be32_to_cpu(word);
 	}
 
 	return 0;
 }
-
-static int wrnc_dev_simple_open(struct inode *inode, struct file *file)
-{
-	int m = iminor(inode);
-
-	file->private_data = to_wrnc_dev(minors[m]);
-
-	return 0;
-}
-
-static const struct file_operations wrnc_dev_fops = {
-	.owner = THIS_MODULE,
-	.open  = wrnc_dev_simple_open,
-};
 
 
 static int wrnc_cpu_simple_open(struct inode *inode, struct file *file)
@@ -622,6 +678,23 @@ static const struct file_operations wrnc_cpu_fops = {
 	.llseek = generic_file_llseek,
 };
 
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * * HMQ CHAR DEVICE * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+/**
+ * Things to do after HMQ device release
+ */
+static void wrnc_hmq_release(struct device *dev)
+{
+	//wrnc_minor_put(dev);
+}
+
+/**
+ * It simply opens a HMQ device
+ */
 static int wrnc_hmq_simple_open(struct inode *inode, struct file *file)
 {
 	int m = iminor(inode);
@@ -631,6 +704,11 @@ static int wrnc_hmq_simple_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
+/**
+ * It writes message in the drive message queue. The messages will be sent on
+ * IRQ signal
+ * @TODO to be done!
+ */
 static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 			      size_t count, loff_t *offp)
 {
@@ -646,9 +724,13 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 		return -EINVAL;
 	}
 
+	/* TODO ... */
 	return count;
 }
 
+/**
+ * It writes a message to a FPGA HMQ
+ */
 static void wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
 {
 	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
@@ -669,6 +751,9 @@ static void wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
 	spin_unlock_irqrestore(&hmq->lock, flags);
 }
 
+/**
+ * It reads a message from a FPGA HMQ
+ */
 static struct wrnc_msg *wrnc_message_pop(struct wrnc_hmq *hmq)
 {
 	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
@@ -700,6 +785,9 @@ static struct wrnc_msg *wrnc_message_pop(struct wrnc_hmq *hmq)
 	return msg;
 }
 
+/**
+ * Send a message and wait for the answer
+ */
 static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 {
 	struct wrnc_msg_element *msgel;
@@ -735,10 +823,11 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	mutex_lock(&hmq->mtx);
 
 	/*
-	 * Wait for the CPU-out queue is empty. Then get the mutex to avoit other
-	 * processes to read our synchronous answer
+	 * Wait for the CPU-out queue is empty. Then get the mutex to avoid
+	 * other processes to read our synchronous answer
 	 */
-	to = wait_event_interruptible(hmq_out->q_msg, list_empty(&hmq_out->list_msg));
+	to = wait_event_interruptible(hmq_out->q_msg,
+				      list_empty(&hmq_out->list_msg));
 	if (unlikely(to < 0))
 	        goto out_out;
 	mutex_lock(&hmq_out->mtx);
@@ -747,8 +836,8 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	wrnc_message_push(hmq, &msg.msg);
 
 	/*
-	 * Wait our synchronous answer. If after 1000ms we don't receive an answer,
-	 * something is seriously broken
+	 * Wait our synchronous answer. If after 1000ms we don't receive
+	 * an answer, something is seriously broken
 	 */
 	to = wait_event_interruptible_timeout(hmq_out->q_msg,
 					      !list_empty(&hmq_out->list_msg),
@@ -780,6 +869,9 @@ out:
         return copy_to_user(uarg, &msg, sizeof(struct wrnc_msg_sync));
 }
 
+/**
+ * Set of special operations that can be done on the HMQ
+ */
 static long wrnc_hmq_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
 	struct wrnc_hmq *hmq = f->private_data;
@@ -798,6 +890,7 @@ static long wrnc_hmq_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 	if (err)
 		return -EFAULT;
 
+	/* Perform commands */
 	switch (cmd) {
 	case WRNC_IOCTL_MSG_SYNC:
 		err = wrnc_ioctl_msg_sync(hmq, uarg);
@@ -812,7 +905,7 @@ static long wrnc_hmq_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 
 
 /**
- * It returns to user space messages from an output hmq
+ * It returns a message to user space messages from an output HMQ
  */
 static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 			     size_t count, loff_t *offp)
@@ -826,6 +919,7 @@ static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 		return -EFAULT;
 	}
 
+	/* Calculate the number of messages to read */
 	if (count % sizeof(struct wrnc_msg)) {
 		dev_err(&hmq->dev, "we can read only entire messages\n");
 		return -EINVAL;
@@ -840,13 +934,14 @@ static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 			*offp = 0;
 			break;
 		}
-
+		/* Get the oldest message in the queue */
 		spin_lock(&hmq->lock);
 		msgel = list_entry(hmq->list_msg.next, struct wrnc_msg_element, list);
 		list_del(&msgel->list);
 		hmq->count--;
 		spin_unlock(&hmq->lock);
 
+		/* Copy to user space buffer */
 		if (copy_to_user(buf + count, msgel->msg, sizeof(struct wrnc_msg)))
 			return -EFAULT;
 
@@ -860,6 +955,10 @@ static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 	return count;
 }
 
+/**
+ * For HMQ output it checks if there is something in our message queue to read
+ * For HMQ input it checks if there is space in our message queue to write
+ */
 static unsigned int wrnc_hmq_poll(struct file *f, struct poll_table_struct *w)
 {
 	struct wrnc_hmq *hmq = f->private_data;
@@ -887,9 +986,18 @@ static const struct file_operations wrnc_hmq_fops = {
 	.poll = wrnc_hmq_poll,
 };
 
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * * HMQ IRQ MANAGEMENT  * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
 /**
  * It handles an input interrupts. The CPU is waiting for input data, so
  * we should feed the CPU if we have something in our local buffer.
+ *
+ * @TODO to be tested. For the time being we are working only in
+ *       synchronous mode
  */
 static void wrnc_irq_handler_input(struct wrnc_hmq *hmq)
 {
@@ -942,6 +1050,7 @@ static void wrnc_irq_handler_output(struct wrnc_hmq *hmq)
 		return;
 	}
 
+	/* get the message from the device */
 	msgel->msg = wrnc_message_pop(hmq);
 	if (IS_ERR_OR_NULL(msgel->msg)) {
 		kfree(msgel);
@@ -953,7 +1062,7 @@ static void wrnc_irq_handler_output(struct wrnc_hmq *hmq)
 	list_add_tail(&msgel->list, &hmq->list_msg);
 	hmq->count++;
 	if (unlikely(hmq->count > hmq_max_msg)) {
-		/* Remove the oldest message */
+		/* there is no more space, remove the oldest message */
 		list_del(&msgel->list);
 		hmq->count--;
 	}
@@ -1010,6 +1119,16 @@ dispatch_irq:
 	return IRQ_HANDLED;
 }
 
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * DRIVER (un)LOADING  * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+/**
+ * It initializes and registers a HMQ device
+ */
 static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
 			  unsigned int is_input)
 {
@@ -1057,7 +1176,7 @@ static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
 }
 
 /**
- * It initialize the WRNC device
+ * It initialize the WRNC device (device, CPUs, HMQs)
  */
 int wrnc_probe(struct fmc_device *fmc)
 {
@@ -1126,7 +1245,6 @@ int wrnc_probe(struct fmc_device *fmc)
 		wrnc->cpu[i].dev.parent = &wrnc->dev;
 		wrnc->cpu[i].dev.groups = wrnc_cpu_groups;
 		wrnc->cpu[i].dev.release = wrnc_cpu_release;
-		/* TODO add fops to r/w firmware */
 		err = device_register(&wrnc->cpu[i].dev);
 		if (err)
 		        goto out_cpu;
@@ -1203,7 +1321,7 @@ out_n_cpu:
 }
 
 /**
- * It remove the WRNC device
+ * It remove the WRNC device (device, CPUs, HMQs) and free irq handler
  */
 int wrnc_remove(struct fmc_device *fmc)
 {
@@ -1230,6 +1348,13 @@ int wrnc_remove(struct fmc_device *fmc)
 	return 0;
 }
 
+
+/**
+ * List of device to match.
+ *
+ * @FIXME for the time being we match the TDC mezzanine because we do not have
+ *        the capability to match single FPGA components
+ */
 static struct fmc_fru_id wrnc_fru_id[] = {
 	{
 		//.product_name = "white-rabbit-node-core",
@@ -1248,6 +1373,10 @@ static struct fmc_driver wrnc_dev_drv = {
 	},
 };
 
+
+/**
+ * Allocate resources for the driver. Char devices and FMC driver
+ */
 static int wrnc_init(void)
 {
 	int err, i;
@@ -1261,7 +1390,8 @@ static int wrnc_init(void)
 		pr_err("%s: unable to register class\n", __func__);
 	        return err;
 	}
-	/* Allocate a char device region for CPU and slots */
+
+	/* Allocate a char device region for devices, CPUs and slots */
 	err = alloc_chrdev_region(&basedev, 0, WRNC_MAX_MINORS, "wrnc");
 	if (err) {
 		pr_err("%s: unable to allocate region for %i minors\n",
@@ -1269,18 +1399,20 @@ static int wrnc_init(void)
 	        goto out_all;
 	}
 
-	/* Register the char device */
+	/* Register the device char-device */
 	cdev_init(&cdev_dev, &wrnc_dev_fops);
 	cdev_dev.owner = THIS_MODULE;
 	err = cdev_add(&cdev_dev, basedev, WRNC_MAX_CARRIER);
 	if (err)
 		goto out_cdev_dev;
+	/* Register the cpu char-device */
 	cdev_init(&cdev_cpu, &wrnc_cpu_fops);
 	cdev_cpu.owner = THIS_MODULE;
 	err = cdev_add(&cdev_cpu, basedev + WRNC_MAX_CARRIER,
 		       WRNC_MAX_CPU_MINORS);
 	if (err)
 		goto out_cdev_cpu;
+	/* Register the hmq char-device */
 	cdev_init(&cdev_hmq, &wrnc_hmq_fops);
 	cdev_cpu.owner = THIS_MODULE;
 	err = cdev_add(&cdev_hmq,
@@ -1288,6 +1420,7 @@ static int wrnc_init(void)
 		       WRNC_MAX_HMQ_MINORS);
 	if (err)
 		goto out_cdev_hmq;
+
 	/* Register the FMC driver */
         err = fmc_driver_register(&wrnc_dev_drv);
 	if (err)
@@ -1308,6 +1441,10 @@ out_all:
 	return err;
 }
 
+
+/**
+ * Undo all the resource allocations
+ */
 static void wrnc_exit(void)
 {
 	fmc_driver_unregister(&wrnc_dev_drv);

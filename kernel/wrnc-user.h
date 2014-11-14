@@ -26,7 +26,9 @@ struct wrnc_msg_sync {
 	unsigned int timeout_ms; /**< time to wait for an answer in ms */
 };
 
-
+/**
+ * Available ioctl() messages
+ */
 enum ual_ioctl_commands {
         WRNC_MSG_SYNC, /**< send a synchronous message */
 };

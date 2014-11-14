@@ -26,31 +26,39 @@
 #define WRNC_FLAG_HMQ_DIR (1 << 0) /**< 1 CPU input, 0 CPU output */
 #define WRNC_FLAG_HMQ_SHR (1 << 1) /**< 1 shared, means that more than
 				      1 CPU is using it */
-
+/**
+ * Available type of devices
+ */
 enum wrnc_dev_type {
-	WRNC_DEV,
-	WRNC_CPU,
-	WRNC_HMQ,
+	WRNC_DEV, /**< the whole WRNC component */
+	WRNC_CPU, /**< CPU core of the WRNC*/
+	WRNC_HMQ, /**< HMQ slot ot the WRNC */
 };
 
+/**
+ * Message structure for the driver
+ */
 struct wrnc_msg_element {
-	struct list_head list;
-	struct wrnc_msg *msg;
+	struct list_head list; /**< to keep it in our local queue */
+	struct wrnc_msg *msg; /**< the real message */
 };
 
+/**
+ * It describe the status of a HMQ slot
+ */
 struct wrnc_hmq {
 	struct device dev;
 	int index; /**< instance number */
-	unsigned long flags; /**< describe the status of the hmq slot from
+	unsigned long flags; /**< describe the status of the HMQ slot from
 			      the driver point of view */
 
-	uint32_t status; /**< describe the status of the mhq slot from the
+	uint32_t status; /**< describe the status of the HMQ slot from the
 			  cpu point of view */
 	uint32_t base_sr; /**< base address of the slot register */
-	struct list_head list_msg; /**< list of messages */
-	unsigned int count; /**< number of messages */
-	struct spinlock lock;
-	struct mutex mtx;
+	struct list_head list_msg; /**< list of messages to/from th HMQ */
+	unsigned int count; /**< number of messages in the list */
+	struct spinlock lock; /**< to protect list read/write */
+	struct mutex mtx; /**< to protect operations on the HMQ */
 	wait_queue_head_t q_msg; /**< wait queue for synchronous messages */
 };
 
@@ -66,17 +74,20 @@ struct wrnc_cpu {
 						    this CPU */
 };
 
+/**
+ * It describes the generic instance of a WRNC
+ */
 struct wrnc_dev {
 	unsigned int app_id; /**< Application ID of the FPGA bitstream */
 	struct device dev;
 
 	unsigned int n_cpu; /**< number of CPU in the FPGA bitstream */
-	struct wrnc_cpu cpu[WRNC_MAX_CPU];
+	struct wrnc_cpu cpu[WRNC_MAX_CPU]; /**< CPU instances */
 
 	unsigned int n_hmq_in; /**< number of input slots in the HMQ */
 	unsigned int n_hmq_out; /**< number of output slots in the HMQ */
-	struct wrnc_hmq hmq_in[MAX_MQUEUE_SLOTS];
-	struct wrnc_hmq hmq_out[MAX_MQUEUE_SLOTS];
+	struct wrnc_hmq hmq_in[MAX_MQUEUE_SLOTS]; /**< HMQ input instances */
+	struct wrnc_hmq hmq_out[MAX_MQUEUE_SLOTS]; /**< HMQ output instances */
 	uint32_t base_core; /**< base address of the WRNC component */
 	uint32_t base_csr; /**< base address of the Shared Control Register */
 	uint32_t base_hmq; /**< base address of the HMQ */

@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <getopt.h>
 #include <libwrnc.h>
 
@@ -22,7 +23,7 @@ static void help()
 
 int main(int argc, char *argv[])
 {
-	const char (*list)[WRNC_NAME_LEN];
+	char (*list)[WRNC_NAME_LEN];
 	unsigned int appid = 0, cpucount = 0;
 	struct wrnc_dev *wrnc;
 	uint32_t count;

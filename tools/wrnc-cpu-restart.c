@@ -36,7 +36,7 @@ static void help()
 #define MAX_CPU 8
 int main(int argc, char *argv[])
 {
-	unsigned int i = 0, j, si = 0, di = 0, cnt = 0;
+	unsigned int i = 0, j, si = 0, di = 0;
 	unsigned int index[MAX_DEV][MAX_CPU];
 	uint32_t dev_id[MAX_DEV];
 	struct wrnc_dev *wrnc[MAX_DEV];

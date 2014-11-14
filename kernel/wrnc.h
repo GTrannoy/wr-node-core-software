@@ -10,13 +10,10 @@
 #include "hw/mqueue.h"
 #include "wrnc-user.h"
 
-#define WRNC_MAX_CPU 8
 #define WRNC_MAX_HMQ_SLOT (MAX_MQUEUE_SLOTS * 2)
-#define WRNC_MAX_CARRIER 20
 #define WRNC_MAX_CPU_MINORS (WRNC_MAX_CPU * WRNC_MAX_CARRIER)
 #define WRNC_MAX_HMQ_MINORS (WRNC_MAX_HMQ_SLOT * WRNC_MAX_CARRIER)
 #define WRNC_MAX_MINORS (WRNC_MAX_CARRIER + WRNC_MAX_CPU_MINORS + WRNC_MAX_HMQ_MINORS)
-#define WRNC_MAX_PAYLOAD_SIZE 128
 
 #define to_wrnc_cpu(_dev) (container_of(_dev, struct wrnc_cpu, dev))
 #define to_wrnc_dev(_dev) (container_of(_dev, struct wrnc_dev, dev))

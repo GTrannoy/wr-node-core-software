@@ -4,6 +4,11 @@
  * License: GPL v3
  */
 
+#define WRNC_MAX_CARRIER 20 /**< Maximum number of WRNC components on a
+			       single computer*/
+#define WRNC_MAX_CPU 8 /**< Maximum number of CPU core in a WRNC bitstream */
+#define WRNC_MAX_HMQ_SLOT 32 /**< Maximum number of HMQ slots in a
+				WRNC bitstream */
 
 #define WRNC_MAX_PAYLOAD_SIZE 128
 

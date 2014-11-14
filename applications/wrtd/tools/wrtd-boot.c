@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
 	/* Get the WRNC token */
 	wrnc = wrtd_get_wrnc_dev(wrtd);
 
-	fprintf(stdout, "Reboot applications\n", tdc);
+	fprintf(stdout, "Reboot applications\n");
 	/* Enable TDC and FD CPUs */
 	err = wrnc_cpu_enable(wrnc, 0);
 	if (err)

@@ -63,7 +63,7 @@ int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 
 	/* Send the message and get answer */
 	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
-        if (msg.datalen != 29 || msg.data[0] != WRTD_REP_STATE) {
+        if (err || msg.datalen != 29 || msg.data[0] != WRTD_REP_STATE) {
 		errno = EWRTD_INVALD_ANSWER_STATE;
 		return -1;
 	}

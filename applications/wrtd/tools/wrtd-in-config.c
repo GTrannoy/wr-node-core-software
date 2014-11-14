@@ -13,6 +13,7 @@
 #include <getopt.h>
 #include <libwrnc.h>
 #include <libwrtd.h>
+#include <inttypes.h>
 
 #include <wrtd-internal.h>
 
@@ -112,7 +113,7 @@ void dump_input_state(struct wrtd_input_state *state)
 		       tmp, tmp2, state->last_sent.seq);
 	}
 
-	printf(" - Dead time:             %ld ns\n",
+	printf(" - Dead time:             %" PRIu64 "ld ns\n",
 	       ts_to_picos( state->dead_time ) / 1000 );
 
 	decode_log_level(tmp,state->log_level);

@@ -100,12 +100,7 @@ out:
  */
 struct wrtd_node *wrtd_open_by_lun(int lun)
 {
-	char name[12];
-	uint32_t dev_id;
-
-	snprintf(name, 12, "wrnc.%d", lun);
-	/*TODO convert to FMC */
-	return wrtd_open_by_fmc(dev_id);
+	return NULL;
 }
 
 

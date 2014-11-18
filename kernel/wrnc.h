@@ -14,6 +14,8 @@
 #define WRNC_MAX_HMQ_MINORS (WRNC_MAX_HMQ_SLOT * WRNC_MAX_CARRIER)
 #define WRNC_MAX_MINORS (WRNC_MAX_CARRIER + WRNC_MAX_CPU_MINORS + WRNC_MAX_HMQ_MINORS)
 
+#define WRNC_SMEM_MAX_SIZE 8192
+
 #define to_wrnc_cpu(_dev) (container_of(_dev, struct wrnc_cpu, dev))
 #define to_wrnc_dev(_dev) (container_of(_dev, struct wrnc_dev, dev))
 #define to_fmc_dev(_wrnc) (container_of(_wrnc->dev.parent, struct fmc_device, dev))
@@ -89,7 +91,10 @@ struct wrnc_dev {
 	uint32_t base_hmq; /**< base address of the HMQ */
 	uint32_t base_gcr; /**< base address of the Global Control Register
 			      for the HMQ */
+	uint32_t base_smem; /**< base address of the Shared Memory */
 	uint32_t irq_mask; /**< IRQ mask in use */
+
+	enum wrnc_smem_modifier mod; /**< smem operation modifier */
 };
 
 #endif

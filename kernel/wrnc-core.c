@@ -366,12 +366,44 @@ static ssize_t wrnc_store_reset_mask(struct device *dev,
 	return count;
 }
 
+
+static ssize_t wrnc_show_smem_op(struct device *dev,
+				 struct device_attribute *attr,
+				 char *buf)
+{
+	struct wrnc_dev *wrnc = to_wrnc_dev(dev);
+
+	return sprintf(buf, "%d", wrnc->mod);
+}
+
+static ssize_t wrnc_store_smem_op(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
+{
+	struct wrnc_dev *wrnc = to_wrnc_dev(dev);
+	long val;
+
+	if (strict_strtol(buf, 0, &val))
+		return -EINVAL;
+
+	if (val < WRNC_SMEM_DIRECT || val > WRNC_SMEM_ADD) {
+		dev_err(&wrnc->dev, "Unsupported operation %d\n", val);
+		return -EINVAL;
+	}
+
+	wrnc->mod = val;
+
+	return count;
+}
+
 DEVICE_ATTR(application_id, S_IRUGO, wrnc_show_app_id, NULL);
 DEVICE_ATTR(n_cpu, S_IRUGO, wrnc_show_n_cpu, NULL);
 DEVICE_ATTR(enable_mask, (S_IRUGO | S_IWUSR),
 	    wrnc_show_enable_mask, wrnc_store_enable_mask);
 DEVICE_ATTR(reset_mask, (S_IRUGO | S_IWUSR),
 	    wrnc_show_reset_mask, wrnc_store_reset_mask);
+DEVICE_ATTR(smem_operation, (S_IRUGO | S_IWUSR),
+	    wrnc_show_smem_op, wrnc_store_smem_op);
 
 static struct attribute *wrnc_dev_attr[] = {
 	&dev_attr_application_id.attr,
@@ -480,6 +512,73 @@ static void wrnc_dev_release(struct device *dev)
 
 }
 
+/**
+ * It writes on the shared memory
+ */
+static ssize_t wrnc_write(struct file *f, const char __user *buf,
+			  size_t count, loff_t *offp)
+{
+	struct wrnc_dev *wrnc = f->private_data;
+	struct fmc_device *fmc = to_fmc_dev(wrnc);
+	uint32_t val, addr;
+	int err, i;
+
+	if (*offp + count >= WRNC_SMEM_MAX_SIZE)
+		return -EINVAL;
+	if (*offp % 4 || count % 4 ) {
+		dev_warn(&wrnc->dev, "Only word size access allowed\n");
+		return -EINVAL;
+	}
+
+	addr = wrnc->base_smem + (wrnc->mod * WRNC_SMEM_MAX_SIZE) + *offp;
+	for (i = 0; i < count; i += 4) {
+		err = copy_from_user(&val, buf + i, 4);
+		if (err) {
+			dev_err(&wrnc->dev,
+				"Incomplete write on shared memory addr 0x%x size %d\n",
+				*offp, count);
+			return -EFAULT;
+		}
+		fmc_writel(fmc, val, addr + i);
+
+	}
+
+	*offp += count;
+
+	return count;
+}
+
+/**
+ * It reads from the shared memory
+ */
+static ssize_t wrnc_read(struct file *f, char __user *buf,
+			 size_t count, loff_t *offp)
+{
+	struct wrnc_dev *wrnc = f->private_data;
+	struct fmc_device *fmc = to_fmc_dev(wrnc);
+	uint32_t val, addr;
+	int err, i;
+
+	if (*offp + count >= WRNC_SMEM_MAX_SIZE)
+		return -EINVAL;
+	if (*offp % 4 || count % 4 ) {
+		dev_warn(&wrnc->dev, "Only word size access allowed\n");
+		return -EINVAL;
+	}
+
+	addr = wrnc->base_smem + *offp;
+	for (i = 0; i < count; i += 4) {
+		val = fmc_readl(fmc,  addr + i);
+		err = copy_to_user(buf + i, &val, 4);
+		if (err)
+			return -EFAULT;
+	}
+
+	*offp += count;
+
+	return count;
+}
+
 
 /**
  * Open the char device on the top of the hierarchy
@@ -496,6 +595,9 @@ static int wrnc_dev_simple_open(struct inode *inode, struct file *file)
 static const struct file_operations wrnc_dev_fops = {
 	.owner = THIS_MODULE,
 	.open  = wrnc_dev_simple_open,
+	.read = wrnc_read,
+	.write = wrnc_write,
+	.llseek = generic_file_llseek,
 };
 
 
@@ -1192,6 +1294,7 @@ int wrnc_probe(struct fmc_device *fmc)
 	wrnc->base_core = fmc_find_sdb_device(fmc->sdb, 0xce42, 0x90de, NULL);
 	/* FIXME use SDB - <base> + <CSR offset> */
 	wrnc->base_csr = wrnc->base_core + 0x10000;
+	wrnc->base_smem = wrnc->base_core + 0x20000;
 	wrnc->base_hmq = wrnc->base_core + BASE_HMQ;
 	wrnc->base_gcr = wrnc->base_hmq + MQUEUE_BASE_GCR;
 

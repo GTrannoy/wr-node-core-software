@@ -1189,8 +1189,8 @@ int wrnc_probe(struct fmc_device *fmc)
 		return -ENOMEM;
 	fmc_set_drvdata(fmc, wrnc);
 
+	wrnc->base_core = fmc_find_sdb_device(fmc->sdb, 0xce42, 0x90de, NULL);
 	/* FIXME use SDB - <base> + <CSR offset> */
-	wrnc->base_core = 0xC0000;
 	wrnc->base_csr = wrnc->base_core + 0x10000;
 	wrnc->base_hmq = wrnc->base_core + BASE_HMQ;
 	wrnc->base_gcr = wrnc->base_hmq + MQUEUE_BASE_GCR;
@@ -1279,7 +1279,7 @@ int wrnc_probe(struct fmc_device *fmc)
 	 * Great everything is configured properly, we can enable the interrupts
 	 * now and start working.
 	 */
-	fmc->irq = 0xC0000;//fmc_find_sdb_device(fmc->sdb, 0xce42, 0x13, NULL);
+	fmc->irq = wrnc->base_core;
 	err = fmc->op->irq_request(fmc, wrnc_irq_handler, (char *)dev_name(&wrnc->dev),
 				   0 /*VIC is used */);
 	if (err) {

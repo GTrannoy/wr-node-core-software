@@ -12,6 +12,16 @@
 
 #define WRNC_MAX_PAYLOAD_SIZE 128
 
+enum wrnc_smem_modifier {
+	WRNC_SMEM_DIRECT = 0, /**< direct read/write of the memory */
+	WRNC_SMEM_OR, /**< on write, atomic OR with memory content */
+	WRNC_SMEM_CLR_AND, /**< on write, atomic AND with complemented memory
+			      content */
+	WRNC_SMEM_XOR, /**< on write, atomic XOR with memory content */
+	WRNC_SMEM_ADD, /**< on write, atomic ADD to memory content */
+};
+
+
 /**
  * Messages descriptor
  */
@@ -32,23 +42,27 @@ struct wrnc_msg_sync {
 };
 
 /**
+ * Descriptor of the IO operation on Shared Memory
+ */
+struct wrnc_smem_io {
+	uint32_t addr; /**< address to access */
+	uint32_t value; /**< value to write. After ioctl it will be overwritte
+			   with the new value in the shared memory */
+	int is_input; /**< flag to determinte data direction */
+	enum wrnc_smem_modifier mod;
+};
+
+/**
  * Available ioctl() messages
  */
 enum ual_ioctl_commands {
         WRNC_MSG_SYNC, /**< send a synchronous message */
+	WRNC_SMEM_IO, /**< access to shared memory */
 };
 
 
 #define WRNC_IOCTL_MAGIC 's'
 #define WRNC_IOCTL_MSG_SYNC _IOWR(WRNC_IOCTL_MAGIC, WRNC_MSG_SYNC, \
 				    struct wrnc_msg_sync)
-
-
-enum wrnc_smem_modifier {
-	WRNC_SMEM_DIRECT = 0, /**< direct read/write of the memory */
-	WRNC_SMEM_OR, /**< on write, atomic OR with memory content */
-	WRNC_SMEM_CLR_AND, /**< on write, atomic AND with complemented memory
-			      content */
-	WRNC_SMEM_XOR, /**< on write, atomic XOR with memory content */
-	WRNC_SMEM_ADD, /**< on write, atomic ADD to memory content */
-};
+#define WRNC_IOCTL_SMEM_IO _IOWR(WRNC_IOCTL_MAGIC, WRNC_SMEM_IO, \
+				    struct wrnc_smem_io)

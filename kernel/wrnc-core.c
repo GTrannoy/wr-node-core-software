@@ -513,6 +513,67 @@ static void wrnc_dev_release(struct device *dev)
 }
 
 /**
+ * ioctl command to read/write shared memory
+ */
+static long wrnc_ioctl_io(struct wrnc_dev *wrnc, void __user *uarg)
+{
+	struct fmc_device *fmc = to_fmc_dev(wrnc);
+	struct wrnc_smem_io io;
+	uint32_t addr;
+	int err;
+
+	/* Copy the message from user space*/
+	err = copy_from_user(&io, uarg, sizeof(struct wrnc_smem_io));
+	if (err)
+	        return err;
+
+	if (io.is_input) {
+		/* read */
+		addr = wrnc->base_smem + io.addr;
+	} else {
+		/* write */
+		addr = wrnc->base_smem + (io.mod * WRNC_SMEM_MAX_SIZE)  + io.addr;
+		fmc_writel(fmc, io.value, addr);
+	}
+
+	/* read value from SMEM */
+	io.value = fmc_readl(fmc, addr);
+
+	return copy_to_user(uarg, &io, sizeof(struct wrnc_smem_io));
+}
+
+static long wrnc_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
+{
+	struct wrnc_dev *wrnc = f->private_data;
+	void __user *uarg = (void __user *)arg;
+	int err = 0;
+
+	/* Check type and command number */
+	if (_IOC_TYPE(cmd) != WRNC_IOCTL_MAGIC)
+		return -ENOTTY;
+
+	/* Validate user pointer */
+	if (_IOC_DIR(cmd) & _IOC_READ)
+		err = !access_ok(VERIFY_WRITE, uarg, _IOC_SIZE(cmd));
+	if (_IOC_DIR(cmd) & _IOC_WRITE)
+		err = !access_ok(VERIFY_READ, uarg, _IOC_SIZE(cmd));
+	if (err)
+		return -EFAULT;
+
+	/* Perform commands */
+	switch (cmd) {
+	case WRNC_IOCTL_SMEM_IO:
+		err = wrnc_ioctl_io(wrnc, uarg);
+		break;
+	default:
+		pr_warn("ual: invalid ioctl command %d\n", cmd);
+		return -EINVAL;
+	}
+
+	return err;
+}
+
+/**
  * It writes on the shared memory
  */
 static ssize_t wrnc_write(struct file *f, const char __user *buf,
@@ -598,6 +659,7 @@ static const struct file_operations wrnc_dev_fops = {
 	.read = wrnc_read,
 	.write = wrnc_write,
 	.llseek = generic_file_llseek,
+	.unlocked_ioctl = wrnc_ioctl,
 };
 
 

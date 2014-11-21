@@ -127,6 +127,7 @@ struct wrnc_dev *wrnc_open(const char *device)
 
 	strncpy(wrnc->name, device, WRNC_NAME_LEN);
 
+	wrnc->fd_dev = -1;
 	for (i = 0; i < WRNC_MAX_CPU; ++i)
 		wrnc->fd_cpu[i] = -1;
         for (i = 0; i < WRNC_MAX_HMQ_SLOT / 2; ++i)
@@ -642,16 +643,78 @@ int wrnc_slot_poll(struct wrnc_dev *wrnc, struct pollfd *p, nfds_t nfds,
 }
 
 /**
- * It reads from the shared memory of the WRNC
+ * It opens a WRNC device
+ * @param[in] wdesc device to use
+ * @param[in] index index of the slot to open
+ * @param[in] dir direction of the slot (1 input, 0 output)
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+static int wrnc_dev_open(struct wrnc_desc *wdesc)
+{
+	char path[64];
+
+
+	if (wdesc->fd_dev < 0) {
+		snprintf(path, 64, "/dev/%s", wdesc->name);
+	        wdesc->fd_dev = open(path, O_RDWR);
+		if (wdesc->fd_dev < 0)
+			return -1;
+	}
+
+	return 0;
+}
+
+/**
+ * It execute the ioctl command to read/write an smem address
  * @param[in] wrnc device to use
  * @param[in] addr memory address
  * @param[out] data value in the shared memory
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_smem_read(struct wrnc_dev *wrnc, uint32_t addr, uint32_t *data)
+static int wrnc_smem_io(struct wrnc_desc *wdesc, uint32_t addr, uint32_t *data,
+			size_t count, enum wrnc_smem_modifier mod, int is_input)
 {
-	errno = EWRNC_NO_IMPLEMENTATION;
-	return -1;
+	struct wrnc_smem_io io;
+	int err, i;
+
+	err = wrnc_dev_open(wdesc);
+	if (err)
+		return -1;
+
+	io.is_input = is_input;
+	io.mod = mod;
+	for (i = 0; i < count; i++) {
+		io.addr = addr + (i * 4);
+		if (!io.is_input)
+			io.value = data[i];
+		err = ioctl(wdesc->fd_dev, WRNC_IOCTL_SMEM_IO, &io);
+		if (err)
+			return -1;
+		printf("%s:%d\n", __func__, __LINE__);
+		data[i] = io.value;
+		printf("%s:%d\n", __func__, __LINE__);
+	}
+
+
+	return 0;
+}
+
+/**
+ * It reads from the shared memory of the WRNC
+ * @param[in] wrnc device to use
+ * @param[in] addr memory address
+ * @param[in, out] data values to write in the shared memory. The function will
+ *                 replace this value with the read back value
+ * @param[in] count number of values
+ * @param[in] mod shared memory operation mode
+ * @return 0 on success, -1 otherwise and errno is set appropriately
+ */
+int wrnc_smem_read(struct wrnc_dev *wrnc, uint32_t addr, uint32_t *data,
+		   size_t count, enum wrnc_smem_modifier mod)
+{
+	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
+
+	return wrnc_smem_io(wdesc, addr, data, count, mod, 1);
 }
 
 
@@ -659,13 +722,18 @@ int wrnc_smem_read(struct wrnc_dev *wrnc, uint32_t addr, uint32_t *data)
  * It writes on the shared memory of the WRNC
  * @param[in] wrnc device to use
  * @param[in] addr memory address
- * @param[out] data value to write in the shared memory
+ * @param[in, out] data values to write in the shared memory. The function will
+ *                 replace this value with the read back value
+ * @param[in] count number of values
+ * @param[in] mod shared memory operation mode
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_smem_write(struct wrnc_dev *wrnc, uint32_t addr, uint32_t data)
+int wrnc_smem_write(struct wrnc_dev *wrnc, uint32_t addr, uint32_t *data,
+		    size_t count, enum wrnc_smem_modifier mod)
 {
-	errno = EWRNC_NO_IMPLEMENTATION;
-	return -1;
+	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
+
+	return wrnc_smem_io(wdesc, addr, data, count, mod, 0);
 }
 
 

@@ -107,8 +107,10 @@ extern int wrnc_slot_poll(struct wrnc_dev *wrnc, struct pollfd *p, nfds_t nfds,
 			  int timeout);
 extern int wrnc_slot_fd_get(struct wrnc_dev *wrnc, unsigned int is_input,
 			    unsigned int index);
-extern int wrnc_smem_read(struct wrnc_dev *wrnc, uint32_t addr, uint32_t *data);
-extern int wrnc_smem_write(struct wrnc_dev *wrnc, uint32_t addr, uint32_t data);
+extern int wrnc_smem_read(struct wrnc_dev *wrnc, uint32_t addr, uint32_t *data,
+			  size_t count, enum wrnc_smem_modifier mod);
+extern int wrnc_smem_write(struct wrnc_dev *wrnc, uint32_t addr, uint32_t *data,
+			   size_t count, enum wrnc_smem_modifier mod);
 extern int wrnc_bind(struct wrnc_dev *wrnc, struct wrnc_msg_filter *flt,
 		     unsigned int length);
 

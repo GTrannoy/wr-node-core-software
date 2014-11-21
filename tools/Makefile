@@ -13,6 +13,7 @@ PROGS += lswrnc
 PROGS += wrnc-loader
 PROGS += wrnc-messages
 PROGS += wrnc-cpu-restart
+PROGS += wrnc-smem
 
 all: $(PROGS)
 

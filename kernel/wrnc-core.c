@@ -596,7 +596,7 @@ static ssize_t wrnc_write(struct file *f, const char __user *buf,
 		err = copy_from_user(&val, buf + i, 4);
 		if (err) {
 			dev_err(&wrnc->dev,
-				"Incomplete write on shared memory addr 0x%x size %d\n",
+				"Incomplete write on shared memory addr 0x%llx size %d\n",
 				*offp, count);
 			return -EFAULT;
 		}
@@ -1353,6 +1353,11 @@ int wrnc_probe(struct fmc_device *fmc)
 		return -ENOMEM;
 	fmc_set_drvdata(fmc, wrnc);
 
+        err = fmc_scan_sdb_tree(fmc, 0x0);
+	if (err < 0 && err != -EBUSY) {
+		dev_err(fmc->hwdev, "SDB is missing\n");
+		return err;
+	}
 	wrnc->base_core = fmc_find_sdb_device(fmc->sdb, 0xce42, 0x90de, NULL);
 	/* FIXME use SDB - <base> + <CSR offset> */
 	wrnc->base_csr  = wrnc->base_core + 0x10000;
@@ -1521,8 +1526,7 @@ int wrnc_remove(struct fmc_device *fmc)
  */
 static struct fmc_fru_id wrnc_fru_id[] = {
 	{
-		//.product_name = "white-rabbit-node-core",
-		.product_name = "FmcTdc1ns5cha"
+		.product_name = "wr-node-core"
 	},
 };
 

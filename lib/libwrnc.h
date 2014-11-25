@@ -70,16 +70,16 @@ extern char *wrnc_name_get(struct wrnc_dev *wrnc);
 extern int wrnc_app_id_get(struct wrnc_dev *wrnc, uint32_t *app_id);
 
 extern int wrnc_cpu_load_application_raw(struct wrnc_dev *wrnc,
-						 unsigned int index,
-						 void *code, size_t length,
-						 unsigned int offset);
+					 unsigned int index,
+					 void *code, size_t length,
+					 unsigned int offset);
 extern int wrnc_cpu_load_application_file(struct wrnc_dev *wrnc,
 					  unsigned int index,
 					  char *path);
 extern int wrnc_cpu_dump_application_raw(struct wrnc_dev *wrnc,
-						 unsigned int index,
-						 void *code, size_t length,
-						 unsigned int offset);
+					 unsigned int index,
+					 void *code, size_t length,
+					 unsigned int offset);
 extern int wrnc_cpu_dump_application_file(struct wrnc_dev *wrnc,
 					  unsigned int index,
 					  char *path);

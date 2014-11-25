@@ -31,10 +31,17 @@ static inline int wrtd_in_send_and_receive_sync(struct wrtd_desc *wrtd,
 /* * * * * * * * * * PROTOTYPEs IMPLEMENTATION * * * * * * * * * */
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+/*
+ * FIXME
+ * Most of the function's code below can be optimized by using memcpy()
+ * or similar operations. For the time being, I'm leaving it like this
+ * because data structures are shared with the real-time applications
+ */
+
 /**
  * It retreives the current status of a given input channel
- * @param[in] dev pointer to open node device.
- * @param[in] input index (0-based) of the trigger input to enable
+ * @param[in] dev device token
+ * @param[in] input index (0-based) of the input channel
  * @param[out] state the current status of a channel
  * @return 0 on success, -1 on error and errno is set appropriately
  */
@@ -99,7 +106,7 @@ int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 /**
  * Hardware enable/disable a WRTD input channel.
  * @param[in] dev pointer to open node device.
- * @param[in] input index (0-based) of the trigger input to enable
+ * @param[in] input index (0-based) of the input channel
  * @param[in] enable 1 to enable the input, 0 disables it.
  * @return 0 on success, -1 on error and errno is set appropriately
  */
@@ -134,8 +141,8 @@ int wrtd_in_enable(struct wrtd_node *dev, unsigned int input, int enable)
  * Assign (unassign) a trigger ID to a given WRTD input. Passing a NULL trig_id
  * un-assigns the current trigger (the input will be tagging pulses and
  * logging them, but they will not be sent as triggers to the WR network).
- * @param[in] dev pointer to open node device.
- * @param[in] input index (0-based) of the trigger input to assign trigger to.
+ * @param[in] dev device token
+ * @param[in] input index (0-based) of the input channel
  * @param[in] trig_id the trigger to be sent upon reception of a pulse on the
  *            given input.
  * @return 0 on success, -1 on error and errno is set appropriately
@@ -175,9 +182,12 @@ int wrtd_in_trigger_assign(struct wrtd_node *dev, unsigned int input,
 /**
  * It un-assign the trigger on an input channel. It is just an helper that
  * internally use wrtd_in_trigger_unassign()
+ * @param[in] dev device token
+ * @param[in] input index (0-based) of the input channel
+ * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_in_trigger_unassign(struct wrtd_node *dev,
-					   unsigned int input)
+			     unsigned int input)
 {
 	return wrtd_in_trigger_assign(dev, input, NULL);
 }
@@ -191,8 +201,8 @@ int wrtd_in_trigger_unassign(struct wrtd_node *dev,
  * trigger on the first incoming pulse and will ignore the subsequent pulses
  * until re-armed.
  *
- * @param[in] dev pointer to open node device.
- * @param[in] input (0-based) index of the trigger input
+ * @param[in] dev device token
+ * @param[in] input (0-based) of the input channel
  * @param[in] mode triggering mode.
  * @return 0 on success, -1 on error and errno is set appropriately
  */
@@ -226,7 +236,7 @@ int wrtd_in_trigger_mode_set(struct wrtd_node *dev, unsigned int input,
 
 /**
  * Software-trigger the input at a given TAI value
- * @param[in] dev pointer to open node device.
+ * @param[in] dev device token
  * @param[in] trigger trigger to enumlate
  * @return 0 on success, -1 on error and errno is set appropriately
  */
@@ -262,8 +272,8 @@ int wrtd_in_trigger_software(struct wrtd_node *dev,
 /**
  * Arm (disarm) a WRTD input for triggering. By arming the input, you are making
  * it ready to accept/send triggers
- * @param[in] dev pointer to open node device.
- * @param[in] input index (0-based) of the trigger input
+ * @param[in] dev device token
+ * @param[in] input index (0-based) of input channel
  * @param[in] armed 1 arms the input, 0 disarms the input.
  * @return 0 on success, -1 on error and errno is set appropriately
  */
@@ -296,8 +306,11 @@ int wrtd_in_arm(struct wrtd_node *dev, unsigned int input, int armed)
 
 /**
  * Disarm the WRTD input. It is just an helper that internally use wrtd_in_arm()
+ * @param[in] dev device token
+ * @param[in] input index (0-based) of input channel
+ * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrtd_in_disarm(struct wrtd_node *dev, unsigned int input, int armed)
+int wrtd_in_disarm(struct wrtd_node *dev, unsigned int input)
 {
 	return wrtd_in_arm(dev, input, 0);
 }
@@ -307,8 +320,8 @@ int wrtd_in_disarm(struct wrtd_node *dev, unsigned int input, int armed)
  * Set the dead time (the minimum gap between input pulses, below which
  * the TDC ignores the subsequent pulses; limits maximum input pulse rate,
  * 16 ns granularity)
- * @param[in] dev pointer to open node device.
- * @param[in] input index (0-based) of the trigger input to enable
+ * @param[in] dev device token
+ * @param[in] input index (0-based) of input channel
  * @param[in] dead_time_ps dead time in pico-seconds
  * @return 0 on success, -1 on error and errno is set appropriately
  */
@@ -351,11 +364,13 @@ int wrtd_in_dead_time_set(struct wrtd_node *dev, unsigned int input,
 
 /**
  * Set the offset (for compensating cable delays), in 10 ps steps.
- * @param[in] dev pointer to open node device.
+ * @param[in] dev device token
+ * @param[in] input index (0-based) of input channel
+ * @param[in] delay_ps delay in pico-seconds
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_in_delay_set(struct wrtd_node *dev, unsigned int input,
-				 uint64_t delay_ps)
+		      uint64_t delay_ps)
 {
   	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wr_timestamp t;
@@ -388,8 +403,10 @@ int wrtd_in_delay_set(struct wrtd_node *dev, unsigned int input,
 
 
 /**
- * @param[in] dev pointer to open node device.
- * @param[in] input index (0-based) of the trigger input to enable
+ * Set the time offset on a given input channel
+ * @param[in] dev device token
+ * @param[in] input index (0-based) of input channel
+ * @param[in] offset time offset in pico seconds
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_in_timebase_offset_set(struct wrtd_node *dev, unsigned int input,
@@ -426,7 +443,9 @@ int wrtd_in_timebase_offset_set(struct wrtd_node *dev, unsigned int input,
 
 
 /**
- * @param[in] dev pointer to open node device.
+ * Reset all counters on a given input channel
+ * @param[in] dev device token
+ * @param[in] input index (0-based) of input channel
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_in_counters_reset(struct wrtd_node *dev, unsigned int input)
@@ -456,8 +475,9 @@ int wrtd_in_counters_reset(struct wrtd_node *dev, unsigned int input)
 
 
 /**
- * @param[in] dev pointer to open node device.
- * @param[in] input index (0-based) of the trigger input to enable
+ * Set the log level of a given input channel
+ * @param[in] dev device token
+ * @param[in] input index (0-based) of input channel
  * @param[in] log_level log level to apply to the logging messages
  * @return 0 on success, -1 on error and errno is set appropriately
  */
@@ -493,11 +513,11 @@ int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
  * Log every trigger pulse sent out to the network. Each log message contains
  * the input number, sequence ID, trigger ID, trigger counter (since arm) and
  * origin timestamp.
- * @param[in] dev pointer to open node device.
- * @param[out] log
+ * @param[in] dev device token
+ * @param[out] log log message
  * @param[in] flags
- * @param[in] input_mask
- * @param[in] count
+ * @param[in] input_mask bit mask of channel where read
+ * @param[in] count number of messages to read
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_in_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
@@ -541,8 +561,8 @@ int wrtd_in_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
 
 /**
  * Check the enable status on a trigger input.
- * @param[in] dev pointer to open node device.
- * @param[in] input index (0-based) of the trigger input to enable
+ * @param[in] dev device token
+ * @param[in] input index (0-based) of input channel
  * @param[in] enable 1 enables the input, 0 disables it.
  * @return 0 on success, -1 on error and errno is set appropriately
  */
@@ -557,13 +577,13 @@ int wrtd_in_is_enabled(struct wrtd_node *dev, unsigned int input)
  * Get the dead time (the minimum gap between input pulses, below which
  * the TDC ignores the subsequent pulses; limits maximum input pulse rate,
  * 16 ns granularity)
- * @param[in] dev pointer to open node device
- * @param[in] input index (0-based) of the trigger input to enable
+ * @param[in] dev device token
+ * @param[in] input index (0-based) of input channel
  * @param[out] dead_time_ps dead time in pico-seconds
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_in_dead_time_get(struct wrtd_node *dev, unsigned int input,
-				 uint64_t *dead_time_ps)
+			  uint64_t *dead_time_ps)
 {
 	errno = EWRTD_NO_IMPLEMENTATION;
 	return -1;
@@ -572,11 +592,13 @@ int wrtd_in_dead_time_get(struct wrtd_node *dev, unsigned int input,
 
 /**
  * Get the offset (for compensating cable delays), in 10 ps steps.
- * @param[in] dev pointer to open node device.
+ * @param[in] dev device token
+ * @param[in] input index (0-based) of input channel
+ * @param[out] delay_ps delay in pico-seconds
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_in_delay_get(struct wrtd_node *dev, unsigned int input,
-			     uint64_t *delay_ps)
+		      uint64_t *delay_ps)
 {
 	errno = EWRTD_NO_IMPLEMENTATION;
 	return -1;
@@ -585,8 +607,8 @@ int wrtd_in_delay_get(struct wrtd_node *dev, unsigned int input,
 
 /**
  * Get/set the Sequence ID counter (counting up at every pulse)
- * @param[in] dev pointer to open node device.
- * @param[in] input index (0-based) of the trigger input to enable
+ * @param[in] dev device token
+ * @param[in] input index (0-based) of input channel
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_in_seq_counter_set(struct wrtd_node *dev, unsigned int input)

@@ -18,7 +18,6 @@
 #include <fcntl.h>
 #include <glob.h>
 
-#include "libwrnc.h"
 #include "libwrnc-internal.h"
 
 static uint32_t count;
@@ -32,7 +31,8 @@ static char *wrnc_error_str[] = {
 
 
 /**
- * It returns a string messages corresponding to a given error code
+ * It returns a string messages corresponding to a given error code. If
+ * it is not a libwrnc error code, it will run strerror(3)
  * @param[in] err error code
  * @return a message error
  */
@@ -46,7 +46,8 @@ char *wrnc_strerror(int err)
 
 /**
  * It initializes the WRNC library. It must be called before doing
- * anything else
+ * anything else. If you are going to load/unload WRNC devices, then
+ * you have to un-load (wrnc_exit()) e reload (wrnc_init()) the library.
  * @return 0 on success, otherwise -1 and errno is appropriately set
  */
 int wrnc_init()
@@ -71,8 +72,9 @@ int wrnc_init()
 
 
 /**
- * It releases the resources used by this library. It must be called when
- * you stop to use this library.
+ * It releases the resources allocated by wrnc_init(). It must be called when
+ * you stop to use this library. Then, you cannot use functions from this
+ * library
  */
 void wrnc_exit()
 {
@@ -84,8 +86,9 @@ void wrnc_exit()
 
 
 /**
- * It returns the number of available WRNC
- * @return the number of WRNC available, 0 is also an error check errno to be sure
+ * It returns the number of available WRNCs. This is not calculated on demand.
+ * It depends on library initialization.
+ * @return the number of WRNC available
  */
 uint32_t wrnc_count()
 {
@@ -94,7 +97,8 @@ uint32_t wrnc_count()
 
 
 /**
- * It returns the list of available WRNC devices
+ * It allocates and returns the list of available WRNC devices. The user is
+ * in charge to free(3) the allocated memory
  * @return a list of WRNC devices
  */
 char (*wrnc_list())[WRNC_NAME_LEN]
@@ -111,9 +115,9 @@ char (*wrnc_list())[WRNC_NAME_LEN]
 
 
 /**
- * It opens a wrnc device using a string descriptor. The descriptor correspond
+ * It opens a WRNC device using a string descriptor. The descriptor correspond
  * to the char device name of the white-rabbit node-core.
- * @param[in] device description of the device to open
+ * @param[in] device name of the device to open
  * @return the WRNC token, NULL on error and errno is appropriately set
  */
 struct wrnc_dev *wrnc_open(const char *device)
@@ -140,7 +144,7 @@ struct wrnc_dev *wrnc_open(const char *device)
 
 
 /**
- * It opens a wrnc device using its FMC device_id. The white-rabbit node-core
+ * It opens a WRNC device using its FMC device_id. The white-rabbit node-core
  * driver is based upon the FMC bus infrastructure, so all wrnc devices are
  * identified with their fmc-bus-id.
  * @param[in] device_id FMC device id of the device to use
@@ -156,7 +160,7 @@ struct wrnc_dev *wrnc_open_by_fmc(uint32_t device_id)
 
 
 /**
- * It opens a wrnc device using its Logical Unit Number. The Logical Unit Number
+ * It opens a WRNC device using its Logical Unit Number. The Logical Unit Number
  * is an instance number of a particular hardware. The LUN to use is the carrier
  * one, and not the mezzanine one (if any)
  * @param[in] lun Logical Unit Number of the device to use
@@ -172,8 +176,9 @@ struct wrnc_dev *wrnc_open_by_lun(unsigned int lun)
 
 
 /**
- * It closes an opened wrnc device
- * @param[in] wrnc device to close
+ * It closes a WRNC device opened with one of the following function:
+ * wrnc_open(), wrcn_open_by_lun(), wrnc_open_by_fmc()
+ * @param[in] wrnc device token
  */
 void wrnc_close(struct wrnc_dev *wrnc)
 {
@@ -278,8 +283,8 @@ static int wrnc_sysfs_printf(char *path, const char *fmt, ...)
 
 
 /**
- * It returns the number of available wrnc CPUs on the FPGA bitstream
- * @param[in] wrnc device to use
+ * It returns the number of available WRNC CPUs on the FPGA bitstream
+ * @param[in] wrnc device token
  * @param[out] n_cpu the number of available CPUs
  * @return 0 on success; -1 on error and errno is set appropriately
  */
@@ -297,7 +302,7 @@ int wrnc_cpu_count(struct wrnc_dev *wrnc, uint32_t *n_cpu)
 
 /**
  * It returns the application identifier of the FPGA bitstream in use
- * @param[in] wrnc device that we are insterested in
+ * @param[in] wrnc device token
  * @param[out] app_id application identifier
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
@@ -316,8 +321,8 @@ int wrnc_app_id_get(struct wrnc_dev *wrnc, uint32_t *app_id)
 
 /**
  * It returns the current status of the WRNC CPUs' reset line
- * @param[in] wrnc device to use
- * @param[out] mask the current reset line status
+ * @param[in] wrnc device token
+ * @param[out] mask bit mask of the reset-lines
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
 int wrnc_cpu_reset_get(struct wrnc_dev *wrnc, uint32_t *mask)
@@ -325,7 +330,8 @@ int wrnc_cpu_reset_get(struct wrnc_dev *wrnc, uint32_t *mask)
 	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	char path[WRNC_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN, "/sys/class/wr-node-core/%s/reset_mask",
+	snprintf(path, WRNC_SYSFS_PATH_LEN,
+		 "/sys/class/wr-node-core/%s/reset_mask",
 		 wdesc->name);
 
 	return wrnc_sysfs_scanf(path, "%x", mask);
@@ -335,7 +341,7 @@ int wrnc_cpu_reset_get(struct wrnc_dev *wrnc, uint32_t *mask)
 /**
  * Assert or de-assert the reset line of the WRNC CPUs
  * @param[in] wrnc device to use
- * @param[in] mask bit mask of the line to reset
+ * @param[in] mask bit mask of the reset-lines
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
 int wrnc_cpu_reset_set(struct wrnc_dev *wrnc, uint32_t mask)
@@ -343,7 +349,8 @@ int wrnc_cpu_reset_set(struct wrnc_dev *wrnc, uint32_t mask)
 	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	char path[WRNC_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN, "/sys/class/wr-node-core/%s/reset_mask",
+	snprintf(path, WRNC_SYSFS_PATH_LEN,
+		 "/sys/class/wr-node-core/%s/reset_mask",
 		 wdesc->name);
 
 	return wrnc_sysfs_printf(path, "%x", mask);
@@ -352,8 +359,8 @@ int wrnc_cpu_reset_set(struct wrnc_dev *wrnc, uint32_t mask)
 
 /**
  * It returns the current status of the WRNC CPUs' enable line
- * @param[in] wrnc device to use
- * @param[out] mask the current running line status
+ * @param[in] wrnc device token
+ * @param[out] mask bit mask of the enable-lines
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
 int wrnc_cpu_run_get(struct wrnc_dev *wrnc, uint32_t *mask)
@@ -361,7 +368,8 @@ int wrnc_cpu_run_get(struct wrnc_dev *wrnc, uint32_t *mask)
 	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	char path[WRNC_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN, "/sys/class/wr-node-core/%s/enable_mask",
+	snprintf(path, WRNC_SYSFS_PATH_LEN,
+		 "/sys/class/wr-node-core/%s/enable_mask",
 		 wdesc->name);
 
 	return wrnc_sysfs_scanf(path, "%x", mask);
@@ -370,8 +378,8 @@ int wrnc_cpu_run_get(struct wrnc_dev *wrnc, uint32_t *mask)
 
 /**
  * Assert or de-assert the enable (a.k.a. running) line of the WRNC CPUs
- * @param[in] wrnc device to use
- * @param[in] mask bit mask of the line to enable
+ * @param[in] wrnc device token
+ * @param[in] mask bit mask of the enable-lines
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
 int wrnc_cpu_run_set(struct wrnc_dev *wrnc, uint32_t mask)
@@ -379,7 +387,8 @@ int wrnc_cpu_run_set(struct wrnc_dev *wrnc, uint32_t mask)
 	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	char path[WRNC_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN, "/sys/class/wr-node-core/%s/enable_mask",
+	snprintf(path, WRNC_SYSFS_PATH_LEN,
+		 "/sys/class/wr-node-core/%s/enable_mask",
 		 wdesc->name);
 
 	return wrnc_sysfs_printf(path, "%x", mask);
@@ -388,10 +397,10 @@ int wrnc_cpu_run_set(struct wrnc_dev *wrnc, uint32_t mask)
 
 /**
  * It loads a wrnc CPU firmware from a given buffer
- * @param[in] wrnc device to program
- * @param[in] index CPU index to program
- * @param[in] code buffer to write in the CPU program memory
- * @param[in] length buffer length
+ * @param[in] wrnc device token
+ * @param[in] index CPU index
+ * @param[in] code buffer containing the CPU firmware binary code
+ * @param[in] length code length
  * @return the number of written byte, on error -1 and errno is
  *         set appropriately
  */
@@ -421,11 +430,11 @@ int wrnc_cpu_load_application_raw(struct wrnc_dev *wrnc,
 
 
 /**
- * It dumps a wrnc CPU firmware into a given buffer
- * @param[in] wrnc device to program
- * @param[in] index CPU index to program
- * @param[in] code buffer to write in the CPU program memory
- * @param[in] length buffer length
+ * It dumps a WRNC CPU firmware into a given buffer
+ * @param[in] wrnc device token
+ * @param[in] index CPU index
+ * @param[out] code buffer containing the CPU firmware binary code
+ * @param[in] length code length
  * @return the number of written byte, on error -1 and errno is
  *         set appropriately
  */
@@ -457,14 +466,15 @@ int wrnc_cpu_dump_application_raw(struct wrnc_dev *wrnc,
 
 
 /**
- * It loads a wrnc CPU firmware from a given file
- * @param[in] wrnc device to program
- * @param[in] index CPU index to program
- * @param[in] path path to the file to write into CPU memory
+ * It loads a WRNC CPU firmware from a given file
+ * @param[in] wrnc device token
+ * @param[in] index CPU index
+ * @param[in] path path to the firmware file
+ * @return 0 on success, on error -1 and errno is set appropriately
  */
 int wrnc_cpu_load_application_file(struct wrnc_dev *wrnc,
-					  unsigned int index,
-					  char *path)
+				   unsigned int index,
+				   char *path)
 {
 	int i, len;
 	void *code;
@@ -482,10 +492,11 @@ int wrnc_cpu_load_application_file(struct wrnc_dev *wrnc,
 	code = malloc(len);
 	if (!code)
 		return -1;
-
+	/* Get the code from file */
 	i = fread(code, 1, len, f);
 	fclose(f);
 	if (!i || i != len) {
+		/*TODO: maybe optimize me with a loop */
 		free(code);
 		return -1;
 	}
@@ -501,10 +512,11 @@ int wrnc_cpu_load_application_file(struct wrnc_dev *wrnc,
 
 
 /**
- * It dumps a wrnc CPU firmware into a given file
- * @param[in] wrnc device to program
- * @param[in] index CPU index to program
- * @param[in] path path to the file to write
+ * It dumps a WRNC CPU firmware into a given file
+ * @param[in] wrnc device token
+ * @param[in] index CPU index
+ * @param[in] path path to the firmware file
+ * @return 0 on success, on error -1 and errno is set appropriately
  */
 int wrnc_cpu_dump_application_file(struct wrnc_dev *wrnc,
 				   unsigned int index,
@@ -519,6 +531,7 @@ int wrnc_cpu_dump_application_file(struct wrnc_dev *wrnc,
 		return -1;
 
         do {
+		/* Read from driver and write into file */
 		i += wrnc_cpu_dump_application_raw(wrnc, index, code, 4096, i);
 		if (i != 0)
 			fwrite(code, 1, i, f);
@@ -530,9 +543,9 @@ int wrnc_cpu_dump_application_file(struct wrnc_dev *wrnc,
 }
 
 /**
- * It opens an hmq slot
- * @param[in] wdesc device to use
- * @param[in] index index of the slot to open
+ * It opens an HMQ slot
+ * @param[in] wdesc device token
+ * @param[in] index HMQ index
  * @param[in] dir direction of the slot (1 input, 0 output)
  * @return 0 on success, -1 on error and errno is set appropriately
  */
@@ -549,6 +562,7 @@ static int wrnc_hmq_open(struct wrnc_desc *wdesc, unsigned int index,
 
 	fd = dir ? wdesc->fd_hmq_in : wdesc->fd_hmq_out;
 
+	/* Do not open if it is already opened */
 	if (fd[index] < 0) {
 		snprintf(path, 64, "/dev/%s-hmq-%c-%02d",
 			 wdesc->name, (dir ? 'i' : 'o'), index);
@@ -564,12 +578,12 @@ static int wrnc_hmq_open(struct wrnc_desc *wdesc, unsigned int index,
 /**
  * It sends a synchronous message. The slots are uni-directional, so you must
  * specify where write the message and where the answer is expected.
- * @param[in] wrnc device to use
- * @param[in] index_in index of the input slot
- * @param[in] index_out index of the output slot
+ * @param[in] wrnc device token
+ * @param[in] index_in index of the HMQ input slot
+ * @param[in] index_out index of the HMQ output slot
  * @param[in,out] msg it contains the message to be sent; the answer will
- *                overwrite the content
- * @param[in] timeout_ms ms to wait for an answer
+ *                overwrite the message
+ * @param[in] timeout_ms maximum ms to wait for an answer
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrnc_slot_send_and_receive_sync(struct wrnc_dev *wrnc,
@@ -582,6 +596,7 @@ int wrnc_slot_send_and_receive_sync(struct wrnc_dev *wrnc,
 	struct wrnc_msg_sync smsg;
 	int err;
 
+	/* Build the message */
 	smsg.index_in = index_in;
 	smsg.index_out = index_out;
 	smsg.timeout_ms = timeout_ms;
@@ -591,10 +606,13 @@ int wrnc_slot_send_and_receive_sync(struct wrnc_dev *wrnc,
 	if (err)
 		return err;
 
+	/* Send the message */
 	err = ioctl(wdesc->fd_hmq_in[smsg.index_in],
 		    WRNC_IOCTL_MSG_SYNC, &smsg);
 	if (err)
 		return -1;
+
+	/* Copy the answer */
 	memcpy(msg, &smsg.msg, sizeof(struct wrnc_msg));
 
 	return 0;
@@ -603,8 +621,9 @@ int wrnc_slot_send_and_receive_sync(struct wrnc_dev *wrnc,
 
 /**
  * It is a wrapper of poll(2) for a wrnc slot device.
- * @param[in] wrnc device to use
- * @param[in] p see poll(2), instead of the real FD use the slot index
+ * @param[in] wrnc device token
+ * @param[in] p see poll(2), instead of the real FD use the HMQ slot index.
+ *              This, in order to work only with slots' indexes.
  * @param[in] nfds see poll(2).
  * @param[in] timeout see poll(2)
  * @return see poll(2)
@@ -644,9 +663,7 @@ int wrnc_slot_poll(struct wrnc_dev *wrnc, struct pollfd *p, nfds_t nfds,
 
 /**
  * It opens a WRNC device
- * @param[in] wdesc device to use
- * @param[in] index index of the slot to open
- * @param[in] dir direction of the slot (1 input, 0 output)
+ * @param[in] wdesc device descriptor
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 static int wrnc_dev_open(struct wrnc_desc *wdesc)
@@ -666,13 +683,14 @@ static int wrnc_dev_open(struct wrnc_desc *wdesc)
 
 /**
  * It execute the ioctl command to read/write an smem address
- * @param[in] wrnc device to use
- * @param[in] addr memory address
- * @param[out] data value in the shared memory
+ * @param[in] wdesc device descriptor
+ * @param[in] addr memory address where start the operations
+ * @param[in, out] data value in/to the shared memory
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-static int wrnc_smem_io(struct wrnc_desc *wdesc, uint32_t addr, uint32_t *data,
-			size_t count, enum wrnc_smem_modifier mod, int is_input)
+static int wrnc_smem_io(struct wrnc_desc *wdesc,
+			uint32_t addr, uint32_t *data, size_t count,
+			enum wrnc_smem_modifier mod, int is_input)
 {
 	struct wrnc_smem_io io;
 	int err, i;
@@ -690,9 +708,7 @@ static int wrnc_smem_io(struct wrnc_desc *wdesc, uint32_t addr, uint32_t *data,
 		err = ioctl(wdesc->fd_dev, WRNC_IOCTL_SMEM_IO, &io);
 		if (err)
 			return -1;
-		printf("%s:%d\n", __func__, __LINE__);
 		data[i] = io.value;
-		printf("%s:%d\n", __func__, __LINE__);
 	}
 
 
@@ -700,12 +716,12 @@ static int wrnc_smem_io(struct wrnc_desc *wdesc, uint32_t addr, uint32_t *data,
 }
 
 /**
- * It reads from the shared memory of the WRNC
- * @param[in] wrnc device to use
- * @param[in] addr memory address
- * @param[in, out] data values to write in the shared memory. The function will
- *                 replace this value with the read back value
- * @param[in] count number of values
+ * It does a direct acces to the shared memory to read a set of cells
+ * @param[in] wrnc device token
+ * @param[in] addr memory address where start the operations
+ * @param[out] data values read from in the shared memory. The function will
+ *             replace this value with the read back value
+ * @param[in] count number of values in data
  * @param[in] mod shared memory operation mode
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
@@ -724,7 +740,7 @@ int wrnc_smem_read(struct wrnc_dev *wrnc, uint32_t addr, uint32_t *data,
  * @param[in] addr memory address
  * @param[in, out] data values to write in the shared memory. The function will
  *                 replace this value with the read back value
- * @param[in] count number of values
+ * @param[in] count number of values in data
  * @param[in] mod shared memory operation mode
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
@@ -753,11 +769,11 @@ int wrnc_bind(struct wrnc_dev *wrnc, struct wrnc_msg_filter *flt,
 
 
 /**
- * It starts to execute CPU code
- * @param[in] wrnc device to use
- * @param[in] index cpu to start
+ * It starts to execute code on a given CPU
+ * @param[in] wrnc device token
+ * @param[in] index CPU index
  */
-extern int wrnc_cpu_start(struct wrnc_dev *wrnc, unsigned int index)
+int wrnc_cpu_start(struct wrnc_dev *wrnc, unsigned int index)
 {
 	uint32_t tmp;
 
@@ -767,9 +783,9 @@ extern int wrnc_cpu_start(struct wrnc_dev *wrnc, unsigned int index)
 
 
 /**
- * It stops to execute CPU code
- * @param[in] wrnc device to use
- * @param[in] index cpu to stop
+ * It stops the execution of code on a given CPU
+ * @param[in] wrnc device token
+ * @param[in] index CPU index
  */
 int wrnc_cpu_stop(struct wrnc_dev *wrnc, unsigned int index)
 {
@@ -782,8 +798,8 @@ int wrnc_cpu_stop(struct wrnc_dev *wrnc, unsigned int index)
 
 /**
  * It enables a CPU; in other words, it clear the reset line of a CPU
- * @param[in] wrnc device to use
- * @param[in] index CPU to enable
+ * @param[in] wrnc device token
+ * @param[in] index CPU index
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
 int wrnc_cpu_enable(struct wrnc_dev *wrnc, unsigned int index)
@@ -796,8 +812,8 @@ int wrnc_cpu_enable(struct wrnc_dev *wrnc, unsigned int index)
 
 /**
  * It disables a CPU; in other words, it sets the reset line of a CPU
- * @param[in] wrnc device to use
- * @param[in] index CPU to enable
+ * @param[in] wrnc device token
+ * @param[in] index CPU index
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
 int wrnc_cpu_disable(struct wrnc_dev *wrnc, unsigned int index)
@@ -810,10 +826,11 @@ int wrnc_cpu_disable(struct wrnc_dev *wrnc, unsigned int index)
 
 
 /**
- * It returns a message from an output message queue slot.
+ * It allocates and returns a message from an output message queue slot.
  * The user of this function is in charge to release the memory.
  * @param[in] wrnc device to use
  * @param[in] index CPU to enable
+ * @return a WRNC message, NULL on error and errno is set appropriately
  */
 struct wrnc_msg *wrnc_slot_receive(struct wrnc_dev *wrnc, unsigned int index)
 {
@@ -829,6 +846,7 @@ struct wrnc_msg *wrnc_slot_receive(struct wrnc_dev *wrnc, unsigned int index)
 	if (!msg)
 		return NULL;
 
+	/* Get a message from the driver */
 	n = read(wdesc->fd_hmq_out[index], msg, sizeof(struct wrnc_msg));
 	if (n != sizeof(struct wrnc_msg)) {
 		free(msg);
@@ -841,10 +859,10 @@ struct wrnc_msg *wrnc_slot_receive(struct wrnc_dev *wrnc, unsigned int index)
 
 /**
  * It retreives the file descriptor of a slot
- * @param[in] wrnc device to use
+ * @param[in] wrnc device token
  * @param[in] is_input direction of the slot, 1 for input, 0 for output
- * @param[in] index slot to retreive
- * @return the file descriptor number, -1 if the slot is not yet open
+ * @param[in] index HMQ slot index
+ * @return the file descriptor number, -1 if the slot is not yet opened
  */
 int wrnc_slot_fd_get(struct wrnc_dev *wrnc, unsigned int is_input,
 			    unsigned int index)
@@ -860,7 +878,7 @@ int wrnc_slot_fd_get(struct wrnc_dev *wrnc, unsigned int is_input,
 
 /**
  * It returns the name of the device
- * @param[in] wrnc the device
+ * @param[in] wrnc device token
  * @return the string representing the name of the device
  */
 char *wrnc_name_get(struct wrnc_dev *wrnc)

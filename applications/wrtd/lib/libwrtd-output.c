@@ -11,7 +11,7 @@
 #include <libwrtd-internal.h>
 
 /**
- * Internal helper to send and recevie synchronous messages to/from the FD
+ * Internal helper to send and receive synchronous messages to/from the WRNC
  */
 static inline int wrtd_out_send_and_receive_sync(struct wrtd_desc *wrtd,
 						struct wrnc_msg *msg)
@@ -25,7 +25,9 @@ static inline int wrtd_out_send_and_receive_sync(struct wrtd_desc *wrtd,
 }
 
 /**
- *
+ * It retreive a list of assigned trigger to an output channel
+ * @param[in] dev device token
+ * @param[in] output index (0-based) of output channel
  */
 static int wrtd_out_trig_get(struct wrtd_node *dev, unsigned int output,
 			     unsigned int bucket, unsigned int index,
@@ -105,9 +107,9 @@ static int wrtd_out_trig_get(struct wrtd_node *dev, unsigned int output,
 
 /**
  * It retreives the current output status of a given channel
- * @param[in] dev pointer to open node device.
- * @param[in] output channel to use
- * @param[out] state the current state of a channel
+ * @param[in] dev device token
+ * @param[in] output index (0-based) of output channel
+ * @param[out] state channel status
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
@@ -159,9 +161,9 @@ int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 
 
 /**
- * It enable/disable a trigger output line
- * @param[in] dev pointer to open node device.
- * @param[in] output channel to use
+ * It enables/disables a trigger output line
+ * @param[in] dev device token
+ * @param[in] output index (0-based) of output channel
  * @param[in] enable 1 to enable the output, 0 disables it.
  * @return 0 on success, -1 on error and errno is set appropriately
  */
@@ -195,11 +197,15 @@ extern int wrtd_out_enable(struct wrtd_node *dev, unsigned int output,
 
 /**
  * @param[in] dev pointer to open node device.
+ * @param[in] output index (0-based) of output channel
+ * @param[out] handle
+ * @param[in] trig trigger id to assign
+ * @param[in] condition
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-extern int wrtd_out_trig_assign(struct wrtd_node *dev,
+extern int wrtd_out_trig_assign(struct wrtd_node *dev, int output,
 				struct wrtd_trigger_handle *handle,
-				int output, struct wrtd_trig_id *trig,
+				struct wrtd_trig_id *trig,
 				struct wrtd_trig_id *condition)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
@@ -247,7 +253,9 @@ extern int wrtd_out_trig_assign(struct wrtd_node *dev,
 
 
 /**
+ * Un-assign a give trigger
  * @param[in] dev pointer to open node device.
+ * @param[in] handle
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 extern int wrtd_out_trig_unassign(struct wrtd_node *dev,
@@ -275,12 +283,16 @@ extern int wrtd_out_trig_unassign(struct wrtd_node *dev,
 
 
 /**
- * @param[in] dev pointer to open node device.
+ * It retreive a given number of triggers from output device
+ * @param[in] dev device token
+ * @param[in] output index (0-based) of output channel
+ * @param[out] triggers list of assigned trigger
+ * @param[in] max_count maximum triggers to retreive
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_out_trig_get_all(struct wrtd_node *dev, unsigned int output,
-			   struct wrtd_output_trigger_state *triggers,
-			   int max_count)
+			  struct wrtd_output_trigger_state *triggers,
+			  int max_count)
 {
 	int err, bucket, count = 0, index;
 
@@ -309,7 +321,9 @@ int wrtd_out_trig_get_all(struct wrtd_node *dev, unsigned int output,
 
 /**
  * It returns a trigget from a given index
- * @param[in] dev pointer to open node device.
+ * @param[in] dev device token
+ * @param[in] output index (0-based) of output channel
+ * @param[out] trigger trigger status
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_out_trig_get_by_index(struct wrtd_node *dev, unsigned int index,
@@ -334,7 +348,10 @@ int wrtd_out_trig_get_by_index(struct wrtd_node *dev, unsigned int index,
 
 
 /**
+ * It sets the delay to apply for a given trigger
  * @param[in] dev pointer to open node device.
+ * @param[in] handle trigger where act on
+ * @param[in] delay_ps delay in pico-seconds
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 extern int wrtd_out_trig_delay_set(struct wrtd_node *dev,
@@ -366,12 +383,12 @@ extern int wrtd_out_trig_delay_set(struct wrtd_node *dev,
 }
 
 
-
-
-
 /**
- * @param[in] dev pointer to open node device.
- * @param[in] output channel to use
+ * It set the dead time for a given output channel. so, it applies on all
+ * triggers assigned to the given output channel
+ * @param[in] dev device token
+ * @param[in] output index (0-based) of output channel
+ * @param[in] dead_time_ps dead time in pico-seconds
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 extern int wrtd_out_dead_time_set(struct wrtd_node *dev, unsigned int output,
@@ -382,16 +399,10 @@ extern int wrtd_out_dead_time_set(struct wrtd_node *dev, unsigned int output,
 }
 
 
-
-
-
-
-
-
-
-
 /**
  * @param[in] dev pointer to open node device.
+ * @param[in] handle trigger where act on
+ * @param[in] delay_ps delay in pico-seconds
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 extern int wrtd_out_trig_condition_delay_set(struct wrtd_node *dev,
@@ -405,6 +416,8 @@ extern int wrtd_out_trig_condition_delay_set(struct wrtd_node *dev,
 
 /**
  * @param[in] dev pointer to open node device.
+ * @param[in] handle trigger where act on
+ * @param[out] state trigger status
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 extern int wrtd_out_trig_state_get(struct wrtd_node *dev,
@@ -418,6 +431,8 @@ extern int wrtd_out_trig_state_get(struct wrtd_node *dev,
 
 /**
  * @param[in] dev pointer to open node device.
+ * @param[in] handle trigger where act on
+ * @param[in] enable 1 to enable, 0 to disable
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 extern int wrtd_out_trig_enable(struct wrtd_node *dev,
@@ -429,7 +444,14 @@ extern int wrtd_out_trig_enable(struct wrtd_node *dev,
 
 
 /**
- * @param[in] dev pointer to open node device.
+ * Log every trigger pulse sent out to the network. Each log message contains
+ * the input number, sequence ID, trigger ID, trigger counter (since arm) and
+ * origin timestamp.
+ * @param[in] dev device token
+ * @param[out] log log message
+ * @param[in] flags
+ * @param[in] input_mask bit mask of channel where read
+ * @param[in] count number of messages to read
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 extern int wrtd_out_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
@@ -440,8 +462,9 @@ extern int wrtd_out_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
 }
 
 /**
- * @param[in] dev pointer to open node device.
- * @param[in] output channel to use
+ * @param[in] dev device token
+ * @param[in] output index (0-based) of output channel
+ * @param[in] log_level log level to apply to the logging messages
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 extern int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
@@ -452,8 +475,10 @@ extern int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
 }
 
 /**
- * @param[in] dev pointer to open node device.
- * @param[in] output channel to use
+ * It sets the trigger mode of a given output channel
+ * @param[in] dev device token
+ * @param[in] output index (0-based) of output channel
+ * @param[in] mode output mode
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 extern int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
@@ -465,8 +490,10 @@ extern int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
 
 
 /**
- * @param[in] dev pointer to open node device.
- * @param[in] output channel to use
+ * It arms (un-arms) a given output channel
+ * @param[in] dev device token
+ * @param[in] output index (0-based) of output channel
+ * @param[in] armed 1 to arm, 0 to un-arm
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 extern int wrtd_out_arm(struct wrtd_node *dev, unsigned int ouput, int armed)
@@ -477,8 +504,8 @@ extern int wrtd_out_arm(struct wrtd_node *dev, unsigned int ouput, int armed)
 
 
 /**
- * @param[in] dev pointer to open node device.
- * @param[in] output channel to use
+ * @param[in] dev device token
+ * @param[in] output index (0-based) of output channel
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 extern int wrtd_out_reset_counters_reset(struct wrtd_node *dev, unsigned int output)
@@ -489,8 +516,8 @@ extern int wrtd_out_reset_counters_reset(struct wrtd_node *dev, unsigned int out
 
 
 /**
- * @param[in] dev pointer to open node device.
- * @param[in] output channel to use
+ * @param[in] dev device token
+ * @param[in] output index (0-based) of output channel
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 extern int wrtd_out_check_triggered(struct wrtd_node *dev, unsigned int output)

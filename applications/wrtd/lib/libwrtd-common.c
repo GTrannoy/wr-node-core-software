@@ -10,32 +10,9 @@
 #include <libwrnc.h>
 #include <libwrtd-internal.h>
 
-/**
- * It initializes this library. It must be called before doing anything else.
- * This library is based on the libwrnc, so internally, this function also
- * run wrnc_init() in order to initialize the WRNC library.
- */
-int wrtd_init()
-{
-	int err;
-
-	err = wrnc_init();
-	if (err)
-		return err;
-
-	return 0;
-}
-
-
-/**
- * It release all the library resources. It must be called when
- * you stop to use this library.
- */
-void wrtd_exit()
-{
-	wrnc_exit();
-}
-
+static const uint32_t application_id[] = {
+	0x115790de,
+};
 
 const char *wrtd_errors[] = {
 	"Received an invalid answer from white-rabbit-node-code CPU",
@@ -52,9 +29,10 @@ const char *wrtd_errors[] = {
 
 
 /**
- * It returns the error message associated to a given error code
- * @param[in] err the error code
- * @return an error message
+ * It returns a string messages corresponding to a given error code. If
+ * it is not a libwrtd error code, it will run strerror(3)
+ * @param[in] err error code
+ * @return a message error
  */
 const char *wrtd_strerror(int err)
 {
@@ -62,6 +40,38 @@ const char *wrtd_strerror(int err)
 		return wrnc_strerror(err);
 
 	return wrtd_errors[err - EWRTD_INVALD_ANSWER_ACK];
+}
+
+
+/**
+ * It initializes the WRTD library. It must be called before doing
+ * anything else. If you are going to load/unload WRTD devices, then
+ * you have to un-load (wrtd_exit()) e reload (wrtd_init()) the library.
+ *
+ * This library is based on the libwrnc, so internally, this function also
+ * run wrnc_init() in order to initialize the WRNC library.
+ * @return 0 on success, otherwise -1 and errno is appropriately set
+ */
+int wrtd_init()
+{
+	int err;
+
+	err = wrnc_init();
+	if (err)
+		return err;
+
+	return 0;
+}
+
+
+/**
+ * It releases the resources allocated by wrtd_init(). It must be called when
+ * you stop to use this library. Then, you cannot use functions from this
+ * library
+ */
+void wrtd_exit()
+{
+	wrnc_exit();
 }
 
 
@@ -105,8 +115,9 @@ struct wrtd_node *wrtd_open_by_lun(int lun)
 
 
 /**
- * Close a LIST node device.
- * @param[in] dev pointer to open node device.
+ * It closes a WRTD device opened with one of the following function:
+ * wrtd_open_by_lun(), wrtd_open_by_fmc()
+ * @param[in] dev device token
  */
 void wrtd_close(struct wrtd_node *dev)
 {
@@ -119,9 +130,9 @@ void wrtd_close(struct wrtd_node *dev)
 
 
 /**
- * It returns the white-rabbit node-core token
- * @param[in] dev trig-dist device to use
- * @return the wrnc token
+ * It returns the WRNC token
+ * @param[in] dev device token
+ * @return the WRNC token
  */
 struct wrnc_dev *wrtd_get_wrnc_dev(struct wrtd_node *dev)
 {
@@ -132,8 +143,8 @@ struct wrnc_dev *wrtd_get_wrnc_dev(struct wrtd_node *dev)
 
 
 /**
- * It load a set of real-time applications for TDC and FD
- * @param[in] dev wrtd device to use
+ * It loads a set of real-time applications for TDC and FD
+ * @param[in] dev device token
  * @param[in] rt_tdc path to the TDC application
  * @param[in] rt_fd path to the Fine Delay application
  */
@@ -173,8 +184,3 @@ int wrtd_load_application(struct wrtd_node *dev, char *rt_tdc,
 
 	return 0;
 }
-
-
-static const uint32_t application_id[] = {
-	0x115790de,
-};

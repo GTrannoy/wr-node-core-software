@@ -16,6 +16,11 @@ struct wrtd_node;
 
 #define WRTD_DEFAULT_TIMEOUT	1000
 
+/*
+ * FIXME Structure are not documented because tehy depends on the RT
+ * applications and I'm waiting for their final version
+ */
+
 /**
  * White Rabbit Trigger Distribution errors
  */
@@ -117,7 +122,7 @@ extern int wrtd_in_trigger_mode_set(struct wrtd_node *dev, unsigned int input,
 extern int wrtd_in_trigger_software(struct wrtd_node *dev,
 			     struct wrtd_trigger_entry *trigger);
 extern int wrtd_in_arm(struct wrtd_node *dev, unsigned int input, int armed);
-extern int wrtd_in_disarm(struct wrtd_node *dev, unsigned int input, int armed);
+extern int wrtd_in_disarm(struct wrtd_node *dev, unsigned int input);
 extern int wrtd_in_dead_time_set(struct wrtd_node *dev, unsigned int input,
 				 uint64_t dead_time_ps);
 extern int wrtd_in_delay_set(struct wrtd_node *dev, unsigned int input,
@@ -146,9 +151,9 @@ extern int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 			     struct wrtd_output_state *state);
 extern int wrtd_out_enable(struct wrtd_node *dev, unsigned int output,
 			   int enable);
-extern int wrtd_out_trig_assign(struct wrtd_node *dev,
+extern int wrtd_out_trig_assign(struct wrtd_node *dev, int output,
 				struct wrtd_trigger_handle *handle,
-				int output, struct wrtd_trig_id *trig,
+				struct wrtd_trig_id *trig,
 				struct wrtd_trig_id *condition);
 extern int wrtd_out_trig_unassign(struct wrtd_node *dev,
 				  struct wrtd_trigger_handle *handle);

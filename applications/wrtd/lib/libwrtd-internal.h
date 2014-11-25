@@ -13,11 +13,14 @@
 #include <libwrtd.h>
 #include <libwrtd-internal.h>
 
+/**
+ * Description of a White-Rabbit Trigger-Distribution device
+ */
 struct wrtd_desc {
-	struct wrnc_dev *wrnc;
+	struct wrnc_dev *wrnc; /**< WRNC device associated */
 
-	uint32_t app_id;
-	uint32_t n_cpu;
+	uint32_t app_id; /**< Application id */
+	uint32_t n_cpu; /**< Number of CPUs */
 };
 
 /**

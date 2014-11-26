@@ -334,9 +334,6 @@ int wrtd_out_trig_get_by_index(struct wrtd_node *dev, unsigned int index,
 	int ret;
 
 	ret = wrtd_out_trig_get_all(dev, output, triggers, 256);
-	if (ret)
-		return ret;
-
 	if (ret < 0 || index >= ret) {
 		return -1;
 	}

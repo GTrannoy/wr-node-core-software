@@ -101,8 +101,9 @@ static int wrtd_cmd_delay(struct wrtd_node *wrtd, int output,
 	uint64_t dtime = 0;
 	int index, err;
 
-	if (argc != 1 || argv[0] == NULL) {
-		fprintf(stderr, "Missing deadtime value\n");
+	if (argc != 2 || argv[0] == NULL || argv[1] == NULL) {
+		fprintf(stderr,
+			"Missing arguments: delay <trig-index> <delay>\n");
 		return -1;
 	}
 	index = atoi(argv[0]);
@@ -112,7 +113,7 @@ static int wrtd_cmd_delay(struct wrtd_node *wrtd, int output,
 	if (err)
 		return err;
 
-	parse_delay(argv[0], &dtime);
+	parse_delay(argv[1], &dtime);
 
 	return wrtd_out_trig_delay_set(wrtd, &trig.handle, dtime);
 }
@@ -140,7 +141,7 @@ static int wrtd_cmd_assign(struct wrtd_node *wrtd, int output,
 			return err;
 	}
 
-	return wrtd_out_trig_assign(wrtd, &h, output, &id_t, cond ? &id_cond : NULL);
+	return wrtd_out_trig_assign(wrtd, output, &h, &id_t, cond ? &id_cond : NULL);
 }
 
 static int wrtd_cmd_unassign(struct wrtd_node *wrtd, int output,

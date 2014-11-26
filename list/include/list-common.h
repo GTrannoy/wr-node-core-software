@@ -96,7 +96,7 @@ enum list_io_flags {
     LIST_LAST_VALID = (1 << 2),       /*!< I/O processed at least one pulse. It's timestamp/ID is in the "last" field. */
     LIST_ARMED = (1 << 3),            /*!< I/O is armed */
     LIST_TRIGGERED = (1 << 4),        /*!< I/O has triggered */
-
+    LIST_WR_TIMING_OK = (1 << 5)      /*!< The output has correct WR time */
 };
 
 enum list_log_level {

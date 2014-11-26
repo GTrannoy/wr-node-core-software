@@ -18,24 +18,36 @@
 #include <string.h>
 
 #include "rt.h"
+
 #include "list-common.h"
+#include "list-serializers.h"
+
 #include "hw/fd_channel_regs.h"
 #include "hash.h"
+#include "loop-queue.h"
+
+struct pulse_queue_entry {
+    struct list_trigger_entry trig;
+    int origin_cycles;
+    struct lrt_output_rule *rule;
+};
 
 struct lrt_pulse_queue 
 {
-    struct list_timestamp data[FD_MAX_QUEUE_PULSES];
+    struct pulse_queue_entry data[FD_MAX_QUEUE_PULSES];
     int head, tail, count;
 };
 
 struct lrt_output {
     uint32_t base_addr;
     int index;
-    int hits, miss_timeout, miss_deadtime, miss_overflow;
-    struct list_id last_id;
-    struct list_timestamp last_executed;
-    struct list_timestamp last_enqueued;
-    struct list_timestamp last_programmed, l1, l2, l3;
+    int hits;
+    int miss_timeout, miss_deadtime, miss_overflow, miss_no_timing;
+    struct list_trigger_entry last_executed;
+    struct list_trigger_entry last_enqueued;
+    struct list_trigger_entry last_received;
+    struct list_timestamp last_programmed;
+    struct list_trigger_entry last_lost;
     int idle;
     int state;
     int mode;
@@ -44,8 +56,6 @@ struct lrt_output {
     int dead_time;
     int width_cycles;
     struct lrt_pulse_queue queue;
-    int worst_latency;
-    int pgms;
 };
 
 struct lrt_trigger_handle {
@@ -79,18 +89,18 @@ void pulse_queue_init(struct lrt_pulse_queue *p)
     p->count = 0;
 }
 
-int pulse_queue_push(struct lrt_pulse_queue *p, struct list_timestamp *ts)
+struct pulse_queue_entry *pulse_queue_push(struct lrt_pulse_queue *p)
 {
     if(p->count == FD_MAX_QUEUE_PULSES)
-	   return -1;
+	   return NULL;
 
     p->count++;
-    p->data[p->head] = *ts;
+    struct pulse_queue_entry *ent = &p->data[p->head];
     p->head++;
     if(p->head == FD_MAX_QUEUE_PULSES)
 	   p->head = 0;
 
-    return 0;
+    return ent;
 }
 
 int pulse_queue_empty(struct lrt_pulse_queue *p)
@@ -98,7 +108,7 @@ int pulse_queue_empty(struct lrt_pulse_queue *p)
     return p->count == 0;
 }
 
-struct list_timestamp* pulse_queue_front(struct lrt_pulse_queue *p)
+struct pulse_queue_entry* pulse_queue_front(struct lrt_pulse_queue *p)
 {
     if(!p->count)
 	   return NULL;
@@ -121,8 +131,8 @@ static inline int check_dead_time( struct lrt_output *out, struct list_timestamp
     if(out->idle)
         return 1;
 
-    int delta_s = ts->seconds - out->last_enqueued.seconds;
-    int delta_c = ts->cycles - out->last_enqueued.cycles;
+    int delta_s = ts->seconds - out->last_enqueued.ts.seconds;
+    int delta_c = ts->cycles - out->last_enqueued.ts.cycles;
 
     if(delta_c < 0)
     {
@@ -137,7 +147,7 @@ static inline int check_dead_time( struct lrt_output *out, struct list_timestamp
 
 
 struct lrt_output outputs[FD_NUM_CHANNELS];
-static int rx_total = 0;
+static int rx_ebone = 0, rx_loopback = 0;
 
 void init_outputs()
 {
@@ -163,10 +173,6 @@ static inline uint32_t fd_ch_readl (struct lrt_output *out,  uint32_t reg)
     return dp_readl( reg + out->base_addr );
 }
 
-static int last_cyc=0;
-
-static struct list_timestamp prev_ts,prev_tc;
-
 void do_output( struct lrt_output *out )
 {
         
@@ -178,39 +184,25 @@ void do_output( struct lrt_output *out )
         {
             struct list_timestamp tc;
 
-            tc.cycles = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
             tc.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
+            tc.cycles = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
 
-
-     int delta = tc.seconds - prev_tc.seconds;
-    delta *= 125000000;
-    delta += tc.cycles - prev_tc.cycles;
-
-    if(delta < 0)
-	pp_printf("FUCK-fd!");
-
-	    prev_tc = tc;
-	    delta = tc.seconds - out->last_programmed.seconds;
-	    
+	    int delta = tc.seconds - out->last_programmed.seconds;
 	    delta *= 125000000;
 	    delta += tc.cycles - out->last_programmed.cycles;
 
 	    if(delta > 0)
 	    {
-                out->miss_timeout ++;
+        	pulse_queue_pop(q);
+	        
+	        out->miss_timeout ++;
 		out->idle = 1;
 	        fd_ch_writel(out, FD_DCR_MODE, FD_REG_DCR);
 
-    		out->l1 = out->last_programmed;//tc.seconds; //delta;
-		out->l2 = tc;
-		out->l3 = prev_ts;
-
 	    }
-
-	    last_cyc = tc.cycles;
-
-
         } else {
+	    out->last_executed = pulse_queue_front(q)->trig;
+	    pulse_queue_pop(q);
 	    out->hits++;
 	    out->idle = 1;
 	}
@@ -222,15 +214,12 @@ void do_output( struct lrt_output *out )
     if(pulse_queue_empty(q))
         return;
 
-    struct list_timestamp *ts = pulse_queue_front(q);
- 
-    pulse_queue_pop(q);
+    struct pulse_queue_entry *pq_ent = pulse_queue_front(q);
+    struct list_timestamp *ts = &pq_ent->trig.ts;
 
     gpio_set(0);
     gpio_clear(0);
 
-//    out->pgms++;
-        
     fd_ch_writel(out, ts->seconds, FD_REG_U_STARTL);
     fd_ch_writel(out, ts->cycles, FD_REG_C_START);
     fd_ch_writel(out, ts->frac, FD_REG_F_START);
@@ -257,11 +246,19 @@ void do_output( struct lrt_output *out )
         ts->seconds++;
     }
 
+    volatile uint32_t dummy = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
+    int latency = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES) - pq_ent->origin_cycles;
+
+    if(latency < 0)
+	latency += 125000000;
+
+    if( pq_ent->rule->worst_latency < latency)
+	 pq_ent->rule->worst_latency = latency;
 
     // fixme: hardware miss detection?
-    prev_ts = out->last_programmed;
 
     out->last_programmed = *ts;
+    
     out->idle = 0;
 
     gpio_set(0);
@@ -275,7 +272,7 @@ void enqueue_trigger ( int output, struct lrt_output_rule *rule, struct list_id 
 {
     struct lrt_output *out = &outputs[output];
     struct list_timestamp adjusted = *ts;
-
+    struct pulse_queue_entry *pq_ent;
     ts_adjust_delay (&adjusted, rule->delay_cycles, rule->delay_frac);
 
 //    if(!rule->enabled)
@@ -287,61 +284,73 @@ void enqueue_trigger ( int output, struct lrt_output_rule *rule, struct list_id 
         return;
     }
 
-    if( pulse_queue_push( &out->queue, &adjusted ) < 0)
+    if( (pq_ent = pulse_queue_push( &out->queue )) == NULL)
     {
         out->miss_overflow ++;
         return;
     }
 
-    out->last_enqueued = *ts;
+    pq_ent->trig.ts = adjusted;
+    pq_ent->trig.id = *id;
+    pq_ent->trig.seq = seq;
+    pq_ent->origin_cycles = ts->cycles;
+    pq_ent->rule = rule;
+
+    out->last_enqueued.ts = *ts;
+    out->last_enqueued.id = *id;
+    out->last_enqueued.seq = seq;
 
     gpio_set(0);
     gpio_clear(0);
 
 }
 
+static inline void filter_trigger(struct list_trigger_entry *trig)
+{
+    struct lrt_hash_entry *ent = hash_search( &trig->id, NULL );
+    int j;
+    
+    if(ent)
+    {
+        struct list_timestamp ts = trig->ts;
+        struct list_id id = trig->id;
+        int seq = trig->seq;
+        for(j = 0; j < FD_NUM_CHANNELS; j++)
+	    if(ent->ocfg[j].state != HASH_ENT_EMPTY)
+    	    {
+        	gpio_set(0);
+                gpio_clear(0);
+                enqueue_trigger ( j, &ent->ocfg[j], &id, &ts, seq );
+            }
+    }
+}
+
 void do_rx()
 {
-    if( !rmq_poll( FD_IN_SLOT_REMOTE) )
-	return;
-	
+//    wr_up = 
+
+    if( rmq_poll( FD_IN_SLOT_REMOTE) )
+    {
+	struct list_trigger_message *msg = mq_map_in_buffer(1, FD_IN_SLOT_REMOTE) - sizeof(struct rmq_message_addr);
+        int i, cnt = msg->count;
+
+	for(i=0; i < cnt; i++)
+    	    filter_trigger( &msg->triggers[i] );
+
+	mq_discard(1, FD_IN_SLOT_REMOTE);
+	rx_ebone ++;
+    }
+    
+    struct list_trigger_entry *ent = loop_queue_pop();
+    
+    if(ent)
+    {
+	filter_trigger(ent);
+	rx_loopback++;
+    }
+    
     gpio_set(1);
     gpio_clear(1);
-    struct list_trigger_message *msg = mq_map_in_buffer(1, FD_IN_SLOT_REMOTE) - sizeof(struct rmq_message_addr);
-    int i, j;
-    int cnt = msg->count;
-
-    //struct list_timestamp tc;
-
-    //tc.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
-    //tc.cycles = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
-    //pp_printf("Trx %d %d", tc.seconds, tc.cycles);
-    //pp_printf("%d triggers\n", cnt);
-    for(i=0; i < cnt; i++)
-    {
-        struct list_id id = msg->triggers[i].id;
-        struct lrt_hash_entry *ent = hash_search( &id, NULL );
-
-        rx_total++;
-
-        if(ent)
-        {
-            struct list_timestamp ts = msg->triggers[i].ts;
-            int seq = msg->triggers[i].seq;
-            for(j = 0; j < FD_NUM_CHANNELS; j++)
-                if(ent->ocfg[j].state != HASH_ENT_EMPTY)
-                {
-                    gpio_set(0);
-                    gpio_clear(0);
-                    enqueue_trigger ( j, &ent->ocfg[j], &id, &ts, seq );
-                }
-        } else {
-
-        }
-    }
-    //pp_printf("RX %d %d %d!", msg->triggers[0].id.system, msg->triggers[0].id.source_port, msg->triggers[0].id.trigger);
-    mq_discard(1, FD_IN_SLOT_REMOTE);
-    
 }
 
 void do_outputs()
@@ -353,27 +362,31 @@ void do_outputs()
 }
 
 
-static inline uint32_t *ctl_claim_out()
+static inline struct mq_buffer ctl_claim_out()
 {
     mq_claim(0, FD_OUT_SLOT_CONTROL);
-    return mq_map_out_buffer( 0, FD_OUT_SLOT_CONTROL );
+    return mq_buffer_init_out( 64, 0, FD_OUT_SLOT_CONTROL );
 }
 
 static inline void ctl_ack( uint32_t seq )
 {
-    uint32_t *buf = ctl_claim_out();
-    buf[0] = ID_REP_ACK;
-    buf[1] = seq;
-    mq_send(0, FD_OUT_SLOT_CONTROL, 2);
+    struct mq_buffer buf = ctl_claim_out();
+
+    bag_int ( &buf, ID_REP_ACK );
+    bag_int ( &buf, seq );
+
+    mq_buffer_send ( &buf, 0, FD_OUT_SLOT_CONTROL );
 }
 
 static inline void ctl_nack( uint32_t seq, int err )
 {
-    uint32_t *buf = ctl_claim_out();
-    buf[0] = ID_REP_NACK;
-    buf[1] = seq;
-    buf[2] = err;
-    mq_send(0, FD_OUT_SLOT_CONTROL, 3);
+    struct mq_buffer buf = ctl_claim_out();
+
+    bag_int ( &buf, ID_REP_NACK );
+    bag_int ( &buf, seq );
+    bag_int ( &buf, err );
+
+    mq_buffer_send ( &buf, 0, FD_OUT_SLOT_CONTROL );
 }
 
 static inline void ctl_chan_assign_trigger (int seq, uint32_t *buf)
@@ -407,20 +420,19 @@ static inline void ctl_chan_assign_trigger (int seq, uint32_t *buf)
     handle.cond = NULL;
     handle.trig = hash_add ( &id, ch, &rule );
         
-//    pp_printf("st-t %x\n", rule.state);
-    if(!is_cond) // unconditional trigger
+    if(!is_cond) // unconditional trigger - send its handle to the host app
     {
-//	pp_printf("add-dt %x:%x:%x out %d->%p", id.system, id.source_port, id.trigger, ch, handle.trig);
-        uint32_t *obuf = ctl_claim_out();
-        obuf[0] = ID_REP_TRIGGER_HANDLE;
-        obuf[1] = seq;
-        obuf[2] = handle.channel;
-        obuf[3] = (uint32_t) handle.cond;
-        obuf[4] = (uint32_t) handle.trig;
-        mq_send(0, FD_OUT_SLOT_CONTROL, 5);
-        
-	    return;
-    }
+	struct mq_buffer obuf = ctl_claim_out();
+
+        bag_int ( &obuf, ID_REP_TRIGGER_HANDLE );
+        bag_int ( &obuf, seq );
+        bag_int ( &obuf, handle.channel );
+        bag_int ( &obuf, (uint32_t) handle.cond );
+        bag_int ( &obuf, (uint32_t) handle.trig );
+
+        mq_buffer_send ( &obuf, 0, FD_OUT_SLOT_CONTROL );
+        return;
+    } 
     
     id.system = buf[5];
     id.source_port = buf[6];
@@ -431,18 +443,18 @@ static inline void ctl_chan_assign_trigger (int seq, uint32_t *buf)
     rule.state = HASH_ENT_CONDITION | HASH_ENT_DISABLED; 
     rule.cond_ptr = (struct lrt_output_rule *) handle.trig;
 
-//    pp_printf("add-cond %x:%x:%x out %d->%p", id.system, id.source_port, id.trigger, ch, handle.trig);
-//    pp_printf("st-c %x\n", rule.state);
-
     handle.cond = hash_add ( &id, ch, &rule );
 
-    uint32_t *obuf = ctl_claim_out();
-    obuf[0] = ID_REP_TRIGGER_HANDLE;
-    obuf[1] = seq;    
-    obuf[2] = handle.channel;
-    obuf[3] = (uint32_t) handle.cond;
-    obuf[4] = (uint32_t) handle.trig;
-    mq_send(0, FD_OUT_SLOT_CONTROL, 5);
+
+    struct mq_buffer obuf = ctl_claim_out();
+    
+    bag_int ( &obuf, ID_REP_TRIGGER_HANDLE );
+    bag_int ( &obuf, seq );
+    bag_int ( &obuf, handle.channel );
+    bag_int ( &obuf, (uint32_t) handle.cond );
+    bag_int ( &obuf, (uint32_t) handle.trig );
+
+    mq_buffer_send ( &obuf, 0, FD_OUT_SLOT_CONTROL );
 }
 
 static inline void ctl_chan_remove_trigger (int seq, uint32_t *buf)
@@ -461,19 +473,6 @@ static inline void ctl_chan_remove_trigger (int seq, uint32_t *buf)
     ctl_ack(seq);
 }
 
-static void bag_timestamp(uint32_t *buf, struct list_timestamp *ts )
-{
-    buf[0] = ts->seconds;
-    buf[1] = ts->cycles;
-    buf[2] = ts->frac;
-}
-
-static void bag_id(uint32_t *buf, struct list_id *id )
-{
-    buf[0] = id->system;
-    buf[1] = id->source_port;
-    buf[2] = id->trigger;
-}
 
 
 static inline void ctl_read_hash(int seq, uint32_t *buf)
@@ -482,40 +481,44 @@ static inline void ctl_read_hash(int seq, uint32_t *buf)
     int pos = buf[1];
     int ch = buf[2];
 
-    uint32_t *obuf = ctl_claim_out();
+    struct mq_buffer obuf = ctl_claim_out();
 
     struct lrt_hash_entry *ent = hash_get_entry (bucket, pos);
     struct lrt_hash_entry *cond = NULL;
     
-    obuf[0] = ID_REP_HASH_ENTRY;
-    obuf[1] = seq;
-    obuf[2] = ent ? 1 : 0;
+    bag_int( &buf, ID_REP_HASH_ENTRY );
+    bag_int( &buf, seq );
+    bag_int( &buf, ent ? 1 : 0 );
 
     if(ent)
     {
         cond = (struct lrt_hash_entry *) ent->ocfg[ch].cond_ptr;
-        obuf[9] = (uint32_t) cond;
-        obuf[10] = (uint32_t) ent;
-        
-        if(cond)
-        {    	
-       	    bag_id(obuf + 3, &cond->id);
-            obuf[6] = cond->ocfg[ch].delay_cycles;
-    	    obuf[7] = cond->ocfg[ch].delay_frac;
-    	    obuf[8] = (ent->ocfg[ch].state & HASH_ENT_DISABLED) | HASH_ENT_CONDITION;
-            bag_id(obuf+11, &ent->id);
-    	    obuf[14] = ent->ocfg[ch].delay_cycles;
-    	    obuf[15] = ent->ocfg[ch].delay_frac;
-    	    obuf[16] = HASH_ENT_CONDITIONAL;
-    	} else {
-            bag_id(obuf + 3, &ent->id);
-    	    obuf[6] = ent->ocfg[ch].delay_cycles;
-    	    obuf[7] = ent->ocfg[ch].delay_frac;
-    	    obuf[8] = ent->ocfg[ch].state;
-        }
+    
+	if(cond)
+	{
+	    bag_id ( &buf, &cond->id );
+	    bag_int ( &buf, cond->ocfg[ch].delay_cycles );
+	    bag_int ( &buf, cond->ocfg[ch].delay_frac );
+    	    bag_int ( &buf, (ent->ocfg[ch].state & HASH_ENT_DISABLED) | HASH_ENT_CONDITION );
+    	    bag_int ( &buf, (uint32_t) cond );
+    	    bag_int ( &buf, (uint32_t) ent );
+            bag_id ( &buf, &ent->id);
+    	    bag_int( &buf, ent->ocfg[ch].delay_cycles );
+    	    bag_int( &buf, ent->ocfg[ch].delay_frac );
+    	    bag_int( &buf, HASH_ENT_CONDITIONAL );
+	} else {
+	    bag_id ( &buf, &ent->id );
+	    bag_int ( &buf, ent->ocfg[ch].delay_cycles );
+	    bag_int ( &buf, ent->ocfg[ch].delay_frac );
+    	    bag_int ( &buf, ent->ocfg[ch].state );
+    	    bag_int ( &buf, (uint32_t) cond );
+    	    bag_int ( &buf, (uint32_t) ent );
+    	    bag_skip ( &buf, 6);
+	}
     }
 
-    mq_send(0, FD_OUT_SLOT_CONTROL, 17);
+
+    mq_send(0, FD_OUT_SLOT_CONTROL, 18);
 }
 
 static inline void ctl_chan_set_dead_time (int seq, uint32_t *buf)
@@ -554,6 +557,7 @@ static inline void ctl_chan_get_state (int seq, uint32_t *buf)
     struct lrt_output *st = &outputs[channel];
     uint32_t *obuf = ctl_claim_out();
   
+  
     obuf[0] = ID_REP_STATE;
     obuf[1] = seq;
     obuf[2] = channel;
@@ -561,15 +565,11 @@ static inline void ctl_chan_get_state (int seq, uint32_t *buf)
     obuf[4] = st->miss_timeout;
     obuf[5] = st->miss_deadtime; 
     obuf[6] = st->miss_overflow;
-    bag_id(obuf + 7, &st->last_id);
+    obuf[7] = st->miss_no_timing;
 
-    bag_timestamp(obuf + 10, &st->l1);
-    bag_timestamp(obuf + 13, &st->l2);
-    bag_timestamp(obuf + 16, &st->l3);
+    bag_timestamp(obuf + 8, &st->last_executed);
+    bag_timestamp(obuf + 15, &st->last_enqueued);
 
-//    bag_timestamp(obuf + 10, &st->last_executed);
-//    bag_timestamp(obuf + 13, &st->last_enqueued);
-//    bag_timestamp(obuf + 16, &st->last_programmed);
     obuf[19] = st->idle;
     obuf[20] = st->state;
     obuf[21] = st->mode;
@@ -577,10 +577,13 @@ static inline void ctl_chan_get_state (int seq, uint32_t *buf)
     obuf[23] = st->log_level;
     obuf[24] = st->dead_time;
     obuf[25] = st->width_cycles;
-    obuf[26] = st->worst_latency;
-    obuf[27] = rx_total;
+    obuf[27] = rx_ebone;
+    obuf[28] = rx_loopback;
 
-    mq_send(0, FD_OUT_SLOT_CONTROL, 28);
+    bag_timestamp(obuf + 16, &st->last_received);
+    bag_timestamp(obuf + 29, &st->last_lost);
+
+    mq_send(0, FD_OUT_SLOT_CONTROL, 29);
 }
 
 static inline void ctl_software_trigger (int seq, uint32_t *buf)

@@ -120,6 +120,8 @@ struct lrt_hash_entry *hash_add ( struct list_id *id, int output, struct lrt_out
     if(!ent)
        return NULL;
 
+    rule->worst_latency = 0;
+
     ent->id = *id;
     ent->ocfg[output] = *rule;
     return ent;

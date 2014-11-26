@@ -19,3 +19,6 @@ $(OUTPUT): $(LDSCRIPT) $(OBJS)
 
 clean:
 	rm -f $(OBJS) $(OUTPUT).bin
+	
+install:
+	cp $(OUTPUT).bin /acc/local/share/firmware/list

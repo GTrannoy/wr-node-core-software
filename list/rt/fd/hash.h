@@ -25,6 +25,7 @@ struct lrt_output_rule {
     uint16_t delay_frac;
     uint16_t state;
     struct lrt_output_rule *cond_ptr;
+    int worst_latency;
 };
 
 

@@ -876,6 +876,36 @@ struct wrnc_msg *wrnc_slot_receive(struct wrnc_dev *wrnc, unsigned int index)
 
 
 /**
+ * It sends a message to an input message queue slot.
+ * @param[in] wrnc device to use
+ * @param[in] index HMQ slot to write
+ * @return 0 on success, -1 otherwise and errno is set appropriately
+ */
+int wrnc_slot_send(struct wrnc_dev *wrnc, unsigned int index,
+			  struct wrnc_msg *msg)
+{
+	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
+	int n;
+
+	if (wdesc->fd_hmq_in[index] < 0) {
+		errno = EWRNC_HMQ_CLOSE;
+		return -1;
+	}
+
+	msg = malloc(sizeof(struct wrnc_msg));
+	if (!msg)
+		return -1;
+
+	/* Get a message from the driver */
+	n = write(wdesc->fd_hmq_in[index], msg, sizeof(struct wrnc_msg));
+	if (n != sizeof(struct wrnc_msg))
+		return -1;
+
+	return 0;
+}
+
+
+/**
  * It retreives the file descriptor of a slot
  * @param[in] wrnc device token
  * @param[in] is_input direction of the slot, 1 for input, 0 for output

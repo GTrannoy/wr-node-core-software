@@ -981,13 +981,15 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 
 	/*
 	 * Wait until the message queue is empty so we can safely enqueue
-	 * the synchronous message. Then get the mutex to avoid other process
-	 * to write
+	 * the synchronous message. Get the mutex to avoid other process
+	 * to write while we are waiting to empty the list.
+	 * Sync messages does not have higher priority than the others, so
+	 * we'll wait here until is our turn
 	 */
+	mutex_lock(&hmq->mtx);
 	to = wait_event_interruptible(hmq->q_msg, list_empty(&hmq->list_msg));
 	if (unlikely(to < 0))
 	        goto out;
-	mutex_lock(&hmq->mtx);
 
 	/*
 	 * Wait for the CPU-out queue is empty. Then get the mutex to avoid

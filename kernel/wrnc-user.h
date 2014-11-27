@@ -49,7 +49,7 @@ struct wrnc_smem_io {
 	uint32_t value; /**< value to write. After ioctl it will be overwritte
 			   with the new value in the shared memory */
 	int is_input; /**< flag to determinte data direction */
-	enum wrnc_smem_modifier mod;
+	enum wrnc_smem_modifier mod;  /**< the kind of operation to do */
 };
 
 /**

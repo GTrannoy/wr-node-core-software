@@ -391,7 +391,7 @@ static ssize_t wrnc_store_smem_op(struct device *dev,
 		return -EINVAL;
 
 	if (val < WRNC_SMEM_DIRECT || val > WRNC_SMEM_ADD) {
-		dev_err(&wrnc->dev, "Unsupported operation %d\n", val);
+		dev_err(&wrnc->dev, "Unsupported operation %ld\n", val);
 		return -EINVAL;
 	}
 

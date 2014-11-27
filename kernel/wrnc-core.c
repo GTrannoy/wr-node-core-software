@@ -1230,8 +1230,12 @@ static void wrnc_irq_handler_output(struct wrnc_hmq *hmq)
 	hmq->count++;
 	if (unlikely(hmq->count > hmq_max_msg)) {
 		/* there is no more space, remove the oldest message */
+		msgel = list_entry(hmq->list_msg.next,
+				   struct wrnc_msg_element, list);
 		list_del(&msgel->list);
 		hmq->count--;
+		kfree(msgel->msg);
+		kfree(msgel);
 	}
 	spin_unlock_irqrestore(&hmq->lock, flags);
 

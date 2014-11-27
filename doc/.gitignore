@@ -1,1 +1,7 @@
 doxy-wrnc/
+*.aux
+*.dvi
+*.pdf
+*.log
+*.out
+*~

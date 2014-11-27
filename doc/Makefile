@@ -11,11 +11,15 @@ else
 	BRIEF = "API Documentation"
 endif
 
-all: doxygen
+all: doxygen latex
 
 doxygen:
 	GIT_VERSION=$(GIT_VERSION) EXCLUDE_FILES=$(EXCLUDE_FILES) BRIEF=$(BRIEF) \
 	OUTPUT=$(O) doxygen ./doxygen-wrnc-config
+
+latex:
+	latex wrnc.tex
+	latex wrnc.tex
 
 clean:
 	rm -rf $(O)

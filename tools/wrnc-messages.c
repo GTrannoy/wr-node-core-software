@@ -108,6 +108,12 @@ void *dump_thread(void *arg)
 
 	/* Build the polling structures */
 	for (i = 0; i < idx_valid[idx]; ++i) {
+		err = wrnc_hmq_open(wrnc, slot_index[idx][i], 0);
+		if (err) {
+			fprintf(stderr, "Cannot open HMQ: %s\n",
+				wrnc_strerror(errno));
+			goto out;
+		}
 		p[i].fd = slot_index[idx][i];
 		p[i].events = POLLIN | POLLERR;
 	}
@@ -139,7 +145,9 @@ void *dump_thread(void *arg)
 			break;
 		}
 	}
-
+out:
+	for (i = 0; i < idx_valid[idx]; ++i)
+		wrnc_hmq_close(wrnc, slot_index[idx][i], 0);
 	wrnc_close(wrnc);
 	return NULL;
 }

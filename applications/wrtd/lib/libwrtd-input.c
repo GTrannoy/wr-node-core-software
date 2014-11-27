@@ -17,12 +17,21 @@
 static inline int wrtd_in_send_and_receive_sync(struct wrtd_desc *wrtd,
 						struct wrnc_msg *msg)
 {
+	int err;
+
+  	err = wrnc_hmq_open(wrtd->wrnc, WRTD_IN_TDC_CONTROL, 0);
+	if (err)
+		return err;
+
 	/* Send the message and get answer */
-	return wrnc_slot_send_and_receive_sync(wrtd->wrnc,
-					       WRTD_IN_TDC_CONTROL,
-					       WRTD_OUT_TDC_CONTROL,
-					       msg,
-					       WRTD_DEFAULT_TIMEOUT);
+        err = wrnc_slot_send_and_receive_sync(wrtd->wrnc,
+					      WRTD_IN_TDC_CONTROL,
+					      WRTD_OUT_TDC_CONTROL,
+					      msg,
+					      WRTD_DEFAULT_TIMEOUT);
+	wrnc_hmq_close(wrtd->wrnc, WRTD_IN_TDC_CONTROL, 0);
+
+	return err;
 }
 
 

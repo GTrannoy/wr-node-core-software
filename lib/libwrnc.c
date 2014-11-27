@@ -26,6 +26,7 @@ static char *wrnc_error_str[] = {
 	"Cannot parse data from sysfs attribute",
 	"Invalid slot",
 	"Operation not yet implemented",
+	"The HMQ slot is close",
 	NULL,
 };
 
@@ -189,16 +190,14 @@ void wrnc_close(struct wrnc_dev *wrnc)
 		close(wdesc->fd_dev);
 
 	for (i = 0; i < WRNC_MAX_CPU; ++i)
-		if (wdesc->fd_cpu[i] < 0)
+		if (wdesc->fd_cpu[i] > 0)
 			close(wdesc->fd_cpu[i]);
 
 	for (i = 0; i < WRNC_MAX_HMQ_SLOT / 2; ++i)
-		if (wdesc->fd_hmq_in[i] < 0)
-			close(wdesc->fd_hmq_in[i]);
-
+		wrnc_hmq_close(wrnc, i, 1);
 	for (i = 0; i < WRNC_MAX_HMQ_SLOT / 2; ++i)
-		if (wdesc->fd_hmq_in[i] < 0 )
-			close(wdesc->fd_hmq_in[i]);
+		wrnc_hmq_close(wrnc, i, 0);
+
 	free(wdesc);
 }
 
@@ -549,9 +548,10 @@ int wrnc_cpu_dump_application_file(struct wrnc_dev *wrnc,
  * @param[in] dir direction of the slot (1 input, 0 output)
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-static int wrnc_hmq_open(struct wrnc_desc *wdesc, unsigned int index,
-			 unsigned int dir)
+int wrnc_hmq_open(struct wrnc_dev *wrnc, unsigned int index,
+		  unsigned int dir)
 {
+	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	char path[64];
 	int *fd;
 
@@ -576,6 +576,25 @@ static int wrnc_hmq_open(struct wrnc_desc *wdesc, unsigned int index,
 
 
 /**
+ * It closes a HMQ slot
+ * @param[in] wdesc device token
+ * @param[in] index HMQ index
+ * @param[in] dir direction of the slot (1 input, 0 output)
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+void wrnc_hmq_close(struct wrnc_dev *wrnc, unsigned int index,
+		   unsigned int dir)
+{
+	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
+	int *fd;
+
+	fd = dir ? wdesc->fd_hmq_in : wdesc->fd_hmq_out;
+	if (fd[index] > 0)
+		close(fd[index]);
+}
+
+
+/**
  * It sends a synchronous message. The slots are uni-directional, so you must
  * specify where write the message and where the answer is expected.
  * @param[in] wrnc device token
@@ -596,19 +615,19 @@ int wrnc_slot_send_and_receive_sync(struct wrnc_dev *wrnc,
 	struct wrnc_msg_sync smsg;
 	int err;
 
+	if (wdesc->fd_hmq_in[index_in] < 0) {
+		errno = EWRNC_HMQ_CLOSE;
+		return -1;
+	}
+
 	/* Build the message */
 	smsg.index_in = index_in;
 	smsg.index_out = index_out;
 	smsg.timeout_ms = timeout_ms;
 	memcpy(&smsg.msg, msg, sizeof(struct wrnc_msg));
 
-	err = wrnc_hmq_open(wdesc, smsg.index_in, 1);
-	if (err)
-		return err;
-
 	/* Send the message */
-	err = ioctl(wdesc->fd_hmq_in[smsg.index_in],
-		    WRNC_IOCTL_MSG_SYNC, &smsg);
+	err = ioctl(wdesc->fd_hmq_in[index_in], WRNC_IOCTL_MSG_SYNC, &smsg);
 	if (err)
 		return -1;
 
@@ -640,11 +659,9 @@ int wrnc_slot_poll(struct wrnc_dev *wrnc, struct pollfd *p, nfds_t nfds,
 		lp[i].events = p[i].events;
 		index = p[i].fd;
 		if (p[i].events & POLLIN) {
-			wrnc_hmq_open(wdesc, index, 0);
 			lp[i].fd = wdesc->fd_hmq_out[index];
 		}
 		if (p[i].events & POLLOUT) {
-			wrnc_hmq_open(wdesc, index, 1);
 			lp[i].fd = wdesc->fd_hmq_in[index];
 		}
 	}
@@ -829,18 +846,19 @@ int wrnc_cpu_disable(struct wrnc_dev *wrnc, unsigned int index)
  * It allocates and returns a message from an output message queue slot.
  * The user of this function is in charge to release the memory.
  * @param[in] wrnc device to use
- * @param[in] index CPU to enable
+ * @param[in] index HMQ slot to read
  * @return a WRNC message, NULL on error and errno is set appropriately
  */
 struct wrnc_msg *wrnc_slot_receive(struct wrnc_dev *wrnc, unsigned int index)
 {
 	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	struct wrnc_msg *msg;
-	int err, n;
+	int n;
 
-	err = wrnc_hmq_open(wdesc, index, 0);
-	if (err)
+	if (wdesc->fd_hmq_out[index] < 0) {
+		errno = EWRNC_HMQ_CLOSE;
 		return NULL;
+	}
 
 	msg = malloc(sizeof(struct wrnc_msg));
 	if (!msg)

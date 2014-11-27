@@ -33,6 +33,7 @@ enum wrnc_error_number {
 	EWRNC_INVAL_PARSE = 83630, /**< cannot parse data from sysfs */
 	EWRNC_INVAL_SLOT, /**< invalid slot */
 	EWRNC_NO_IMPLEMENTATION, /**< a prototype is not implemented */
+	EWRNC_HMQ_CLOSE, /**< The HMQ is closed */
 	__EWRNC_MAX,
 };
 
@@ -94,6 +95,10 @@ extern int wrnc_cpu_disable(struct wrnc_dev *wrnc, unsigned int index);
 extern int wrnc_cpu_start(struct wrnc_dev *wrnc, unsigned int index);
 extern int wrnc_cpu_stop(struct wrnc_dev *wrnc, unsigned int index);
 
+extern int wrnc_hmq_open(struct wrnc_dev *wrnc, unsigned int index,
+			 unsigned int dir);
+extern void wrnc_hmq_close(struct wrnc_dev *wrnc, unsigned int index,
+			   unsigned int dir);
 extern struct wrnc_msg *wrnc_slot_receive(struct wrnc_dev *wrnc,
 					  unsigned int index);
 extern int wrnc_slot_send(struct wrnc_dev *wrnc, unsigned int index,

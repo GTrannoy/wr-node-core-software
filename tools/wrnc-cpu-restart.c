@@ -15,19 +15,17 @@ static void help()
 {
 	fprintf(stderr, "\n");
 	fprintf(stderr, "wrnc-cpu-restart  -D 0x<hex-number> -i <number> [options]\n\n");
-	fprintf(stderr, "It restarts a set of CPUs \n\n");
+	fprintf(stderr, "It restarts a set of given CPUs by stopping, resetting and then start again\n\n");
 	fprintf(stderr, "-D   WRNC device identificator in hexadecimal format\n");
 	fprintf(stderr, "-i   cpu index\n");
 	fprintf(stderr, "-h   show this help\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr,
-		"You can restart several devices' CPUs, so the arguments '-D' and '-i' may");
+		"You can restart several CPUs, so the arguments '-D' and '-i' may appear several times. The argument '-i' refers to the previous device id declared\n\n");
 	fprintf(stderr,
-		" appear several times. The argument '-i' refers to the previous device id declared\n\n");
+		"e.g. Restart CPUs 0 and 1 of devices 0x0402 and 0x0382\n\n");
 	fprintf(stderr,
-		"e.g. Restart CPUs 0 and 1 of devices 0x0400 and 0x0380\n\n");
-	fprintf(stderr,
-		"        wrnc-cpu-restart -D 0x0380 -i 0 -i 1 -D 0x0400 -i 0 -i 1\n\n");
+		"        wrnc-cpu-restart -D 0x0382 -i 0 -i 1 -D 0x0402 -i 0 -i 1\n\n");
 	exit(1);
 }
 

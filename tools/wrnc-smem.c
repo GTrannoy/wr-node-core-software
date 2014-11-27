@@ -27,7 +27,7 @@ static void help()
 {
 	fprintf(stderr, "\n");
 	fprintf(stderr, "wrnc-smem -D 0x<hex-number> -a 0x<number> [options] [value]\n\n");
-	fprintf(stderr, "If you privide data, it will write these data into the shared memory. Then, it dumps the content after the write operation (if any)\n\n");
+	fprintf(stderr, "This program reads/write to/from the white-rabbit node-core shared memory. If you privide data, it will write these data into the shared memory. Then, it dumps the content after the write operation (if any). If you do not provide any data, it will simply read the current content of the shared memory\n\n");
 	fprintf(stderr, "-D   WRNC device identificator in hexadecimal format\n");
 	fprintf(stderr, "-a   address where start operation\n");
 	fprintf(stderr, "-n   number of word (32bit) to read/write. The default is 1\n");

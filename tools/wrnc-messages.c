@@ -27,7 +27,7 @@ static void help()
 {
 	fprintf(stderr, "\n");
 	fprintf(stderr, "wrnc-messages -D 0x<hex-number> -i <number> [options]\n\n");
-	fprintf(stderr, "It dumps all messages from a given set slots\n\n");
+	fprintf(stderr, "It dumps all messages from a given set of white-rabbit node-core slots\n\n");
 	fprintf(stderr, "-D   WRNC device identificator in hexadecimal format\n");
 	fprintf(stderr, "-i   slot index\n");
 	fprintf(stderr, "-n   number of total messages to read. The default is 0 (infinite)\n");
@@ -35,13 +35,11 @@ static void help()
 	fprintf(stderr, "-h   show this help\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr,
-		"You can dump from several devices slots, so the arguments '-D' and '-i' may");
+		"You can dump from several devices slots, so the arguments '-D' and '-i' may appear several times. The argument '-i' refers to the previous device id declared\n\n");
 	fprintf(stderr,
-		" appear several times. The argument '-i' refers to the previous device id declared\n\n");
+		"e.g. Dumping messagges from slots 2 and 3 of devices 0x0402 and 0x0382\n\n");
 	fprintf(stderr,
-		"e.g. Dumping messagges from slots 2 and 3 of devices 0x0400 and 0x0380\n\n");
-	fprintf(stderr,
-		"        wrnc-messages -D 0x0380 -i 2 -i 3 -D 0x0400 -i 2 -i 3\n\n");
+		"        wrnc-messages -D 0x0382 -i 2 -i 3 -D 0x0402 -i 2 -i 3\n\n");
 	exit(1);
 }
 

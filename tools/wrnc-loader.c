@@ -16,10 +16,11 @@ static void help()
 {
 	fprintf(stderr, "\n");
 	fprintf(stderr, "wrnc-loader -D 0x<hex-number> -i <number> -f <path> [options]\n\n");
-	fprintf(stderr, "It loads (or dumps) an application to a WRNC internal CPU\n\n");
+	fprintf(stderr, "It loads (or dumps) an application to a white-rabbit node-core internal CPU\n\n");
 	fprintf(stderr, "-D   WRNC device identificator\n");
 	fprintf(stderr, "-i   CPU index\n");
-	fprintf(stderr, "-f   path to the binary to load\n");
+	fprintf(stderr, "-f   path to the binary to load. If the option '-d' is set, then\n");
+	fprintf(stderr, "     this is where the program will store the current CPU application\n");
 	fprintf(stderr, "-d   dump current application\n");
 	fprintf(stderr, "-h   show this help\n");
 	fprintf(stderr, "\n");

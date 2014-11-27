@@ -14,7 +14,7 @@ static void help()
 {
 	fprintf(stderr, "\n");
 	fprintf(stderr, "lswrnc [options]\n\n");
-	fprintf(stderr, "It shows the current wrnc on the system\n\n");
+	fprintf(stderr, "It shows the current white-rabbit node-core available on the system.\n\n");
 	fprintf(stderr, "-v   show more information about a wrnc\n");
 	fprintf(stderr, "-h   show this help\n");
 	fprintf(stderr, "\n");

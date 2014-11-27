@@ -33,6 +33,10 @@ static int hmq_max_msg = 32; /**< Maximum number of messages in driver queue */
 module_param_named(max_slot_msg, hmq_max_msg, int, 0444);
 MODULE_PARM_DESC(max_slot_msg, "Maximum number of messages in driver queue.");
 
+static int hmq_max_con = 8; /**< Maximum number connection for each slot */
+module_param_named(max_slot_con, hmq_max_con, int, 0444);
+MODULE_PARM_DESC(max_slot_con, "Maximum number connection for each slot.");
+
 static int wrnc_dev_uevent(struct device *dev, struct kobj_uevent_env *env)
 {
 	add_uevent_var(env, "DEVMODE=%#o", 0440);

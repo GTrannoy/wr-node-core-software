@@ -545,15 +545,15 @@ int wrnc_cpu_dump_application_file(struct wrnc_dev *wrnc,
  * It opens an HMQ slot
  * @param[in] wdesc device token
  * @param[in] index HMQ index
- * @param[in] dir direction of the slot (1 input, 0 output)
+ * @param[in] flags HMQ flags
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrnc_hmq_open(struct wrnc_dev *wrnc, unsigned int index,
-		  unsigned int dir)
+		  unsigned long flags)
 {
 	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	char path[64];
-	int *fd;
+	int *fd, dir = flags & WRNC_HMQ_INCOMING;
 
 	if (index >= WRNC_MAX_HMQ_SLOT / 2) {
 		errno = EWRNC_INVAL_SLOT;
@@ -579,16 +579,16 @@ int wrnc_hmq_open(struct wrnc_dev *wrnc, unsigned int index,
  * It closes a HMQ slot
  * @param[in] wdesc device token
  * @param[in] index HMQ index
- * @param[in] dir direction of the slot (1 input, 0 output)
+ * @param[in] flags HMQ flags
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 void wrnc_hmq_close(struct wrnc_dev *wrnc, unsigned int index,
-		   unsigned int dir)
+		   unsigned long flags)
 {
 	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	int *fd;
 
-	fd = dir ? wdesc->fd_hmq_in : wdesc->fd_hmq_out;
+	fd = flags & WRNC_HMQ_INCOMING ? wdesc->fd_hmq_in : wdesc->fd_hmq_out;
 	if (fd[index] > 0)
 		close(fd[index]);
 }

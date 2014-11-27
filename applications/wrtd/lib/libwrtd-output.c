@@ -19,7 +19,7 @@ static inline int wrtd_out_send_and_receive_sync(struct wrtd_desc *wrtd,
 	/* Send the message and get answer */
 	int err;
 
-	err = wrnc_hmq_open(wrtd->wrnc, WRTD_IN_FD_CONTROL, 0);
+	err = wrnc_hmq_open(wrtd->wrnc, WRTD_IN_FD_CONTROL, WRNC_HMQ_INCOMING);
 	if (err)
 		return err;
 
@@ -29,7 +29,7 @@ static inline int wrtd_out_send_and_receive_sync(struct wrtd_desc *wrtd,
 					      msg,
 					      WRTD_DEFAULT_TIMEOUT);
 
-	wrnc_hmq_close(wrtd->wrnc, WRTD_IN_FD_CONTROL, 0);
+	wrnc_hmq_close(wrtd->wrnc, WRTD_IN_FD_CONTROL, WRNC_HMQ_INCOMING);
 
 	return err;
 }

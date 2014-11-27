@@ -26,6 +26,12 @@ struct wrnc_dev;
 #define WRNC_DEVICE_PATH_LEN 64
 
 
+#define WRNC_HMQ_INCOMING	(1 << 0)
+#define WRNC_HMQ_OUTCOMING	0x0
+#define WRNC_HMQ_EXCLUSIVE	(1 << 1)
+#define WRNC_HMQ_SHARED		0x0
+
+
 /**
  * Error codes for white-rabbit node-core applications
  */
@@ -96,9 +102,9 @@ extern int wrnc_cpu_start(struct wrnc_dev *wrnc, unsigned int index);
 extern int wrnc_cpu_stop(struct wrnc_dev *wrnc, unsigned int index);
 
 extern int wrnc_hmq_open(struct wrnc_dev *wrnc, unsigned int index,
-			 unsigned int dir);
+			 unsigned long flags);
 extern void wrnc_hmq_close(struct wrnc_dev *wrnc, unsigned int index,
-			   unsigned int dir);
+			   unsigned long flags);
 extern struct wrnc_msg *wrnc_slot_receive(struct wrnc_dev *wrnc,
 					  unsigned int index);
 extern int wrnc_slot_send(struct wrnc_dev *wrnc, unsigned int index,

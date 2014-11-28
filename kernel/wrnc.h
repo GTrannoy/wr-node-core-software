@@ -97,4 +97,11 @@ struct wrnc_dev {
 	enum wrnc_smem_modifier mod; /**< smem operation modifier */
 };
 
+/* Global data */
+extern struct device *minors[WRNC_MAX_MINORS];
+/* CPU data */
+extern const struct file_operations wrnc_cpu_fops;
+extern const struct attribute_group *wrnc_cpu_groups[];
+extern void wrnc_cpu_enable_set(struct wrnc_dev *wrnc, uint8_t mask);
+extern void wrnc_cpu_reset_set(struct wrnc_dev *wrnc, uint8_t mask);
 #endif

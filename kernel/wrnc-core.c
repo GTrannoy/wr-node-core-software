@@ -366,7 +366,7 @@ static ssize_t wrnc_write(struct file *f, const char __user *buf,
 		err = copy_from_user(&val, buf + i, 4);
 		if (err) {
 			dev_err(&wrnc->dev,
-				"Incomplete write on shared memory addr 0x%llx size %d\n",
+				"Incomplete write on shared memory addr 0x%llx size %zu\n",
 				*offp, count);
 			return -EFAULT;
 		}

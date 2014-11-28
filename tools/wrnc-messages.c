@@ -155,7 +155,8 @@ out:
 
 int main(int argc, char *argv[])
 {
-	unsigned int i, di = 0;
+	unsigned long i;
+	unsigned int di = 0;
 	pthread_t tid[MAX_DEV];
 	int err;
 	char c;
@@ -201,7 +202,7 @@ int main(int argc, char *argv[])
 	for (i = 0; i < di; i++) {
 	        err = pthread_create(&tid[i], NULL, dump_thread, (void *)i);
 		if (err)
-			fprintf(stderr, "Cannot create 'dump_thread' instance %d: %s\n",
+			fprintf(stderr, "Cannot create 'dump_thread' instance %ld: %s\n",
 				i, strerror(errno));
 	}
 

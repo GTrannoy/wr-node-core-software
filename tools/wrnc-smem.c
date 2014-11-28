@@ -14,14 +14,8 @@
 #include <pthread.h>
 #include <time.h>
 
-
 #define MAX_DEV 4
 #define MAX_SLOT 32
-
-static unsigned int slot_index[MAX_DEV][MAX_SLOT], idx_valid[MAX_DEV], cnt, n;
-static uint32_t dev_id[MAX_DEV];
-static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
-static int timestamp = 0;
 
 static void help()
 {

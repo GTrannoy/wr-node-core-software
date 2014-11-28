@@ -104,4 +104,9 @@ extern const struct file_operations wrnc_cpu_fops;
 extern const struct attribute_group *wrnc_cpu_groups[];
 extern void wrnc_cpu_enable_set(struct wrnc_dev *wrnc, uint8_t mask);
 extern void wrnc_cpu_reset_set(struct wrnc_dev *wrnc, uint8_t mask);
+/* HMQ */
+extern int hmq_max_msg;
+extern const struct attribute_group *wrnc_hmq_groups[];
+extern const struct file_operations wrnc_hmq_fops;
+extern irqreturn_t wrnc_irq_handler(int irq_core_base, void *arg);
 #endif

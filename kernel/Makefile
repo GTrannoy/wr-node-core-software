@@ -27,6 +27,7 @@ subdirs-ccflags-y = $(ccflags-y)
 obj-m := wr-node-core.o
 wr-node-core-y :=  wrnc-core.o
 wr-node-core-y +=  wrnc-cpu.o
+wr-node-core-y +=  wrnc-hmq.o
 
 all modules:
 	$(MAKE) -C $(LINUX) M=$(shell /bin/pwd) modules

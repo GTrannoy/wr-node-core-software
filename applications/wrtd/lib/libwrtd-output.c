@@ -177,8 +177,8 @@ int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
  * @param[in] enable 1 to enable the output, 0 disables it.
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-extern int wrtd_out_enable(struct wrtd_node *dev, unsigned int output,
-			   int enable)
+int wrtd_out_enable(struct wrtd_node *dev, unsigned int output,
+		    int enable)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrnc_msg msg;
@@ -214,10 +214,10 @@ extern int wrtd_out_enable(struct wrtd_node *dev, unsigned int output,
  * @param[in] condition trigger id to assign to the condition
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-extern int wrtd_out_trig_assign(struct wrtd_node *dev, int output,
-				struct wrtd_trigger_handle *handle,
-				struct wrtd_trig_id *trig,
-				struct wrtd_trig_id *condition)
+int wrtd_out_trig_assign(struct wrtd_node *dev, int output,
+			 struct wrtd_trigger_handle *handle,
+			 struct wrtd_trig_id *trig,
+			 struct wrtd_trig_id *condition)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrnc_msg msg;
@@ -269,8 +269,8 @@ extern int wrtd_out_trig_assign(struct wrtd_node *dev, int output,
  * @param[in] handle
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-extern int wrtd_out_trig_unassign(struct wrtd_node *dev,
-				  struct wrtd_trigger_handle *handle)
+int wrtd_out_trig_unassign(struct wrtd_node *dev,
+			   struct wrtd_trigger_handle *handle)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrnc_msg msg;
@@ -362,9 +362,9 @@ int wrtd_out_trig_get_by_index(struct wrtd_node *dev, unsigned int index,
  * @param[in] delay_ps delay in pico-seconds
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-extern int wrtd_out_trig_delay_set(struct wrtd_node *dev,
-				     struct wrtd_trigger_handle *handle,
-				     uint64_t delay_ps)
+int wrtd_out_trig_delay_set(struct wrtd_node *dev,
+			    struct wrtd_trigger_handle *handle,
+			    uint64_t delay_ps)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wr_timestamp t;
@@ -399,8 +399,8 @@ extern int wrtd_out_trig_delay_set(struct wrtd_node *dev,
  * @param[in] dead_time_ps dead time in pico-seconds
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-extern int wrtd_out_dead_time_set(struct wrtd_node *dev, unsigned int output,
-				  uint64_t dead_time_ps)
+int wrtd_out_dead_time_set(struct wrtd_node *dev, unsigned int output,
+			   uint64_t dead_time_ps)
 {
 	errno = EWRTD_NO_IMPLEMENTATION;
 	return -1;
@@ -413,9 +413,9 @@ extern int wrtd_out_dead_time_set(struct wrtd_node *dev, unsigned int output,
  * @param[in] delay_ps delay in pico-seconds
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-extern int wrtd_out_trig_condition_delay_set(struct wrtd_node *dev,
-					     struct wrtd_trigger_handle *handle,
-					     uint64_t delay_ps)
+int wrtd_out_trig_condition_delay_set(struct wrtd_node *dev,
+				      struct wrtd_trigger_handle *handle,
+				      uint64_t delay_ps)
 {
 	errno = EWRTD_NO_IMPLEMENTATION;
 	return -1;
@@ -428,9 +428,9 @@ extern int wrtd_out_trig_condition_delay_set(struct wrtd_node *dev,
  * @param[out] state trigger status
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-extern int wrtd_out_trig_state_get(struct wrtd_node *dev,
-				   struct wrtd_trigger_handle *handle,
-				   struct wrtd_output_trigger_state *state)
+int wrtd_out_trig_state_get(struct wrtd_node *dev,
+			    struct wrtd_trigger_handle *handle,
+			    struct wrtd_output_trigger_state *state)
 {
 	errno = EWRTD_NO_IMPLEMENTATION;
 	return -1;
@@ -443,8 +443,8 @@ extern int wrtd_out_trig_state_get(struct wrtd_node *dev,
  * @param[in] enable 1 to enable, 0 to disable
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-extern int wrtd_out_trig_enable(struct wrtd_node *dev,
-				struct wrtd_trigger_handle *handle, int enable)
+int wrtd_out_trig_enable(struct wrtd_node *dev,
+			 struct wrtd_trigger_handle *handle, int enable)
 {
 	errno = EWRTD_NO_IMPLEMENTATION;
 	return -1;
@@ -462,8 +462,8 @@ extern int wrtd_out_trig_enable(struct wrtd_node *dev,
  * @param[in] count number of messages to read
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-extern int wrtd_out_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
-			     int flags, unsigned int output_mask, int count)
+int wrtd_out_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
+		      int flags, unsigned int output_mask, int count)
 {
 	errno = EWRTD_NO_IMPLEMENTATION;
 	return -1;
@@ -475,8 +475,8 @@ extern int wrtd_out_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
  * @param[in] log_level log level to apply to the logging messages
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-extern int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
-				  uint32_t log_level)
+int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
+			   uint32_t log_level)
 {
 	errno = EWRTD_NO_IMPLEMENTATION;
 	return -1;
@@ -489,8 +489,8 @@ extern int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
  * @param[in] mode output mode
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-extern int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
-				     unsigned int output, int mode)
+int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
+			      unsigned int output, int mode)
 {
 	errno = EWRTD_NO_IMPLEMENTATION;
 	return -1;
@@ -504,7 +504,7 @@ extern int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
  * @param[in] armed 1 to arm, 0 to un-arm
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-extern int wrtd_out_arm(struct wrtd_node *dev, unsigned int ouput, int armed)
+int wrtd_out_arm(struct wrtd_node *dev, unsigned int ouput, int armed)
 {
 	errno = EWRTD_NO_IMPLEMENTATION;
 	return -1;
@@ -516,7 +516,7 @@ extern int wrtd_out_arm(struct wrtd_node *dev, unsigned int ouput, int armed)
  * @param[in] output index (0-based) of output channel
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-extern int wrtd_out_reset_counters_reset(struct wrtd_node *dev, unsigned int output)
+int wrtd_out_reset_counters_reset(struct wrtd_node *dev, unsigned int output)
 {
 	errno = EWRTD_NO_IMPLEMENTATION;
 	return -1;
@@ -528,7 +528,7 @@ extern int wrtd_out_reset_counters_reset(struct wrtd_node *dev, unsigned int out
  * @param[in] output index (0-based) of output channel
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-extern int wrtd_out_check_triggered(struct wrtd_node *dev, unsigned int output)
+int wrtd_out_check_triggered(struct wrtd_node *dev, unsigned int output)
 {
 	errno = EWRTD_NO_IMPLEMENTATION;
 	return -1;

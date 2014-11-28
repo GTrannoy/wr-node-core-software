@@ -238,7 +238,29 @@ static int wrtd_cmd_reset(struct wrtd_node *wrtd, int input,
 static int wrtd_cmd_sw_trigger(struct wrtd_node *wrtd, int input,
 			  int argc, char *argv[])
 {
-	return wrtd_in_trigger_software(wrtd, input);
+	struct wrtd_trigger_entry ent;
+	uint64_t ts;
+	int ret;
+
+	if (argc != 1 || argv[0] == NULL) {
+		fprintf(stderr, "Missing deadtime value\n");
+		return -1;
+	}
+
+	ret = parse_trigger_id(argv[0], &ent.id);
+	if (ret < 0)
+		return -1;
+
+	if (argv[1] != NULL) {
+		parse_delay(argv[1], &ts);
+		ent.ts = picos_to_ts(ts);
+	} else {
+		ent.ts.seconds = 0;
+		ent.ts.ticks = 100000000000ULL / 8000ULL; /* 100ms */
+		ent.ts.bins = 0;
+	}
+
+	return wrtd_in_trigger_software(wrtd, &ent);
 }
 
 int main(int argc, char *argv[])

@@ -190,5 +190,9 @@ extern int wrtd_out_reset_counters(struct wrtd_node *dev, unsigned int output);
 extern int wrtd_out_check_triggered(struct wrtd_node *dev, unsigned int output);
 //int wrtd_out_wait_trigger(struct wrtd_node*, int output_mask, struct wrtd_trig_id *id);
 
+/**
+ * @file libwrtd-internal.c
+ */
+extern struct wr_timestamp picos_to_ts(uint64_t p);
 
 #endif

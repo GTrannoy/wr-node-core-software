@@ -68,13 +68,13 @@ static ssize_t wrnc_store_reset(struct device *dev,
 	struct wrnc_dev *wrnc = to_wrnc_dev(dev->parent);
 	long val;
 
-	if (strict_strtol(buf, 0, &val))
+	if (kstrtol(buf, 0, &val))
 		return -EINVAL;
 
 	if (val)
-	        wrnc_cpu_reset_set(wrnc, (1 << cpu->index));
+		wrnc_cpu_reset_set(wrnc, (1 << cpu->index));
 	else
-	        wrnc_cpu_reset_clr(wrnc, (1 << cpu->index));
+		wrnc_cpu_reset_clr(wrnc, (1 << cpu->index));
 
 	return count;
 }
@@ -137,13 +137,13 @@ static ssize_t wrnc_store_enable(struct device *dev,
 	struct wrnc_dev *wrnc = to_wrnc_dev(dev->parent);
 	long val;
 
-	if (strict_strtol(buf, 0, &val))
+	if (kstrtol(buf, 0, &val))
 		return -EINVAL;
 
 	if (val)
-	        wrnc_cpu_enable_set(wrnc, (1 << cpu->index));
+		wrnc_cpu_enable_set(wrnc, (1 << cpu->index));
 	else
-	        wrnc_cpu_enable_clr(wrnc, (1 << cpu->index));
+		wrnc_cpu_enable_clr(wrnc, (1 << cpu->index));
 
 	return count;
 }
@@ -163,7 +163,7 @@ static const struct attribute_group wrnc_cpu_group = {
 };
 
 const struct attribute_group *wrnc_cpu_groups[] = {
-        &wrnc_cpu_group,
+	&wrnc_cpu_group,
 	NULL,
 };
 
@@ -212,7 +212,7 @@ static int wrnc_cpu_firmware_load(struct wrnc_cpu *cpu, void *fw_buf,
 				    wrnc->base_csr + WRN_CPU_CSR_REG_UDATA);
 		if (word != word_rb) {
 			dev_err(&cpu->dev, "failed to load firmware\n");
-		        return -EFAULT;
+			return -EFAULT;
 		}
 	}
 

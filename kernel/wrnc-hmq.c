@@ -80,7 +80,7 @@ static ssize_t wrnc_show_count(struct device *dev,
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
 	uint32_t status;
 
-        status = fmc_readl(fmc, hmq->base_sr + MQUEUE_SLOT_STATUS);
+	status = fmc_readl(fmc, hmq->base_sr + MQUEUE_SLOT_STATUS);
 
 	return sprintf(buf, "%d\n", ((status >> 2) & 0xFF));
 }
@@ -214,7 +214,7 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	/* Copy the message from user space*/
 	err = copy_from_user(&msg, uarg, sizeof(struct wrnc_msg_sync));
 	if (err)
-	        return err;
+		return err;
 
 	if (hmq->index != msg.index_in) {
 		dev_warn(&hmq->dev,
@@ -237,7 +237,7 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	mutex_lock(&hmq->mtx);
 	to = wait_event_interruptible(hmq->q_msg, list_empty(&hmq->list_msg));
 	if (unlikely(to < 0))
-	        goto out;
+		goto out;
 
 	/*
 	 * Wait for the CPU-out queue is empty. Then get the mutex to avoid
@@ -246,7 +246,7 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	to = wait_event_interruptible(hmq_out->q_msg,
 				      list_empty(&hmq_out->list_msg));
 	if (unlikely(to < 0))
-	        goto out_out;
+		goto out_out;
 	mutex_lock(&hmq_out->mtx);
 
 	/* Send the message */
@@ -268,13 +268,14 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	}
 	/* We have at least one message in the buffer, return it */
 	spin_lock(&hmq_out->lock);
-	msgel = list_entry(hmq_out->list_msg.next, struct wrnc_msg_element, list);
+	msgel = list_entry(hmq_out->list_msg.next,
+			   struct wrnc_msg_element, list);
 	list_del(&msgel->list);
 	hmq_out->count--;
 	spin_unlock(&hmq_out->lock);
 
 	/* Copy the answer message back to user space */
-        memcpy(&msg.msg, msgel->msg, sizeof(struct wrnc_msg));
+	memcpy(&msg.msg, msgel->msg, sizeof(struct wrnc_msg));
 	kfree(msgel->msg);
 	kfree(msgel);
 
@@ -283,7 +284,7 @@ out_sync:
 out_out:
 	mutex_unlock(&hmq->mtx);
 out:
-        return copy_to_user(uarg, &msg, sizeof(struct wrnc_msg_sync));
+	return copy_to_user(uarg, &msg, sizeof(struct wrnc_msg_sync));
 }
 
 /**
@@ -353,13 +354,15 @@ static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 		}
 		/* Get the oldest message in the queue */
 		spin_lock(&hmq->lock);
-		msgel = list_entry(hmq->list_msg.next, struct wrnc_msg_element, list);
+		msgel = list_entry(hmq->list_msg.next,
+				   struct wrnc_msg_element, list);
 		list_del(&msgel->list);
 		hmq->count--;
 		spin_unlock(&hmq->lock);
 
 		/* Copy to user space buffer */
-		if (copy_to_user(buf + count, msgel->msg, sizeof(struct wrnc_msg)))
+		if (copy_to_user(buf + count, msgel->msg,
+				 sizeof(struct wrnc_msg)))
 			return -EFAULT;
 
 		count = (i + 1) * sizeof(struct wrnc_msg);
@@ -433,7 +436,7 @@ static void wrnc_irq_handler_input(struct wrnc_hmq *hmq)
 	}
 
 	/* Retrieve and send the first message */
-        msgel = list_entry(hmq->list_msg.next, struct wrnc_msg_element, list);
+	msgel = list_entry(hmq->list_msg.next, struct wrnc_msg_element, list);
 	list_del(&msgel->list);
 	hmq->count--;
 	wrnc_message_push(hmq, msgel->msg);
@@ -456,11 +459,8 @@ static void wrnc_irq_handler_output(struct wrnc_hmq *hmq)
 
 	/* Allocate space for the incoming message */
 	msgel = kmalloc(sizeof(struct wrnc_msg_element), GFP_KERNEL);
-	if (!msgel) {
-		dev_err(&hmq->dev,
-			"Cannot allocate memory for a new message\n");
+	if (!msgel)
 		return;
-	}
 
 	/* get the message from the device */
 	msgel->msg = wrnc_message_pop(hmq);
@@ -500,25 +500,26 @@ irqreturn_t wrnc_irq_handler(int irq_core_base, void *arg)
 	struct fmc_device *fmc = arg;
 	struct wrnc_dev *wrnc = fmc_get_drvdata(fmc);
 	uint32_t status;
-	int i;
+	int i, j;
 
 	/* Get the source of interrupt */
 	status = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_SLOT_STATUS);
 	status &= wrnc->irq_mask;
 dispatch_irq:
 	i = -1;
-        while (status && i < WRNC_MAX_HMQ_SLOT) {
+	while (status && i < WRNC_MAX_HMQ_SLOT) {
 		++i;
 		if (!(status & 0x1)) {
 			status >>= 1;
 			continue;
 		}
 
-		if (i >= MAX_MQUEUE_SLOTS)
-			wrnc_irq_handler_input(&wrnc->hmq_in[i - MAX_MQUEUE_SLOTS]);
-		else
+		if (i >= MAX_MQUEUE_SLOTS) {
+			j = i - MAX_MQUEUE_SLOTS;
+			wrnc_irq_handler_input(&wrnc->hmq_in[j]);
+		} else {
 			wrnc_irq_handler_output(&wrnc->hmq_out[i]);
-
+		}
 		/* Clear handled interrupts */
 		status >>= 1;
 	}

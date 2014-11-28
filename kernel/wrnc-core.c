@@ -166,7 +166,7 @@ static ssize_t wrnc_store_enable_mask(struct device *dev,
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
 	long val;
 
-	if (strict_strtol(buf, 16, &val))
+	if (kstrtol(buf, 16, &val))
 		return -EINVAL;
 
 	fmc_writel(fmc, val, wrnc->base_csr + WRN_CPU_CSR_REG_ENABLE);
@@ -201,7 +201,7 @@ static ssize_t wrnc_store_reset_mask(struct device *dev,
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
 	long val;
 
-	if (strict_strtol(buf, 16, &val))
+	if (kstrtol(buf, 16, &val))
 		return -EINVAL;
 
 	fmc_writel(fmc, val, wrnc->base_csr + WRN_CPU_CSR_REG_RESET);
@@ -226,7 +226,7 @@ static ssize_t wrnc_store_smem_op(struct device *dev,
 	struct wrnc_dev *wrnc = to_wrnc_dev(dev);
 	long val;
 
-	if (strict_strtol(buf, 0, &val))
+	if (kstrtol(buf, 0, &val))
 		return -EINVAL;
 
 	if (val < WRNC_SMEM_DIRECT || val > WRNC_SMEM_ADD) {
@@ -294,14 +294,15 @@ static long wrnc_ioctl_io(struct wrnc_dev *wrnc, void __user *uarg)
 	/* Copy the message from user space*/
 	err = copy_from_user(&io, uarg, sizeof(struct wrnc_smem_io));
 	if (err)
-	        return err;
+		return err;
 
 	if (io.is_input) {
 		/* read */
 		addr = wrnc->base_smem + io.addr;
 	} else {
 		/* write */
-		addr = wrnc->base_smem + (io.mod * WRNC_SMEM_MAX_SIZE)  + io.addr;
+		addr = wrnc->base_smem + (io.mod * WRNC_SMEM_MAX_SIZE)
+			+ io.addr;
 		fmc_writel(fmc, io.value, addr);
 	}
 
@@ -355,7 +356,7 @@ static ssize_t wrnc_write(struct file *f, const char __user *buf,
 
 	if (*offp + count >= WRNC_SMEM_MAX_SIZE)
 		return -EINVAL;
-	if (*offp % 4 || count % 4 ) {
+	if (*offp % 4 || count % 4) {
 		dev_warn(&wrnc->dev, "Only word size access allowed\n");
 		return -EINVAL;
 	}
@@ -391,7 +392,7 @@ static ssize_t wrnc_read(struct file *f, char __user *buf,
 
 	if (*offp + count >= WRNC_SMEM_MAX_SIZE)
 		return -EINVAL;
-	if (*offp % 4 || count % 4 ) {
+	if (*offp % 4 || count % 4) {
 		dev_warn(&wrnc->dev, "Only word size access allowed\n");
 		return -EINVAL;
 	}
@@ -440,7 +441,7 @@ static const struct file_operations wrnc_dev_fops = {
  */
 static void wrnc_cpu_release(struct device *dev)
 {
-	//wrnc_minor_put(dev);
+	/*wrnc_minor_put(dev);*/
 }
 
 /**
@@ -448,7 +449,7 @@ static void wrnc_cpu_release(struct device *dev)
  */
 static void wrnc_hmq_release(struct device *dev)
 {
-	//wrnc_minor_put(dev);
+	/*wrnc_minor_put(dev);*/
 }
 
 
@@ -516,7 +517,7 @@ int wrnc_probe(struct fmc_device *fmc)
 		return -ENOMEM;
 	fmc_set_drvdata(fmc, wrnc);
 
-        err = fmc_scan_sdb_tree(fmc, 0x0);
+	err = fmc_scan_sdb_tree(fmc, 0x0);
 	if (err < 0 && err != -EBUSY) {
 		dev_err(fmc->hwdev, "SDB is missing\n");
 		return err;
@@ -529,19 +530,19 @@ int wrnc_probe(struct fmc_device *fmc)
 	wrnc->base_gcr  = wrnc->base_hmq + MQUEUE_BASE_GCR;
 
 	/* Register the device */
-	err = dev_set_name(&wrnc->dev,"wrnc-%04x", fmc->device_id);
+	err = dev_set_name(&wrnc->dev, "wrnc-%04x", fmc->device_id);
 	if (err)
 		return err;
 	err = wrnc_minor_get(&wrnc->dev, WRNC_DEV);
 	if (err)
-	        return err;
+		return err;
 	wrnc->dev.class = &wrnc_cdev_class;
 	wrnc->dev.parent = &fmc->dev;
 	wrnc->dev.groups = wrnc_dev_groups;
 	wrnc->dev.release = wrnc_dev_release;
 	err = device_register(&wrnc->dev);
 	if (err)
-	        return err;
+		return err;
 
 
 	/* Get the Application ID */
@@ -549,10 +550,11 @@ int wrnc_probe(struct fmc_device *fmc)
 	dev_info(&fmc->dev, "Application ID: 0x%08x\n", wrnc->app_id);
 
 	/* Get and check the number of COREs */
-	wrnc->n_cpu = fmc_readl(fmc, wrnc->base_csr + WRN_CPU_CSR_REG_CORE_COUNT);
+	wrnc->n_cpu = fmc_readl(fmc,
+				wrnc->base_csr + WRN_CPU_CSR_REG_CORE_COUNT);
 	if (wrnc->n_cpu < 1 || wrnc->n_cpu > WRNC_MAX_CPU) {
 		dev_err(&fmc->dev, "invalid number of CPU (%d)\n", wrnc->n_cpu);
-	        err = -EINVAL;
+		err = -EINVAL;
 		goto out_n_cpu;
 	}
 	dev_info(&fmc->dev, "Detected %d CPUs\n", wrnc->n_cpu);
@@ -579,18 +581,18 @@ int wrnc_probe(struct fmc_device *fmc)
 		wrnc->cpu[i].dev.release = wrnc_cpu_release;
 		err = device_register(&wrnc->cpu[i].dev);
 		if (err)
-		        goto out_cpu;
+			goto out_cpu;
 	}
 
 	/* Get and check the number of HMQ slots */
 	tmp = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_SLOT_COUNT);
-        wrnc->n_hmq_in = tmp & MQUEUE_GCR_SLOT_COUNT_N_IN_MASK;
-        wrnc->n_hmq_out = (tmp & MQUEUE_GCR_SLOT_COUNT_N_OUT_MASK) >>
+	wrnc->n_hmq_in = tmp & MQUEUE_GCR_SLOT_COUNT_N_IN_MASK;
+	wrnc->n_hmq_out = (tmp & MQUEUE_GCR_SLOT_COUNT_N_OUT_MASK) >>
 		MQUEUE_GCR_SLOT_COUNT_N_OUT_SHIFT;
 	if (wrnc->n_hmq_in + wrnc->n_hmq_out >= WRNC_MAX_HMQ_SLOT) {
 		dev_err(&fmc->dev, "wrnc: invalid number of HMQ slots (in %d out %d)\n",
 			 wrnc->n_hmq_in, wrnc->n_hmq_out);
-	        err = -EINVAL;
+		err = -EINVAL;
 		goto out_n_slot;
 	}
 	dev_info(&fmc->dev, "Detected slots: %d input, %d output\n",
@@ -613,7 +615,8 @@ int wrnc_probe(struct fmc_device *fmc)
 	 * now and start working.
 	 */
 	fmc->irq = wrnc->base_core;
-	err = fmc->op->irq_request(fmc, wrnc_irq_handler, (char *)dev_name(&wrnc->dev),
+	err = fmc->op->irq_request(fmc, wrnc_irq_handler,
+				   (char *)dev_name(&wrnc->dev),
 				   0 /*VIC is used */);
 	if (err) {
 		dev_err(&wrnc->dev,
@@ -626,12 +629,13 @@ int wrnc_probe(struct fmc_device *fmc)
 	 * going to use only synchronous messages
 	 */
 	if (0)
-	        wrnc->irq_mask = (((1 << wrnc->n_hmq_in) - 1) << MQUEUE_GCR_IRQ_MASK_IN_SHIFT);
+		wrnc->irq_mask = (((1 << wrnc->n_hmq_in) - 1)
+				  << MQUEUE_GCR_IRQ_MASK_IN_SHIFT);
 	else
-	        wrnc->irq_mask = 0;
-        wrnc->irq_mask |= (1 << wrnc->n_hmq_out) - 1;
+		wrnc->irq_mask = 0;
+	wrnc->irq_mask |= (1 << wrnc->n_hmq_out) - 1;
 	fmc_writel(fmc, wrnc->irq_mask, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
-        tmp = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
+	tmp = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
 
 	return 0;
 
@@ -712,14 +716,13 @@ static int wrnc_init(void)
 {
 	int err, i;
 
-	for (i = 0; i < WRNC_MAX_CPU_MINORS; ++i) {
+	for (i = 0; i < WRNC_MAX_CPU_MINORS; ++i)
 		minors[i] = NULL;
-	}
 
 	err = class_register(&wrnc_cdev_class);
 	if (err) {
 		pr_err("%s: unable to register class\n", __func__);
-	        return err;
+		return err;
 	}
 
 	/* Allocate a char device region for devices, CPUs and slots */
@@ -727,7 +730,7 @@ static int wrnc_init(void)
 	if (err) {
 		pr_err("%s: unable to allocate region for %i minors\n",
 		       __func__, WRNC_MAX_CPU_MINORS);
-	        goto out_all;
+		goto out_all;
 	}
 
 	/* Register the device char-device */
@@ -753,9 +756,9 @@ static int wrnc_init(void)
 		goto out_cdev_hmq;
 
 	/* Register the FMC driver */
-        err = fmc_driver_register(&wrnc_dev_drv);
+	err = fmc_driver_register(&wrnc_dev_drv);
 	if (err)
-	        goto out_reg;
+		goto out_reg;
 
 	return 0;
 

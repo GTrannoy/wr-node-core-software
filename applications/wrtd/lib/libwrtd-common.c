@@ -30,7 +30,7 @@ const char *wrtd_errors[] = {
 
 /**
  * It returns a string messages corresponding to a given error code. If
- * it is not a libwrtd error code, it will run strerror(3)
+ * it is not a libwrtd error code, it will run wrnc_strerror()
  * @param[in] err error code
  * @return a message error
  */
@@ -67,7 +67,7 @@ int wrtd_init()
 /**
  * It releases the resources allocated by wrtd_init(). It must be called when
  * you stop to use this library. Then, you cannot use functions from this
- * library
+ * library.
  */
 void wrtd_exit()
 {
@@ -76,7 +76,7 @@ void wrtd_exit()
 
 
 /**
- * Open a WRTD node device using LUN
+ * Open a WRTD node device using FMC ID
  * @param[in] device_id FMC device identificator
  * @return It returns an anonymous wrtd_node structure on success.
  *         On error, NULL is returned, and errno is set appropriately.
@@ -144,7 +144,8 @@ void wrtd_close(struct wrtd_node *dev)
 
 
 /**
- * It returns the WRNC token
+ * It returns the WRNC token in order to allows users to run
+ * functions from the WRNC library
  * @param[in] dev device token
  * @return the WRNC token
  */

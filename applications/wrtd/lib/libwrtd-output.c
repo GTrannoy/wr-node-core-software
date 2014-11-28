@@ -206,11 +206,12 @@ extern int wrtd_out_enable(struct wrtd_node *dev, unsigned int output,
 
 
 /**
+ * It assign a trigger to an output channel
  * @param[in] dev pointer to open node device.
  * @param[in] output index (0-based) of output channel
  * @param[out] handle
  * @param[in] trig trigger id to assign
- * @param[in] condition
+ * @param[in] condition trigger id to assign to the condition
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 extern int wrtd_out_trig_assign(struct wrtd_node *dev, int output,

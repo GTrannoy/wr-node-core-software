@@ -110,7 +110,21 @@ out:
  */
 struct wrtd_node *wrtd_open_by_lun(int lun)
 {
-	return NULL;
+	struct wrtd_desc *wrtd;
+
+	wrtd = malloc(sizeof(struct wrtd_desc));
+	if (!wrtd)
+		return NULL;
+
+	wrtd->wrnc = wrnc_open_by_lun(lun);
+	if (!wrtd->wrnc)
+		goto out;
+
+	return (struct wrtd_node *)wrtd;
+
+out:
+	free(wrtd);
+	return wrtd;
 }
 
 

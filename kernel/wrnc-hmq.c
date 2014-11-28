@@ -246,7 +246,7 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	to = wait_event_interruptible(hmq_out->q_msg,
 				      list_empty(&hmq_out->list_msg));
 	if (unlikely(to < 0))
-		goto out_out;
+		goto out;
 	mutex_lock(&hmq_out->mtx);
 
 	/* Send the message */
@@ -281,9 +281,9 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 
 out_sync:
 	mutex_unlock(&hmq_out->mtx);
-out_out:
-	mutex_unlock(&hmq->mtx);
 out:
+	mutex_unlock(&hmq->mtx);
+
 	return copy_to_user(uarg, &msg, sizeof(struct wrnc_msg_sync));
 }
 

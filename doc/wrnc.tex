@@ -223,17 +223,102 @@ CPU\footnote{Internally, the White-Rabbit Node-Core has up to 8 CPUs.
 Each CPU run independently a real-time application.}, and the Linux
 driver.
 
+The device hierarchy of the driver is shown in figure 
+\ref{fig:swdrvhier}; there is a main device and then sub-devices 
+according to the White-Rabbit Node-Core configuration.
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[scale=0.5]{img/sw-drv-hier.eps}
+	\caption{White-Rabbit Node-Core Device Driver Hierarchy}
+        \label{fig:swdrvhier}
+\end{figure}
+
+The Linux device driver export two Interfaces: sysfs attributes and
+char-devices.
+
+\subsubsection{Char-Devices Interface}
+All char-devices are available under the directory \texttt{/dev/}.
+
+\begin{description}
+ \item['wrnc-\%04x', device\_id] it refers to the entire device 
+(\texttt{\%04x = device\_id}). It supports\texttt{read}, 
+\texttt{write}, \texttt{seek} and \texttt{ioctl}. It allows users to 
+read/write the internal shared memory.
+ 
+ \item['wrnc-\%04x-cpu-\%02d', device\_id, cpu\_index] it refers to a 
+single CPU in the
+ White-Rabbit Node-Core. It supports \texttt{read}, \texttt{write} and 
+\texttt{seek}. It allows users to load or to dump CPU firmware.
+ 
+ \item['wrnc-\%04x-hmq-\%c-\%02d', device\_id, direction, hmq\_index] 
+it refers to a single HMQ slot in
+the White-Rabbit Node-Core. Slot are splitted in two category: input 
+slots (\texttt{\%c = 'i'}) and output slots (\texttt{\%c = 'o'}). It 
+supports \texttt{read}\footnote{on output slots}, 
+\texttt{write}\footnote{on input slots}, \texttt{seek} and 
+\texttt{poll}
+\end{description}
+
+\subsubsection{Sysfs Interface}
+You can find all the sysfs attributes under the directory 
+\texttt{/sys/class/wr-node-core/}. Following a table of all sysfs 
+attributes available.
+
+\renewcommand{\arraystretch}{1.8}
+\begin{tabular}{c c c p{6cm}}
+  device & name & direction & description \\
+
+\hline
+  wrnc & application\_id & RO & application identifier of the WRNC 
+bitstream \\
+
+\hline
+  wrnc & n\_cpu & RO & get the number of CPUs \\
+
+\hline
+  wrnc & enable\_mask & RW & it enable/disable CPUs. It's a bit mask. 
+Actually, it means that it runs or pauses the code  \\
+
+\hline
+  wrnc & reset\_mask & RW & it (de-)assert the CPUs' reset line. It's 
+a bit mask \\
+
+\hline
+  wrnc & smem\_operation & RW & it set the default operation modo for 
+te access to the shared memory \\
+
+\hline \hline
+
+  cpu & enable & RW & it enable/disable a CPU. Actually, it means 
+that it runs or pauses the code \\
+
+\hline
+  cpu & reset & RW & it (de-)assert the CPU reset line \\
+
+\hline \hline
+
+  hmq & count & RO & number of messages in the HMQ slot \\
+
+\hline
+  hmq & empty & RO & the hardware status of the HMQ slot is empty \\
+
+\hline
+  hmq & full & RO & the hardware status of the HMQ slot is full \\
+
+\end{tabular}
+
 
 \subsubsection{Load Real-Time Programs}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Without applications the White-Rabbit Node-Core does nothing. So, to
-make it productive we must load a real-time application.
+make it productive we must load a real-time application on the CPU.
 
 For this purpose the driver offers a dedicated char device for each
 CPU that allows you to load (dump) application to (from) the CPU
 memory.
 
-You can find these char-devices under \texttt{/dev/} with the
-following patter \textit{wrnc-\%04x-cpu-\%02d}.
+You can find these char-devices under the directory \texttt{/dev/} 
+with the following patter \textit{wrnc-\%04x-cpu-\%02d}.
 
 You can load an application by writing to the char device. You can
 dump an application by reading from the char device. With
@@ -254,29 +339,23 @@ from/to these char-devices you can send/receive messages. Obviously,
 the content of the message depends on the application running on the
 White-Rabbit Node-Core CPUs.
 
-You can find these char-devices under \texttt{/dev/}, its name has
-following patter \textit{wrnc-\%04x-hmq-\%c-\%02d}.
+You can find these char-devices under the directory \texttt{/dev/}, 
+with following patter \textit{wrnc-\%04x-hmq-\%c-\%02d}.
 
-Here the data structures involved in the communication:
+Here the data structures\footnote{read the doxygen 
+documentation for details} involved in the communication:
 
 \begin{lstlisting}
-/**
- * Messages descriptor
- */
 struct wrnc_msg {
-	uint32_t datalen; /**< payload length*/
-	uint32_t data[WRNC_MAX_PAYLOAD_SIZE]; /**< payload */
+	uint32_t datalen;
+	uint32_t data[WRNC_MAX_PAYLOAD_SIZE];
 };
 
-/**
- * Message descriptor used to send synchronous messages
- */
 struct wrnc_msg_sync {
-  struct wrnc_msg msg; /**< the message to send. It will be overwritten by
-				the synchronous answer */
-  uint16_t index_in; /**< where write the message */
-  uint16_t index_out; /**< where we expect the synchronous answer */
-  unsigned int timeout_ms; /**< time to wait for an answer in ms */
+  struct wrnc_msg msg;
+  uint16_t index_in;
+  uint16_t index_out;
+  unsigned int timeout_ms;
 };
 \end{lstlisting}
 
@@ -296,21 +375,27 @@ or \texttt{fseek(2)} the char-device you can point to a specific
 memory offset.
 
 The size of this Shared-Memory is 8192 bytes. The Shared-Memory
-address space is divided by range; each range has an associated write
+address space is divided by ranges; each range has an associated write
 operation. The first offset range from 0 to 8192 allows you to
 directly access the Shared-Memory without any operation. All the other
-range perform atomic operations; the write operation is always
+ranges perform atomic operations; the write operation is always
 executed by using as argument the current content of the memory cell:
 
 \begin{math}
   cell = cell \left\{ \vee, \wedge, +, \dots \right\} value
 \end{math}
 
-Please, refer to the HDL documentation for details about ranges
-and operations.
+To keep consistency between documentations, please, refer to the HDL 
+documentation for details about ranges and operations.
 
 You can find these char-devices under \texttt{/dev/} with the
 following name patter \textit{wrnc-\%04x}.
+
+The default operation of the char-device is a direct access to the 
+memory. You can change the default behaviour of the char-device by 
+writing on the sysfs attribute \texttt{smem\_operation}
+\footnote{\texttt{/sys/class/wr-node-core/wrnc-\%04x/smem\_operation}}
+ 
 
 The char-devices have also \texttt{ioctl(2)} capabilities:
 \begin{description}
@@ -320,19 +405,16 @@ The char-devices have also \texttt{ioctl(2)} capabilities:
     value will be overwritten with the result of the write operation.
 \end{description}
 
-Here the data structures involved in the communication using
+Here the data structures\footnote{read the doxygen documentation for 
+details} involved in the communication using
 \texttt{ioctl(2)}:
 
 \begin{lstlisting}
-/**
- * Descriptor of the IO operation on Shared Memory
- */
 struct wrnc_smem_io {
-	uint32_t addr; /**< address to access */
-	uint32_t value; /**< value to write. After ioctl it will be overwritte
-			   with the new value in the shared memory */
-	int is_input; /**< flag to determinte data direction */
-	enum wrnc_smem_modifier mod; /**< the kind of operation to do */
+	uint32_t addr;
+	uint32_t value;
+	int is_input;
+	enum wrnc_smem_modifier mod;
 };
 \end{lstlisting}
 

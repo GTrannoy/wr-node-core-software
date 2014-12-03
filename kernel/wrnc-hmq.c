@@ -179,7 +179,7 @@ static struct wrnc_msg *wrnc_message_pop(struct wrnc_hmq *hmq)
 	uint32_t status;
 	int i;
 
-	msg = kmalloc(sizeof(struct wrnc_msg), GFP_KERNEL);
+	msg = kmalloc(sizeof(struct wrnc_msg), GFP_ATOMIC);
 	if (!msg)
 		return ERR_PTR(-ENOMEM);
 

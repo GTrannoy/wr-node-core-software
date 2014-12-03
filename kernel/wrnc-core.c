@@ -467,6 +467,8 @@ static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
 	hmq = is_input ? &wrnc->hmq_in[slot] : &wrnc->hmq_out[slot];
 
 	hmq->index = slot;
+	if (hmq_shared)
+		hmq->flags |= WRNC_FLAG_HMQ_SHR_USR;
 
 	err = wrnc_minor_get(&hmq->dev, WRNC_HMQ);
 	if (err)
@@ -487,7 +489,9 @@ static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
 		return err;
 
 	INIT_LIST_HEAD(&hmq->list_filters);
-	INIT_LIST_HEAD(&hmq->list_msg);
+	INIT_LIST_HEAD(&hmq->list_msg_input);
+	INIT_LIST_HEAD(&hmq->list_usr);
+
 	if (is_input) { /* CPU input */
 		hmq->flags |= WRNC_FLAG_HMQ_DIR;
 		hmq->base_sr = wrnc->base_hmq +	MQUEUE_BASE_IN(slot);
@@ -498,8 +502,6 @@ static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
 	/* Flush the content of the slot */
 	fmc_writel(fmc, MQUEUE_CMD_PURGE,
 		   hmq->base_sr + MQUEUE_SLOT_COMMAND);
-
-	hmq->count = 0;
 
 	return 0;
 }

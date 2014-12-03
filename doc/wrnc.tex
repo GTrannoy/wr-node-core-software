@@ -119,8 +119,7 @@ gatewares must be placed under \texttt{/lib/firmware} and loaded with
 other fmc's drivers.
 %FIXME it will change with UAL
 
-\subsection{Software Installation}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsubsection{Compilation}
+\subsubsection{Compilation}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 There are not special requirements for the compilation, just run
 
 \begin{verbatim}
@@ -146,15 +145,7 @@ directories.
 Note that the compilation process will also compile all the
 applications under the directory \texttt{applications}.
 
-\subsubsection{Library and Tools Installation}
-Once you have compiled the library and tools you can install the
-binaries in order to make them visible to the entire system.
-
-\begin{verbatim}
-  make install
-\end{verbatim}
-
-\subsubsection{Driver Loading}
+\subsection{Driver Loading}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 You can place the driver wherever you want and load it using
 \texttt{modporbe(8)} or \texttt{insmod(8)}.
 
@@ -164,11 +155,23 @@ The driver support the following module parameters:
     driver internal queue for each slot.
   \item[sync\_timeout] Maximum number of milli-seconds to wait for a
     synchronous answer.
+ driver internal queue for each slot. Default is 32
+  \item[max\_slot\_con] Maximum number of consumers for a single slot.
+Default is 8.
+  \item[slot\_share] Set default behaviour with multiple consumers.
+Default is 0 (not shared)
 \end{description}
 
+\subsubsection{Library and Tools Installation}%%%%%%%%%%%%%%%%%%%%%%%
+Once you have compiled the library and tools you can install the
+binaries in order to make them visible to the entire system.
+
+\begin{verbatim}
+  make install
+\end{verbatim}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Software Usage}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Software Overview}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 In figure~\ref{fig:swgenstack} you can see an overview of the software
 stack and the White-Rabbit Node-Core internal components seen by the
 driver.
@@ -198,8 +201,13 @@ communicate with the White-Rabbit Node-Core is through its Linux
 driver; there are not other ways to access it.
 
 
-\subsection{Library Interface}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-More details about the White-Rabbit Node-Core library API are
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{The Library}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The White-Rabbit Node-Core library allows you a complete access to 
+all the drivers capabilities.
+
+All details about the White-Rabbit Node-Core library API are
 available through the doxygen documentation. To build the doxygen
 documentation, run the following commands:
 
@@ -214,13 +222,24 @@ documentation. For each application you should find a \texttt{doc}
 directory where you can build the doxygen documentation or any other
 kind of documentation.
 
+\subsection{Suggestions}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Following a list of suggestions that may helps you during the 
+development:
 
-\subsection{Driver Interface}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{itemize}
+ \item use \texttt{wrnc\_strerror()} to prints errors from the 
+library.
+\end{itemize}
+
+\subsection{Installation}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{The Driver}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 The driver is the only software component in the stack that can access
 the White-Rabbit Node-Core component on the FPGA. The White-Rabbit
 Node-Core exports two communication channels: Host-Message-Queue and
-the Shared-Memory. These communication channels are used to communicate
-between a real-time application, running on the
+the Shared-Memory. These communication channels are used to 
+communicate between a real-time application, running on the
 CPU\footnote{Internally, the White-Rabbit Node-Core has up to 8 CPUs.
 Each CPU runs, independently, a real-time application.}, and the Linux
 driver.
@@ -236,8 +255,8 @@ according to the White-Rabbit Node-Core configuration.
         \label{fig:swdrvhier}
 \end{figure}
 
-The Linux device driver export three interfaces: sysfs attributes,
-char-devices and debugfs.
+The Linux device driver export three interfaces: \textit{sysfs attributes},
+\textit{char-devices} and \textit{debugfs}.
 
 \subsubsection{Debugfs Interface}
 The purpose of the \textit{debugfs} is to provide debuggin information.
@@ -258,7 +277,7 @@ CPU we have a debugfs file. By reading the debugfs file you can
 read the debug messages coming from the real-time application.
 \end{description}
 
-\subsubsection{Char-Devices Interface}
+\subsection{Char-Devices Interface} %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 All char-devices are available under the directory \texttt{/dev/}.
 
 \begin{description}
@@ -281,7 +300,7 @@ supports \texttt{read}\footnote{on output slots},
 \texttt{poll}
 \end{description}
 
-\subsubsection{Sysfs Interface}
+\subsection{Sysfs Interface}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 You can find all the sysfs attributes under the directory 
 \texttt{/sys/class/wr-node-core/}. Following a table of all sysfs 
 attributes available.
@@ -327,10 +346,14 @@ that it runs or pauses the code \\
 \hline
   hmq & full & RO & the hardware status of the HMQ slot is full \\
 
+\hline
+  hmq & shared\_by\_users & RW & set if the HMQ slot char device 
+should share the same message with all users \\
 \end{tabular}
 
 
-\subsubsection{Load Real-Time Programs}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Driver Usage}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Load Real-Time Programs}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Without applications the White-Rabbit Node-Core does nothing. So, to
 make it productive we must load a real-time application on the CPU.
 
@@ -461,7 +484,8 @@ order to mount \textit{debugfs}:
 mount -t debugfs none /sys/kernel/debug/
 \end{verbatim}
 
-\subsection{Tools}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Tools}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Under the directory \texttt{tools} you can find the following
 programs:
 
@@ -482,11 +506,10 @@ Each tool has an internal help page accessible using the
 command line option \texttt{-h}. Please use this help. We are not
 providing information here in order to avoid inconsistencies.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Bugs and Missing Features}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{itemize}
-  \item Reading a slot is an exclusive operation. More threads cannot
-    read the same message from the same slot. (It will be implemented
-    later)
+  \item filtering debug messages is not possible yet
   \item filtering messages is not possible yet
 \end{itemize}
 

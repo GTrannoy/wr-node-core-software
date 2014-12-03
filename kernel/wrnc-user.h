@@ -90,7 +90,7 @@ struct wrnc_smem_io {
 /**
  * Available ioctl() messages
  */
-enum ual_ioctl_commands {
+enum wrnc_ioctl_commands {
         WRNC_MSG_SYNC, /**< send a synchronous message */
 	WRNC_SMEM_IO, /**< access to shared memory */
 	WRNC_MSG_FILTER_ADD, /**< add a message filter */

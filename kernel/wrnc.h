@@ -28,10 +28,15 @@
 #define WRNC_FLAG_HMQ_SHR (1 << 1) /**< 1 shared, means that more than
 				      1 CPU is using it */
 
+#define WRNC_FLAG_HMQ_SHR_USR (1 << 2) /**< Shared by users */
+#define WRNC_FLAG_HMQ_SYNC (1 << 3) /**< Next message is sync answer */
+
+
 struct wrnc_msg_filter_element {
 	struct wrnc_msg_filter filter;
 	struct list_head list;
 };
+
 
 /**
  * Available type of devices
@@ -62,11 +67,27 @@ struct wrnc_hmq {
 	uint32_t status; /**< describe the status of the HMQ slot from the
 			  cpu point of view */
 	uint32_t base_sr; /**< base address of the slot register */
-	struct list_head list_msg; /**< list of messages to/from th HMQ */
-	unsigned int count; /**< number of messages in the list */
+	struct list_head list_msg_input; /**< list of messages to
+					    input slot */
+	unsigned int n_input; /**< number of messages in the list */
 	struct spinlock lock; /**< to protect list read/write */
 	struct mutex mtx; /**< to protect operations on the HMQ */
 	wait_queue_head_t q_msg; /**< wait queue for synchronous messages */
+
+	struct list_head list_usr; /**< list of consumer of the output slot  */
+	unsigned int n_user; /**< number of users in the list */
+};
+
+/**
+ * It describes the consumer of the output slot
+ */
+struct wrnc_hmq_user {
+	struct list_head list; /**< to keep it in our local queue */
+	struct wrnc_hmq *hmq; /**< reference to opened HMQ */
+	struct spinlock lock; /**< to protect list read/write */
+	struct list_head list_msg_output; /**< list of messages from
+					     output slot */
+	unsigned int n_output; /**< number of messages in the list */
 
 	struct list_head list_filters; /**< list of filters to apply */
 	unsigned int n_filters; /**< number of filters */
@@ -127,6 +148,7 @@ extern void wrnc_cpu_enable_set(struct wrnc_dev *wrnc, uint8_t mask);
 extern void wrnc_cpu_reset_set(struct wrnc_dev *wrnc, uint8_t mask);
 extern irqreturn_t wrnc_irq_handler_debug(int irq_core_base, void *arg);
 /* HMQ */
+extern int hmq_shared;
 extern int hmq_max_msg;
 extern const struct attribute_group *wrnc_hmq_groups[];
 extern const struct file_operations wrnc_hmq_fops;

@@ -935,3 +935,80 @@ char *wrnc_name_get(struct wrnc_dev *wrnc)
 
 	return wdesc->name;
 }
+
+
+/**
+ * It opens the debug message stream
+ * @param[in] wrnc device token
+ * @param[in] index CPU index
+ * @return a debug token on success, NULL otherwise and errno is set
+ *         appropriately
+ */
+struct wrnc_dbg *wrnc_debug_open(struct wrnc_dev *wrnc, unsigned int index)
+{
+	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
+	struct wrnc_dbg *dbg;
+	char path[64];
+
+	dbg = malloc(sizeof(struct wrnc_dbg));
+	if (!dbg)
+		return NULL;
+	dbg->wrnc = wrnc;
+	dbg->cpu_index = index;
+	snprintf(path, 64, "/sys/kernel/debug/%s/%s-cpu-%02d-dbg",
+		 wdesc->name, wdesc->name, index);
+
+	dbg->fd = open(path, O_RDONLY);
+	if (!dbg->fd) {
+	        free(dbg);
+		return NULL;
+	}
+
+	return dbg;
+}
+
+
+/**
+ * It closes the debug message stream
+ * @param[in] dbg_tkn debug token
+ * @param[in] index CPU index
+ */
+void wrnc_debug_close(struct wrnc_dbg *dbg)
+{
+	close(dbg->fd);
+	free(dbg);
+	dbg = NULL;
+}
+
+
+/**
+ * It retrieve a message from the debug channel. It fills the buffer with a
+ * NULL terminated string.
+ * @param[in] dbg_tkn debug token
+ * @param[out] buf where store incoming message
+ * @param[in] count maximum number of char to read (terminator included)
+ * @return number of byte read on success, -1 otherwise and errno is set
+ *         appropriately
+ */
+int wrnc_debug_message_get(struct wrnc_dbg *dbg, char *buf, size_t count)
+{
+	int n = 0, real_count = 0;
+
+	memset(buf, 0, count);
+	do {
+		n = read(dbg->fd, buf + real_count, count - real_count);
+		if (n <= 0)
+		        return -1;
+
+		real_count += n;
+		/* check if the string from the CPU is shorter */
+	        if (buf[real_count - 1] == '\0')
+		        break;
+
+	} while (real_count < count);
+
+	/* Put a terminator */
+	buf[real_count - 1] = '\0';
+
+	return real_count;
+}

@@ -12,6 +12,7 @@
 #include <linux/vmalloc.h>
 #include <linux/interrupt.h>
 #include <linux/byteorder/generic.h>
+#include <linux/debugfs.h>
 #include <linux/fs.h>
 #include <linux/cdev.h>
 #include <linux/spinlock.h>
@@ -508,6 +509,7 @@ static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
 int wrnc_probe(struct fmc_device *fmc)
 {
 	struct wrnc_dev *wrnc;
+	char tmp_name[128];
 	int err, i;
 	uint32_t tmp;
 
@@ -544,6 +546,13 @@ int wrnc_probe(struct fmc_device *fmc)
 	if (err)
 		return err;
 
+	wrnc->dbg_dir = debugfs_create_dir(dev_name(&wrnc->dev), NULL);
+	if (IS_ERR_OR_NULL(wrnc->dbg_dir)) {
+		pr_err("UAL: Cannot create debugfs\n");
+		err = PTR_ERR(wrnc->dbg_dir);
+		goto out_dbg;
+	}
+
 
 	/* Get the Application ID */
 	wrnc->app_id = fmc_readl(fmc, wrnc->base_csr + WRN_CPU_CSR_REG_APP_ID);
@@ -567,6 +576,7 @@ int wrnc_probe(struct fmc_device *fmc)
 	/* Configure CPUs */
 	for (i = 0; i < wrnc->n_cpu; ++i) {
 		wrnc->cpu[i].index = i;
+		spin_lock_init(&wrnc->cpu[i].lock);
 
 		err = wrnc_minor_get(&wrnc->cpu[i].dev, WRNC_CPU);
 		if (err)
@@ -582,6 +592,13 @@ int wrnc_probe(struct fmc_device *fmc)
 		err = device_register(&wrnc->cpu[i].dev);
 		if (err)
 			goto out_cpu;
+		snprintf(tmp_name, 128, "%s-dbg", dev_name(&wrnc->cpu[i].dev));
+		wrnc->cpu[i].dbg_msg = debugfs_create_file(tmp_name, 0444,
+							   wrnc->dbg_dir,
+							   &wrnc->cpu[i],
+							   &wrnc_cpu_dbg_fops);
+		if (IS_ERR_OR_NULL(wrnc->cpu[i].dbg_msg))
+			dev_err(&wrnc->cpu[i].dev, "Cannot create debug interface\n");
 	}
 
 	/* Get and check the number of HMQ slots */
@@ -637,6 +654,19 @@ int wrnc_probe(struct fmc_device *fmc)
 	fmc_writel(fmc, wrnc->irq_mask, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
 	tmp = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
 
+	/* Enable debug interrupts */
+	fmc->irq = wrnc->base_core + 1;
+	err = fmc->op->irq_request(fmc,  wrnc_irq_handler_debug,
+				   (char *)dev_name(&wrnc->cpu[i].dev),
+				   0 /*VIC is used */);
+	if (err) {
+		dev_err(&wrnc->dev,
+			"Cannot request IRQ 0x%x - we'll not receive debug messages\n",
+			fmc->irq);
+	}
+	fmc_writel(fmc, 0xFFFFFFFF/*(wrnc->n_cpu - 1)*/,
+		   wrnc->base_csr + WRN_CPU_CSR_REG_DBG_IMSK);
+
 	return 0;
 
 out_hmq_out:
@@ -652,6 +682,8 @@ out_cpu:
 	while (--i)
 		device_unregister(&wrnc->cpu[i].dev);
 out_n_cpu:
+	debugfs_remove_recursive(wrnc->dbg_dir);
+out_dbg:
 	device_unregister(&wrnc->dev);
 	return err;
 }
@@ -665,8 +697,14 @@ int wrnc_remove(struct fmc_device *fmc)
 	int i;
 
 	fmc_writel(fmc, 0x0, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
-	fmc->irq = 0xC0000;
+	fmc->irq = wrnc->base_core;
 	fmc->op->irq_free(fmc);
+
+	fmc_writel(fmc, 0x0, wrnc->base_csr + WRN_CPU_CSR_REG_DBG_IMSK);
+	fmc->irq = wrnc->base_core + 1;
+	fmc->op->irq_free(fmc);
+
+	debugfs_remove_recursive(wrnc->dbg_dir);
 
 	for (i = 0; i < wrnc->n_cpu; ++i)
 		device_unregister(&wrnc->cpu[i].dev);

@@ -15,6 +15,7 @@ struct wrnc_desc {
 	char name[WRNC_NAME_LEN]; /**< Name of the device */
 	int fd_dev; /**< File Descriptor of the device */
 	int fd_cpu[WRNC_MAX_CPU];  /**< File Descriptor of the CPUs */
+	int fd_dbg[WRNC_MAX_CPU]; /**< File Descriptor for the CPUs debug */
 	int fd_hmq_in[WRNC_MAX_HMQ_SLOT];  /**< File Descriptor of the
 					      input HMQ */
 	int fd_hmq_out[WRNC_MAX_HMQ_SLOT];  /**< File Descriptor of the

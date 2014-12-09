@@ -12,14 +12,25 @@
 #include <libwrnc.h>
 #include <getopt.h>
 #include <pthread.h>
+#include <unistd.h>
 #include <time.h>
 
 
 #define MAX_DEV 4
 #define MAX_SLOT 32
+#define MAX_CPU 8
 
-static unsigned int slot_index[MAX_DEV][MAX_SLOT], idx_valid[MAX_DEV], cnt, n;
-static uint32_t dev_id[MAX_DEV];
+
+struct wrnc_thread_desc {
+	struct wrnc_dev *wrnc;
+	uint32_t dev_id;
+	int cpu_index[MAX_CPU];
+	int n_cpu;
+	int slot_index[MAX_SLOT];
+	int n_slot;
+};
+
+static unsigned int  cnt, n;
 static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 static int timestamp = 0;
 
@@ -32,6 +43,7 @@ static void help()
 	fprintf(stderr, "-i   slot index\n");
 	fprintf(stderr, "-n   number of total messages to read. The default is 0 (infinite)\n");
 	fprintf(stderr, "-t   print message timestamp\n");
+	fprintf(stderr, "-d <CPU index>  show debug messages for given CPU\n");
 	fprintf(stderr, "-h   show this help\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr,
@@ -88,46 +100,95 @@ static int dump_message(struct wrnc_dev *wrnc, unsigned int slot_index)
 	return 0;
 }
 
+void print_debug(struct wrnc_dbg *dbg)
+{
+	int n;
+	char c[256];
+
+	n = wrnc_debug_message_get(dbg, c, 256);
+	if (n < 0)
+		return;
+
+	fprintf(stderr, "%s-cpu-%d: %s\n",
+		wrnc_name_get(dbg->wrnc), dbg->cpu_index, c);
+}
+
+
 /**
  * pthread for each device. It dumps messages from slots
  * @param[in] arg a pointer to the device index
  */
 void *dump_thread(void *arg)
 {
-	unsigned long idx = (unsigned long)arg, i;
-	struct pollfd p[MAX_SLOT];
+	struct wrnc_thread_desc *th_data = arg;
+	struct pollfd p[MAX_SLOT], p_dbg[MAX_CPU];
+	struct wrnc_dbg *wdbg[MAX_CPU];
 	struct wrnc_dev *wrnc;
-	int ret, err;
+	int ret, err, i;
 
 	/* Open the device */
-	wrnc = wrnc_open_by_fmc(dev_id[idx]);
+	wrnc = wrnc_open_by_fmc(th_data->dev_id);
 	if (!wrnc) {
 		fprintf(stderr, "Cannot open WRNC: %s\n", wrnc_strerror(errno));
 	        pthread_exit(NULL);
 	}
 
 	/* Build the polling structures */
-	for (i = 0; i < idx_valid[idx]; ++i) {
-		err = wrnc_hmq_open(wrnc, slot_index[idx][i], WRNC_HMQ_OUTCOMING);
+	for (i = 0; i < th_data->n_slot; ++i) {
+		err = wrnc_hmq_open(wrnc, th_data->slot_index[i],
+				    WRNC_HMQ_OUTCOMING);
 		if (err) {
 			fprintf(stderr, "Cannot open HMQ: %s\n",
 				wrnc_strerror(errno));
-			goto out;
+			goto out_slot;
 		}
-		p[i].fd = slot_index[idx][i];
+		p[i].fd = th_data->slot_index[i];
 		p[i].events = POLLIN | POLLERR;
+	}
+
+	/* If there, open all debug channels */
+	for (i = 0; i < th_data->n_cpu; i++) {
+		wdbg[i] = wrnc_debug_open(wrnc, th_data->cpu_index[i]);
+		if (!wdbg[i]) {
+			fprintf(stderr, "Cannot open WRNC debug channel: %s\n",
+				wrnc_strerror(errno));
+			goto out_dbg;
+		}
+		p_dbg[i].fd = wdbg[i]->fd;
+		p_dbg[i].events = POLLIN | POLLERR;
 	}
 
 	/* Start dumping messages */
 	while (n == 0 || n > cnt) {
-		/* Polling slots */
-		ret = wrnc_slot_poll(wrnc, p, idx_valid[idx], 10000);
+		/* Polling debug messages */
+		ret = poll(p_dbg, th_data->n_cpu, 1000);
 		switch (ret) {
 		default:
 			/* Dump from the slot */
-			for (i = 0; i < idx_valid[idx]; ++i) {
+			for (i = 0; i < th_data->n_cpu; ++i) {
+				if (!(p_dbg[i].revents & POLLIN))
+					continue;
+				print_debug(wdbg[i]);
+			}
+			break;
+		case 0:
+			/* timeout */
+			break;
+		case -1:
+			/* error */
+		        goto out;
+			break;
+		}
+
+		/* Polling slots */
+		ret = wrnc_slot_poll(wrnc, p, th_data->n_slot, 10000);
+		switch (ret) {
+		default:
+			/* Dump from the slot */
+			for (i = 0; i < th_data->n_slot; ++i) {
 				if (!(p[i].revents & POLLIN))
 					continue;
+
 				err = dump_message(wrnc, p[i].fd);
 				if (err)
 					continue;
@@ -141,13 +202,19 @@ void *dump_thread(void *arg)
 			break;
 		case -1:
 			/* error */
-			pthread_exit(NULL);
-			break;
+		        goto out;
 		}
 	}
+
 out:
-	for (i = 0; i < idx_valid[idx]; ++i)
-		wrnc_hmq_close(wrnc, slot_index[idx][i], WRNC_HMQ_OUTCOMING);
+out_dbg:
+	/* Close all debug channels */
+	for (i = 0; i < th_data->n_cpu; i++)
+		wrnc_debug_close(wdbg[i]);
+out_slot:
+	/* Close all message slots */
+	for (i = 0; i < th_data->n_slot; ++i)
+		wrnc_hmq_close(wrnc, th_data->slot_index[i], WRNC_HMQ_OUTCOMING);
 	wrnc_close(wrnc);
 	return NULL;
 }
@@ -155,6 +222,7 @@ out:
 
 int main(int argc, char *argv[])
 {
+	struct wrnc_thread_desc th_data[MAX_DEV], *last;
 	unsigned long i;
 	unsigned int di = 0;
 	pthread_t tid[MAX_DEV];
@@ -163,27 +231,27 @@ int main(int argc, char *argv[])
 
 	atexit(wrnc_exit);
 
-	for (i = 0; i < MAX_SLOT; i++)
-		idx_valid[i] = 0;
+	memset(th_data, 0, sizeof(struct wrnc_thread_desc) * MAX_DEV);
 
-	while ((c = getopt (argc, argv, "hi:D:n:t")) != -1) {
+	while ((c = getopt (argc, argv, "hi:D:n:td:")) != -1) {
 		switch (c) {
 		default:
 			help();
 			break;
 		case 'i':
 		/* Save slot index for each device id */
-			if (di > 0 && idx_valid[di - 1] >= MAX_SLOT)
+			if (!last || last->n_slot >= MAX_SLOT)
 				break;
 			sscanf(optarg, "%d",
-			       &slot_index[di - 1][idx_valid[di - 1]]);
-			idx_valid[di - 1]++;
+			       &last->slot_index[last->n_slot]);
+			last->n_slot++;
 			break;
 		case 'D':
 		/* Save device ids to use */
 			if (di >= MAX_DEV)
 				break;
-			sscanf(optarg, "0x%x", &dev_id[di]);
+			last = &th_data[di];
+			sscanf(optarg, "0x%x", &last->dev_id);
 			di++;
 			break;
 		case 'n':
@@ -193,6 +261,13 @@ int main(int argc, char *argv[])
 		case 't':
 			timestamp = 1;
 			break;
+		case 'd':
+			if (!last || last->n_cpu >= MAX_CPU)
+				break;
+
+			sscanf(optarg, "%d", &last->cpu_index[last->n_cpu]);
+		        last->n_cpu++;
+			break;
 		}
 	}
 
@@ -200,11 +275,12 @@ int main(int argc, char *argv[])
 
 	/* Run dumping on in parallel from several devices */
 	for (i = 0; i < di; i++) {
-	        err = pthread_create(&tid[i], NULL, dump_thread, (void *)i);
+	        err = pthread_create(&tid[i], NULL, dump_thread, (void *)(&th_data[i]));
 		if (err)
 			fprintf(stderr, "Cannot create 'dump_thread' instance %ld: %s\n",
 				i, strerror(errno));
 	}
+
 
 	/* Wait for the threads to finish */
 	for (i = 0; i < di; i++)

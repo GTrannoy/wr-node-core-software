@@ -43,6 +43,9 @@ struct wrnc_hmq {
 	int fd; /**< file descriptor */
 };
 
+#define WRNC_FMC_OFFSET 2 /* FIXME this is an hack because fmc-bus does not allow
+			   us a dynamic allocation of fake fmc devices */
+
 #define WRNC_NAME_LEN 12
 
 #define WRNC_SYSFS_PATH_LEN 128

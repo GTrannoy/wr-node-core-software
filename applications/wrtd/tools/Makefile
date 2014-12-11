@@ -5,9 +5,11 @@
 
 DESTDIR ?= /usr/local
 
+LIBTDC ?= ../fmc-tdc-sw/lib
+LIBFD ?= ../fine-delay-sw/lib
 WRNC ?= ../../../
 CFLAGS += -Wall -ggdb -I. -I../common -I$(WRNC)/lib -I$(WRNC)/kernel -I../lib $(EXTRACFLAGS)
-LDLIBS += -L../lib -lwrtd -L$(WRNC)/lib -lwrnc
+LDLIBS += -L$(LIBFD) -lfdelay -L$(LIBTDC) -lfmctdc -L../lib -lwrtd -L$(WRNC)/lib -lwrnc
 
 PROGS := wrtd-boot
 PROGS += wrtd-in-config

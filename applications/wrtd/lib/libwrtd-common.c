@@ -6,9 +6,12 @@
  */
 
 #include <stdlib.h>
+#include <unistd.h>
 #include <errno.h>
 #include <libwrnc.h>
 #include <libwrtd-internal.h>
+#include <fmctdc-lib.h>
+#include <fdelay-lib.h>
 
 static const uint32_t application_id[] = {
 	0x115790de,
@@ -93,6 +96,7 @@ struct wrtd_node *wrtd_open_by_fmc(uint32_t device_id)
 	if (!wrtd->wrnc)
 		goto out;
 
+	wrtd->dev_id = device_id;
 	return (struct wrtd_node *)wrtd;
 
 out:
@@ -156,6 +160,91 @@ struct wrnc_dev *wrtd_get_wrnc_dev(struct wrtd_node *dev)
 	return (struct wrnc_dev *)wrtd->wrnc;
 }
 
+
+/**
+ * It synchronize the mezzanines with the white rabbit network
+ * @param[in] dev device token
+ * @return 0 on success, -1 on error and errno is appropiately set
+ */
+int wrtd_white_rabbit_sync(struct wrtd_node *dev, unsigned long timeout_s)
+{
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct fmctdc_board *tdc;
+	struct fdelay_board *fd;
+	unsigned long time_left;
+	uint32_t dev_id = wrtd->dev_id - WRNC_FMC_OFFSET;
+	int err, n;
+
+	/* Lock TDC to white-rabbit */
+	n = fmctdc_init();
+	if (n <= 0)
+		goto out_tdc;
+	tdc = fmctdc_open(-1, dev_id + WRTD_TDC_DEV_ID_OFFSET);
+	if (!tdc)
+		goto out_tdc_open;
+	err = fmctdc_wr_mode(tdc, 1);
+        if (err) {
+		errno = err;
+		goto out_tdc_sync;
+	}
+	/* wait until TDC is in wr mode */
+	time_left = timeout_s;
+	do {
+		err = fmctdc_check_wr_mode(tdc);
+		sleep(1);
+	} while (--time_left > 0 && err != 0 && err != ENOLINK);
+	if (err) {
+		errno = err;
+	        goto out_tdc_sync;
+	}
+	if (!time_left) {
+		errno = ETIME;
+		goto out_tdc_sync;
+	}
+	fmctdc_close(tdc);
+	fmctdc_exit();
+
+
+	/* Lock FD to white-rabbit */
+	n = fdelay_init();
+	if (n <= 0)
+		goto out_fd;
+	fd = fdelay_open(-1, dev_id + WRTD_FD_DEV_ID_OFFSET);
+	if (!fd)
+		goto out_fd_open;
+	err = fdelay_wr_mode(fd, 1);
+        if (err) {
+		errno = err;
+		goto out_fd_sync;
+	}
+	time_left = timeout_s;
+	do {
+		err = fdelay_check_wr_mode(fd);
+		sleep(1);
+	} while (--time_left > 0 && err != 0 && err != ENOLINK);
+	if (err) {
+		errno = err;
+	        goto out_fd_sync;
+	}
+	if (!time_left) {
+		errno = ETIME;
+		goto out_fd_sync;
+	}
+	return 0;
+
+out_tdc_sync:
+	fmctdc_close(tdc);
+out_tdc_open:
+	fmctdc_exit();
+out_tdc:
+	return -1;
+out_fd_sync:
+	fdelay_close(fd);
+out_fd_open:
+	fdelay_exit();
+out_fd:
+	return -1;
+}
 
 /**
  * It loads a set of real-time applications for TDC and FD

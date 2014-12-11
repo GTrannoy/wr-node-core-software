@@ -19,6 +19,7 @@
 #include "rt.h"
 #include "list-common.h"
 #include "hw/fmctdc-direct.h"
+#include "loop-queue.h"
 
 #define DEFAULT_DEAD_TIME (80000/16)
 
@@ -65,6 +66,8 @@ static inline void send_trigger (struct tdc_channel_state *ch, struct list_times
     msg->triggers[coalesce_count].id = ch->id;
     msg->triggers[coalesce_count].seq = ch->seq;
     msg->triggers[coalesce_count].ts = *ts; 
+    
+    loop_queue_push(&ch->id, ch->seq, ts);
     
     ch->last = *ts;
     coalesce_count++;
@@ -120,15 +123,6 @@ static inline void do_channel (int channel, struct list_timestamp *ts)
     ch->total_pulses++;
 
     ts_add(ts, &ch->delay);
-
-    int delta = ts->seconds - ch->prev.seconds;
-    delta *= 125000000;    
-    delta += ts->cycles - ch->prev.cycles;
-
-    if(delta < 0)
-	pp_printf("FUCK!");
-
-    ch->prev = *ts;
 
     if( (ch->flags & LIST_TRIGGER_ASSIGNED ) && (ch->flags & LIST_ARMED) )
     {

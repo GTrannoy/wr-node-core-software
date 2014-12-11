@@ -55,6 +55,15 @@ static inline void bag_ts ( struct mq_buffer *buf, struct list_timestamp *ts )
     buf->data += 3;
 }
 
+static inline void bag_id ( struct mq_buffer *buf, struct list_id *id )
+{
+    mq_buffer_require ( buf, 3 );
+    buf->data[0] = id->system;
+    buf->data[1] = id->source_port;
+    buf->data[2] = id->trigger;
+    buf->data += 3;
+}
+
 static inline void bag_trigger_entry ( struct mq_buffer *buf, struct list_trigger_entry *ent )
 {
     mq_buffer_require ( buf, 7 );

@@ -486,9 +486,9 @@ static inline void ctl_read_hash(int seq, uint32_t *buf)
     struct lrt_hash_entry *ent = hash_get_entry (bucket, pos);
     struct lrt_hash_entry *cond = NULL;
     
-    bag_int( &buf, ID_REP_HASH_ENTRY );
-    bag_int( &buf, seq );
-    bag_int( &buf, ent ? 1 : 0 );
+    bag_int( &obuf, ID_REP_HASH_ENTRY );
+    bag_int( &obuf, seq );
+    bag_int( &obuf, ent ? 1 : 0 );
 
     if(ent)
     {
@@ -496,27 +496,26 @@ static inline void ctl_read_hash(int seq, uint32_t *buf)
     
 	if(cond)
 	{
-	    bag_id ( &buf, &cond->id );
-	    bag_int ( &buf, cond->ocfg[ch].delay_cycles );
-	    bag_int ( &buf, cond->ocfg[ch].delay_frac );
-    	    bag_int ( &buf, (ent->ocfg[ch].state & HASH_ENT_DISABLED) | HASH_ENT_CONDITION );
-    	    bag_int ( &buf, (uint32_t) cond );
-    	    bag_int ( &buf, (uint32_t) ent );
-            bag_id ( &buf, &ent->id);
-    	    bag_int( &buf, ent->ocfg[ch].delay_cycles );
-    	    bag_int( &buf, ent->ocfg[ch].delay_frac );
-    	    bag_int( &buf, HASH_ENT_CONDITIONAL );
+	    bag_id ( &obuf, &cond->id );
+	    bag_int ( &obuf, cond->ocfg[ch].delay_cycles );
+	    bag_int ( &obuf, cond->ocfg[ch].delay_frac );
+    	    bag_int ( &obuf, (ent->ocfg[ch].state & HASH_ENT_DISABLED) | HASH_ENT_CONDITION );
+    	    bag_int ( &obuf, (uint32_t) cond );
+    	    bag_int ( &obuf, (uint32_t) ent );
+            bag_id ( &obuf, &ent->id);
+    	    bag_int( &obuf, ent->ocfg[ch].delay_cycles );
+    	    bag_int( &obuf, ent->ocfg[ch].delay_frac );
+    	    bag_int( &obuf, HASH_ENT_CONDITIONAL );
 	} else {
-	    bag_id ( &buf, &ent->id );
-	    bag_int ( &buf, ent->ocfg[ch].delay_cycles );
-	    bag_int ( &buf, ent->ocfg[ch].delay_frac );
-    	    bag_int ( &buf, ent->ocfg[ch].state );
-    	    bag_int ( &buf, (uint32_t) cond );
-    	    bag_int ( &buf, (uint32_t) ent );
-    	    bag_skip ( &buf, 6);
+	    bag_id ( &obuf, &ent->id );
+	    bag_int ( &obuf, ent->ocfg[ch].delay_cycles );
+	    bag_int ( &obuf, ent->ocfg[ch].delay_frac );
+    	    bag_int ( &obuf, ent->ocfg[ch].state );
+    	    bag_int ( &obuf, (uint32_t) cond );
+    	    bag_int ( &obuf, (uint32_t) ent );
+    	    bag_skip ( &obuf, 6);
 	}
     }
-
 
     mq_send(0, FD_OUT_SLOT_CONTROL, 18);
 }
@@ -549,41 +548,39 @@ static inline void ctl_chan_set_delay (int seq, uint32_t *buf)
     ctl_ack(seq);
 }
 
-
 static inline void ctl_chan_get_state (int seq, uint32_t *buf)
 {
     int channel = buf[0];
 
     struct lrt_output *st = &outputs[channel];
-    uint32_t *obuf = ctl_claim_out();
+    struct mq_buffer obuf = ctl_claim_out();
+    
+    bag_int( &obuf, ID_REP_STATE );
+    bag_int( &obuf, seq );
+    bag_int( &obuf, channel );
   
-  
-    obuf[0] = ID_REP_STATE;
-    obuf[1] = seq;
-    obuf[2] = channel;
-    obuf[3] = st->hits;
-    obuf[4] = st->miss_timeout;
-    obuf[5] = st->miss_deadtime; 
-    obuf[6] = st->miss_overflow;
-    obuf[7] = st->miss_no_timing;
+    bag_int( &obuf, st->hits );
+    bag_int( &obuf, st->miss_timeout );
+    bag_int( &obuf, st->miss_deadtime ); 
+    bag_int( &obuf, st->miss_overflow );
+    bag_int( &obuf, st->miss_no_timing ); 
 
-    bag_timestamp(obuf + 8, &st->last_executed);
-    bag_timestamp(obuf + 15, &st->last_enqueued);
+    bag_trigger_entry( &obuf, &st->last_executed );
+    bag_trigger_entry( &obuf, &st->last_enqueued );
+    bag_trigger_entry( &obuf, &st->last_received );
+    bag_trigger_entry( &obuf, &st->last_lost );
 
-    obuf[19] = st->idle;
-    obuf[20] = st->state;
-    obuf[21] = st->mode;
-    obuf[22] = st->flags;
-    obuf[23] = st->log_level;
-    obuf[24] = st->dead_time;
-    obuf[25] = st->width_cycles;
-    obuf[27] = rx_ebone;
-    obuf[28] = rx_loopback;
+    bag_int( &obuf, st->idle );
+    bag_int( &obuf, st->state );
+    bag_int( &obuf, st->mode );
+    bag_int( &obuf, st->flags );
+    bag_int( &obuf, st->log_level );
+    bag_int( &obuf, st->dead_time );
+    bag_int( &obuf, st->width_cycles );
+    bag_int( &obuf, rx_ebone );
+    bag_int( &obuf, rx_loopback );
 
-    bag_timestamp(obuf + 16, &st->last_received);
-    bag_timestamp(obuf + 29, &st->last_lost);
-
-    mq_send(0, FD_OUT_SLOT_CONTROL, 29);
+    mq_buffer_send ( &obuf, 0, FD_OUT_SLOT_CONTROL );
 }
 
 static inline void ctl_software_trigger (int seq, uint32_t *buf)

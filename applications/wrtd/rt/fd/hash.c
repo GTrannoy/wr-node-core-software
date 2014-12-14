@@ -109,7 +109,7 @@ struct lrt_hash_entry *hash_alloc( int pos )
     return current;
 }
 
-struct lrt_hash_entry *hash_add ( struct list_id *id, int output, struct lrt_output_rule *rule )
+struct lrt_hash_entry *hash_add ( struct wrtd_trig_id *id, int output, struct lrt_output_rule *rule )
 {
     int pos;
     struct lrt_hash_entry *ent = hash_search( id, &pos );

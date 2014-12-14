@@ -10,8 +10,9 @@
 #ifndef __WRTD_COMMON_H
 #define __WRTD_COMMON_H
 
-#define WRTD_CPU_TDC 0
-#define WRTD_CPU_FD 1
+/* WR Node CPU Core indices */
+#define WRTD_CPU_TDC 0			/* Core 0 controls the TDC mezzanine */
+#define WRTD_CPU_FD 1			/* Core 0 controls the FD mezzanine */
 
 #define WRTD_IN_MAX		2
 #define WRTD_IN_TDC_CONTROL	0
@@ -22,6 +23,14 @@
 #define WRTD_OUT_FD_CONTROL	1
 #define WRTD_OUT_TDC_LOGGING	2
 #define WRTD_OUT_FD_LOGGING	3
+
+
+#define WRTD_REMOTE_IN_MAX	1
+#define WRTD_REMOTE_IN_FD	0
+
+#define WRTD_REMOTE_OUT_MAX	1
+#define WRTD_REMOTE_OUT_TDC	0
+
 
 /* Command and log message IDs */
 #define WRTD_LOG_RAW_INPUT	  	 0x1
@@ -126,7 +135,7 @@ enum wrtd_log_level {
 struct wr_timestamp {
 	uint64_t seconds;
 	uint64_t ticks;
-	uint64_t bins;
+	uint64_t frac;
 };
 
 struct wrtd_trig_id {
@@ -169,14 +178,14 @@ static inline void ts_add(struct wr_timestamp *a, const struct wr_timestamp *b)
     if(a->frac >= 4096)
     {
     	a->frac -= 4096;
-    	a->cycles ++;
+    	a->ticks ++;
     }
 
-    a->cycles += b->cycles;
+    a->ticks += b->ticks;
 
-    if(a->cycles >= 125000000)
+    if(a->ticks >= 125000000)
     {
-    	a->cycles -= 125000000;
+    	a->ticks -= 125000000;
     	a->seconds++;
     }
 
@@ -190,14 +199,14 @@ static inline void ts_sub(struct wr_timestamp *a, const struct wr_timestamp *b)
     if(a->frac < 0)
     {
     	a->frac += 4096;
-    	a->cycles --;
+    	a->ticks --;
     }
 
-    a->cycles -= b->cycles;
+    a->ticks -= b->ticks;
 
-    if(a->cycles < 0)
+    if(a->ticks < 0)
     {
-    	a->cycles += 125000000;
+    	a->ticks += 125000000;
     	a->seconds--;
     }
 
@@ -206,7 +215,7 @@ static inline void ts_sub(struct wr_timestamp *a, const struct wr_timestamp *b)
     if(a->seconds == -1)
     {
       a->seconds = 0;
-      a->cycles -= 125000000;
+      a->ticks -= 125000000;
     }
 }
 #endif

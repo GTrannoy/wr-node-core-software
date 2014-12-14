@@ -257,7 +257,7 @@ static int wrtd_cmd_sw_trigger(struct wrtd_node *wrtd, int input,
 	} else {
 		ent.ts.seconds = 0;
 		ent.ts.ticks = 100000000000ULL / 8000ULL; /* 100ms */
-		ent.ts.bins = 0;
+		ent.ts.frac = 0;
 	}
 
 	return wrtd_in_trigger_software(wrtd, &ent);

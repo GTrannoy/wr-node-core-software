@@ -40,7 +40,7 @@ struct wr_timestamp picos_to_ts(uint64_t p)
 	p %= (1000ULL * 1000ULL * 1000ULL * 1000ULL);
 	t.ticks = p / 8000;
 	p %= 8000;
-	t.bins = p * 4096 / 8000;
+	t.frac = p * 4096 / 8000;
 
 	return t;
 }
@@ -57,5 +57,5 @@ void unbag_ts(uint32_t *buf, int offset, struct wr_timestamp *ts)
 {
     ts->seconds = buf[offset];
     ts->ticks = buf[offset + 1];
-    ts->bins = buf[offset + 2];
+    ts->frac = buf[offset + 2];
 }

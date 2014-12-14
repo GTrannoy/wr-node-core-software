@@ -12,7 +12,7 @@ LOBJ += libwrtd-input.o
 LOBJ += libwrtd-output.o
 LOBJ += $(WRNC)/lib/libwrnc.o
 
-CFLAGS += -Wall -ggdb -O2 -I. -I../common -I$(WRNC)/lib -I$(WRNC)/kernel $(EXTRACFLAGS)
+CFLAGS += -Wall -ggdb -O2 -I. -I../include -I$(WRNC)/lib -I$(WRNC)/kernel $(EXTRACFLAGS)
 LDLIBS += -L. -lwrtd
 
 

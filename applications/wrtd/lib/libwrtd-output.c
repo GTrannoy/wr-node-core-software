@@ -90,7 +90,7 @@ static int wrtd_out_trig_get(struct wrtd_node *dev, unsigned int output,
 	trigger->trigger.trigger = msg.data[5];
 	trigger->delay_trig.seconds = 0;
 	trigger->delay_trig.ticks = msg.data[6];
-	trigger->delay_trig.bins = msg.data[7];
+	trigger->delay_trig.frac = msg.data[7];
 	trigger->is_conditional = 0;
 	trigger->worst_latency_us = (msg.data[17] + 124) / 125;
 
@@ -101,7 +101,7 @@ static int wrtd_out_trig_get(struct wrtd_node *dev, unsigned int output,
 		trigger->condition.trigger = msg.data[13];
 		trigger->delay_cond.seconds = 0;
 		trigger->delay_cond.ticks = msg.data[14];
-		trigger->delay_cond.bins = msg.data[15];
+		trigger->delay_cond.frac = msg.data[15];
 	}
 
 	trigger->enabled = (state & HASH_ENT_DISABLED) ? 0 : 1;
@@ -380,7 +380,7 @@ int wrtd_out_trig_delay_set(struct wrtd_node *dev,
 	msg.data[2] = handle->channel;
 	msg.data[3] = handle->ptr_trig;
 	msg.data[4] = t.ticks;
-	msg.data[5] = t.bins;
+	msg.data[5] = t.frac;
 
 	/* Send the message and get answer */
 	err = wrtd_out_send_and_receive_sync(wrtd, &msg);

@@ -1,5 +1,6 @@
 # and don't touch the rest unless you know what you're doing.
-CROSS_COMPILE ?= /user/twlostow/apps/gcc-lm32/bin/lm32-elf-
+CROSS_COMPILE ?= lm32-elf-
+INSTALL_PREFIX ?= .
 
 CC =		$(CROSS_COMPILE)gcc
 LD =		$(CROSS_COMPILE)ld
@@ -11,6 +12,8 @@ CFLAGS = -DWRNODE_RT -g -O3 -I. -I../common -I../../include -mmultiply-enabled -
 OBJS += ../common/wrn-crt0.o ../common/vsprintf-xint.o ../common/printf.o ../common/rt-common.o ../common/loop-queue.o
 LDSCRIPT = ../common/wrnode.ld
 
+all:	$(OUTPUT)
+
 $(OUTPUT): $(LDSCRIPT) $(OBJS)
 	${CC} -o $(OUTPUT).elf -nostartfiles $(OBJS) -T $(LDSCRIPT) -lgcc -lc
 	${OBJCOPY} --remove-section .smem -O binary $(OUTPUT).elf $(OUTPUT).bin
@@ -21,4 +24,4 @@ clean:
 	rm -f $(OBJS) $(OUTPUT).bin
 	
 install:
-	cp $(OUTPUT).bin /acc/local/share/firmware/list
+	cp $(OUTPUT).bin $(INSTALL_PREFIX)

@@ -18,7 +18,7 @@
 #define __LIST_HASH_H
 
 #include "rt.h"
-#include "list-common.h"
+#include "wrtd-common.h"
 
 struct lrt_output_rule {
     uint32_t delay_cycles;
@@ -30,7 +30,7 @@ struct lrt_output_rule {
 
 
 struct lrt_hash_entry {
-    struct list_id id;					
+    struct wrtd_trig_id id;					
     struct lrt_output_rule ocfg [FD_NUM_CHANNELS];	
     struct lrt_hash_entry *next;			
 };
@@ -38,12 +38,12 @@ struct lrt_hash_entry {
 extern struct lrt_hash_entry* htab [ FD_HASH_ENTRIES ];
 
 void hash_init();
-struct lrt_hash_entry *hash_add ( struct list_id *id, int output, struct lrt_output_rule *rule );
+struct lrt_hash_entry *hash_add ( struct wrtd_trig_id *id, int output, struct lrt_output_rule *rule );
 int hash_remove ( struct lrt_hash_entry *ent, int output );
 int hash_free_count();
 struct lrt_hash_entry *hash_get_entry (int bucket, int pos);
 
-static inline int hash_func( struct list_id *id )
+static inline int hash_func( struct wrtd_trig_id *id )
 {
     int h = 0;
     h += id->system * 10291;
@@ -52,7 +52,7 @@ static inline int hash_func( struct list_id *id )
     return h & (FD_HASH_ENTRIES - 1); // hash table size must be a power of 2
 }
 
-static inline struct lrt_hash_entry *hash_search( struct list_id *id, int *pos )
+static inline struct lrt_hash_entry *hash_search( struct wrtd_trig_id *id, int *pos )
 {
     int p = hash_func( id );
 

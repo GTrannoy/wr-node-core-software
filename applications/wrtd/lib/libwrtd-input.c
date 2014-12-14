@@ -92,7 +92,7 @@ int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 	state->tagged_pulses = msg.data[18];
 	state->sent_triggers = msg.data[19];
 	state->dead_time.seconds = 0;
-	state->dead_time.bins = 0;
+	state->dead_time.frac = 0;
 	state->dead_time.ticks = msg.data[20] * 2;
 
 	state->assigned_id.system = msg.data[3];
@@ -400,7 +400,7 @@ int wrtd_in_delay_set(struct wrtd_node *dev, unsigned int input,
 	msg.data[2] = input;
 	msg.data[3] = t.seconds;
 	msg.data[4] = t.ticks;
-	msg.data[5] = t.bins;
+	msg.data[5] = t.frac;
 
 	/* Send the message and get answer */
 	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
@@ -440,7 +440,7 @@ int wrtd_in_timebase_offset_set(struct wrtd_node *dev, unsigned int input,
 	msg.data[2] = input;
 	msg.data[3] = t.seconds;
 	msg.data[4] = t.ticks;
-	msg.data[5] = t.bins;
+	msg.data[5] = t.frac;
 
 	/* Send the message and get answer */
 	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
@@ -554,7 +554,7 @@ int wrtd_in_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
     			cur->id.trigger = msg->data[5];
     			cur->ts.seconds = msg->data[6];
     			cur->ts.ticks = msg->data[7];
-    			cur->ts.bins = msg->data[8];
+    			cur->ts.frac = msg->data[8];
 
     			remaining--;
 			n_read++;

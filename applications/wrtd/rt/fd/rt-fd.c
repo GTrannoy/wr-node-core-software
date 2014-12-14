@@ -18,13 +18,13 @@
 #include <string.h>
 
 #include "rt.h"
-#include "list-common.h"
+#include "wrtd-common.h"
 #include "hw/fd_channel_regs.h"
 #include "hash.h"
 #include "loop-queue.h"
 
 struct pulse_queue_entry {
-    struct list_trigger_entry trig;
+    struct wrtd_trigger_entry trig;
     int origin_cycles;
     struct lrt_output_rule *rule;
 };
@@ -39,11 +39,11 @@ struct lrt_output {
     int index;
     int hits;
     int miss_timeout, miss_deadtime, miss_overflow, miss_no_timing;
-    struct list_trigger_entry last_executed;
-    struct list_trigger_entry last_enqueued;
-    struct list_trigger_entry last_received;
-    struct list_timestamp last_programmed;
-    struct list_trigger_entry last_lost;
+    struct wrtd_trigger_entry last_executed;
+    struct wrtd_trigger_entry last_enqueued;
+    struct wrtd_trigger_entry last_received;
+    struct wr_timestamp last_programmed;
+    struct wrtd_trigger_entry last_lost;
 	int idle;
     int state;
     int mode;
@@ -62,18 +62,18 @@ struct lrt_trigger_handle {
 	int channel;
 };
 
-static inline void ts_adjust_delay(struct list_timestamp *ts, uint32_t cycles, uint32_t frac)
+static inline void ts_adjust_delay(struct wr_timestamp *ts, uint32_t cycles, uint32_t frac)
 {
     ts->frac += frac;
 
     if (ts->frac & 0x1000)
-		ts->cycles++;
+		ts->ticks++;
 
     ts->frac &= 0xfff;
-    ts->cycles += cycles;
+    ts->ticks += cycles;
 
-    if (ts->cycles >= 125000000) {
-		ts->cycles -= 125000000;
+    if (ts->ticks >= 125000000) {
+		ts->ticks -= 125000000;
 		ts->seconds++;
     }
 }
@@ -122,13 +122,13 @@ void pulse_queue_pop(struct lrt_pulse_queue *p)
 
 
 
-static inline int check_dead_time( struct lrt_output *out, struct list_timestamp *ts )
+static inline int check_dead_time( struct lrt_output *out, struct wr_timestamp *ts )
 {
     if(out->idle)
         return 1;
 
 	int delta_s = ts->seconds - out->last_enqueued.ts.seconds;
-	int delta_c = ts->cycles - out->last_enqueued.ts.cycles;
+	int delta_c = ts->ticks - out->last_enqueued.ts.ticks;
 
     if(delta_c < 0) {
         delta_c += 125 * 1000 * 1000;
@@ -176,16 +176,16 @@ void do_output( struct lrt_output *out )
 
     if(!out->idle) {
         if (!(dcr & FD_DCR_PG_TRIG)) { // still waiting for trigger
-            struct list_timestamp tc;
+            struct wr_timestamp tc;
 
 			// order is important: first seconds, then cycles (cycles
 			// get latched on reading secs regi
             tc.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
-            tc.cycles = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
+            tc.ticks = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
 
 			int delta = tc.seconds - out->last_programmed.seconds;
 			delta *= 125000000;
-			delta += tc.cycles - out->last_programmed.cycles;
+			delta += tc.ticks - out->last_programmed.ticks;
 
 			if (delta > 0) {
         		pulse_queue_pop(q);
@@ -206,33 +206,33 @@ void do_output( struct lrt_output *out )
         return;
 
 	struct pulse_queue_entry *pq_ent = pulse_queue_front(q);
-	struct list_timestamp *ts = &pq_ent->trig.ts;
+	struct wr_timestamp *ts = &pq_ent->trig.ts;
 
 	// left intentionally for debugging purposes
     gpio_set(0);
     gpio_clear(0);
 
     fd_ch_writel(out, ts->seconds, FD_REG_U_STARTL);
-    fd_ch_writel(out, ts->cycles, FD_REG_C_START);
+    fd_ch_writel(out, ts->ticks, FD_REG_C_START);
     fd_ch_writel(out, ts->frac, FD_REG_F_START);
     
-    ts->cycles += out->width_cycles;
-	if (ts->cycles >= 125000000) {
-		ts->cycles -= 125000000;
+    ts->ticks += out->width_cycles;
+	if (ts->ticks >= 125000000) {
+		ts->ticks -= 125000000;
 		ts->seconds++;
 	}
 
     fd_ch_writel(out, ts->seconds, FD_REG_U_ENDL);
-    fd_ch_writel(out, ts->cycles, FD_REG_C_END);
+    fd_ch_writel(out, ts->ticks, FD_REG_C_END);
     fd_ch_writel(out, ts->frac, FD_REG_F_END);
     fd_ch_writel(out, 0, FD_REG_RCR);
     fd_ch_writel(out, FD_DCR_MODE, FD_REG_DCR);
     fd_ch_writel(out, FD_DCR_MODE | FD_DCR_UPDATE, FD_REG_DCR);
     fd_ch_writel(out, FD_DCR_MODE | FD_DCR_PG_ARM | FD_DCR_ENABLE, FD_REG_DCR);
 
-    ts->cycles += 1000;
-	if (ts->cycles >= 125000000) {
-		ts->cycles -= 125000000;
+    ts->ticks += 1000;
+	if (ts->ticks >= 125000000) {
+		ts->ticks -= 125000000;
 		ts->seconds++;
 	}
 
@@ -253,10 +253,10 @@ void do_output( struct lrt_output *out )
 }
 
 void enqueue_trigger(int output, struct lrt_output_rule *rule,
-		       struct list_id *id, struct list_timestamp *ts, int seq)
+		       struct wrtd_trig_id *id, struct wr_timestamp *ts, int seq)
 {
     struct lrt_output *out = &outputs[output];
-    struct list_timestamp adjusted = *ts;
+    struct wr_timestamp adjusted = *ts;
 	struct pulse_queue_entry *pq_ent;
 
     ts_adjust_delay (&adjusted, rule->delay_cycles, rule->delay_frac);
@@ -277,7 +277,7 @@ void enqueue_trigger(int output, struct lrt_output_rule *rule,
 	pq_ent->trig.ts = adjusted;
 	pq_ent->trig.id = *id;
 	pq_ent->trig.seq = seq;
-	pq_ent->origin_cycles = ts->cycles;
+	pq_ent->origin_cycles = ts->ticks;
 	pq_ent->rule = rule;
 
 	out->last_enqueued.ts = *ts;
@@ -289,15 +289,15 @@ void enqueue_trigger(int output, struct lrt_output_rule *rule,
 
 }
 
-static inline void filter_trigger(struct list_trigger_entry *trig)
+static inline void filter_trigger(struct wrtd_trigger_entry *trig)
 {
     struct lrt_hash_entry *ent = hash_search (&trig->id, NULL);
     int j;
 
     if(ent)
     {
-        struct list_timestamp ts = trig->ts;
-        struct list_id id = trig->id;
+        struct wr_timestamp ts = trig->ts;
+        struct wrtd_trig_id id = trig->id;
         int seq = trig->seq;
         for(j = 0; j < FD_NUM_CHANNELS; j++)
 	    if(ent->ocfg[j].state != HASH_ENT_EMPTY)
@@ -311,18 +311,18 @@ static inline void filter_trigger(struct list_trigger_entry *trig)
 
 void do_rx()
 {
-    if (rmq_poll( FD_IN_SLOT_REMOTE)) {
-		struct list_trigger_message *msg = mq_map_in_buffer (1, FD_IN_SLOT_REMOTE) - sizeof(struct rmq_message_addr);
+    if (rmq_poll( WRTD_REMOTE_IN_FD)) {
+		struct wrtd_trigger_message *msg = mq_map_in_buffer (1, WRTD_REMOTE_IN_FD) - sizeof(struct rmq_message_addr);
         int i, cnt = msg->count;
 
 		for (i = 0; i < cnt; i++)
     	    filter_trigger (&msg->triggers[i]);
 
-		mq_discard (1, FD_IN_SLOT_REMOTE);
+		mq_discard (1, WRTD_REMOTE_IN_FD);
 		rx_ebone++;
 	}
 
-	struct list_trigger_entry *ent = loop_queue_pop();
+	struct wrtd_trigger_entry *ent = loop_queue_pop();
     
     if (ent) {
 		filter_trigger (ent);
@@ -344,32 +344,32 @@ void do_outputs()
 
 static inline uint32_t *ctl_claim_out()
 {
-	mq_claim(0, FD_OUT_SLOT_CONTROL);
+	mq_claim(0, WRTD_OUT_FD_CONTROL);
 
-	return mq_map_out_buffer( 0, FD_OUT_SLOT_CONTROL );
+	return mq_map_out_buffer( 0, WRTD_OUT_FD_CONTROL );
 }
 
 static inline void ctl_ack( uint32_t seq )
 {
 	uint32_t *buf = ctl_claim_out();
 
-	buf[0] = ID_REP_ACK;
+	buf[0] = WRTD_REP_ACK_ID;
 	buf[1] = seq;
-	mq_send(0, FD_OUT_SLOT_CONTROL, 2);
+	mq_send(0, WRTD_OUT_FD_CONTROL, 2);
 }
 static inline void ctl_nack( uint32_t seq, int err )
 {
 	uint32_t *buf = ctl_claim_out();
 
-	buf[0] = ID_REP_NACK;
+	buf[0] = WRTD_REP_NACK;
 	buf[1] = seq;
 	buf[2] = err;
-	mq_send(0, FD_OUT_SLOT_CONTROL, 3);
+	mq_send(0, WRTD_OUT_FD_CONTROL, 3);
 }
 
 static inline void ctl_chan_assign_trigger (int seq, uint32_t *buf)
 {
-    struct list_id id;
+    struct wrtd_trig_id id;
     struct lrt_output_rule rule;
     struct lrt_trigger_handle handle;
     int ch = buf[0];
@@ -397,12 +397,12 @@ static inline void ctl_chan_assign_trigger (int seq, uint32_t *buf)
     if(!is_cond) // unconditional trigger
     {
         uint32_t *obuf = ctl_claim_out();
-        obuf[0] = ID_REP_TRIGGER_HANDLE;
+        obuf[0] = WRTD_REP_TRIGGER_HANDLE;
         obuf[1] = seq;
         obuf[2] = handle.channel;
         obuf[3] = (uint32_t) handle.cond;
         obuf[4] = (uint32_t) handle.trig;
-        mq_send(0, FD_OUT_SLOT_CONTROL, 5);
+        mq_send(0, WRTD_OUT_FD_CONTROL, 5);
         
 	    return;
     }
@@ -419,12 +419,12 @@ static inline void ctl_chan_assign_trigger (int seq, uint32_t *buf)
     handle.cond = hash_add ( &id, ch, &rule );
 
     uint32_t *obuf = ctl_claim_out();
-    obuf[0] = ID_REP_TRIGGER_HANDLE;
+    obuf[0] = WRTD_REP_TRIGGER_HANDLE;
     obuf[1] = seq;    
     obuf[2] = handle.channel;
     obuf[3] = (uint32_t) handle.cond;
     obuf[4] = (uint32_t) handle.trig;
-    mq_send(0, FD_OUT_SLOT_CONTROL, 5);
+    mq_send(0, WRTD_OUT_FD_CONTROL, 5);
 }
 
 static inline void ctl_chan_remove_trigger (int seq, uint32_t *buf)
@@ -443,14 +443,14 @@ static inline void ctl_chan_remove_trigger (int seq, uint32_t *buf)
     ctl_ack(seq);
 }
 
-static void bag_timestamp(uint32_t *buf, struct list_timestamp *ts )
+static void bag_timestamp(uint32_t *buf, struct wr_timestamp *ts )
 {
 	buf[0] = ts->seconds;
-	buf[1] = ts->cycles;
+	buf[1] = ts->ticks;
 	buf[2] = ts->frac;
 }
 
-static void bag_id(uint32_t *buf, struct list_id *id )
+static void bag_id(uint32_t *buf, struct wrtd_trig_id *id )
 {
 	buf[0] = id->system;
 	buf[1] = id->source_port;
@@ -468,7 +468,7 @@ static inline void ctl_read_hash(int seq, uint32_t *buf)
     struct lrt_hash_entry *ent = hash_get_entry (bucket, pos);
     struct lrt_hash_entry *cond = NULL;
     
-    obuf[0] = ID_REP_HASH_ENTRY;
+    obuf[0] = WRTD_REP_HASH_ENTRY;
     obuf[1] = seq;
     obuf[2] = ent ? 1 : 0;
 
@@ -493,7 +493,7 @@ static inline void ctl_read_hash(int seq, uint32_t *buf)
 		}
 	}
 
-	mq_send(0, FD_OUT_SLOT_CONTROL, 17);
+	mq_send(0, WRTD_OUT_FD_CONTROL, 17);
 }
 
 static inline void ctl_chan_set_dead_time (int seq, uint32_t *buf)
@@ -531,7 +531,7 @@ static inline void ctl_chan_get_state(int seq, uint32_t *buf)
 	struct lrt_output *st = &outputs[channel];
 	uint32_t *obuf = ctl_claim_out();
 
-	obuf[0] = ID_REP_STATE;
+	obuf[0] = WRTD_REP_STATE;
 	obuf[1] = seq;
 	obuf[2] = channel;
 	obuf[3] = st->hits;
@@ -555,7 +555,7 @@ static inline void ctl_chan_get_state(int seq, uint32_t *buf)
 	obuf[27] = rx_ebone;
 	obuf[28] = rx_loopback;
 
-	mq_send(0, FD_OUT_SLOT_CONTROL, 28);
+	mq_send(0, WRTD_OUT_FD_CONTROL, 28);
 }
 
 static inline void ctl_software_trigger (int seq, uint32_t *buf)
@@ -569,7 +569,7 @@ static inline void ctl_chan_set_mode (int seq, uint32_t *buf)
     struct lrt_output *st = &outputs[channel];
 
     st->mode = buf[1];
-    st->flags &= ~(LIST_ARMED | LIST_TRIGGERED | LIST_LAST_VALID) ;
+    st->flags &= ~(WRTD_ARMED | WRTD_TRIGGERED | WRTD_LAST_VALID) ;
 
     ctl_ack(seq);
 }
@@ -580,8 +580,8 @@ static inline void ctl_chan_arm (int seq, uint32_t *buf)
     int channel = buf[0];
     struct lrt_output *st = &outputs[channel];
 
-    st->flags |= LIST_ARMED;
-    st->flags &= ~LIST_TRIGGERED;
+    st->flags |= WRTD_ARMED;
+    st->flags &= ~WRTD_TRIGGERED;
 
     ctl_ack(seq);
 }
@@ -607,28 +607,28 @@ static inline void do_control()
 {
     uint32_t p = mq_poll();
 
-    if(! ( p & ( 1<< FD_IN_SLOT_CONTROL )))
+    if(! ( p & ( 1<< WRTD_IN_FD_CONTROL )))
         return;
 
 
-    uint32_t *buf = mq_map_in_buffer( 0, FD_IN_SLOT_CONTROL );
+    uint32_t *buf = mq_map_in_buffer( 0, WRTD_IN_FD_CONTROL );
 
     int cmd = buf[0];
     int seq = buf[1];
 
 	switch(cmd) {
-        _CMD(ID_FD_CMD_CHAN_ASSIGN_TRIGGER,                ctl_chan_assign_trigger)
-        _CMD(ID_FD_CMD_CHAN_REMOVE_TRIGGER,                ctl_chan_remove_trigger)
-        _CMD(ID_FD_CMD_CHAN_SET_DELAY,	                   ctl_chan_set_delay)
-        _CMD(ID_FD_CMD_READ_HASH,                 	   ctl_read_hash)
-        _CMD(ID_FD_CMD_CHAN_SET_MODE,                      ctl_chan_set_mode)
-        _CMD(ID_FD_CMD_CHAN_ARM,                           ctl_chan_arm)
-        _CMD(ID_FD_CMD_CHAN_GET_STATE,                     ctl_chan_get_state)
+        _CMD(WRTD_CMD_FD_CHAN_ASSIGN_TRIGGER,                ctl_chan_assign_trigger)
+        _CMD(WRTD_CMD_FD_CHAN_REMOVE_TRIGGER,                ctl_chan_remove_trigger)
+        _CMD(WRTD_CMD_FD_CHAN_SET_DELAY,	                   ctl_chan_set_delay)
+        _CMD(WRTD_CMD_FD_READ_HASH,                 	   ctl_read_hash)
+        _CMD(WRTD_CMD_FD_CHAN_SET_MODE,                      ctl_chan_set_mode)
+        _CMD(WRTD_CMD_FD_CHAN_ARM,                           ctl_chan_arm)
+        _CMD(WRTD_CMD_FD_CHAN_GET_STATE,                     ctl_chan_get_state)
 	default:
           break;
     }
 
-    mq_discard(0, FD_IN_SLOT_CONTROL);
+    mq_discard(0, WRTD_IN_FD_CONTROL);
 }
 
 void init() 
@@ -640,7 +640,7 @@ void init()
 
 main()
 {   
-	rt_set_debug_slot(FD_OUT_SLOT_LOGGING);
+//	rt_set_debug_slot(FD_OUT_SLOT_LOGGING);
     init();
 
     gpio_set(24);

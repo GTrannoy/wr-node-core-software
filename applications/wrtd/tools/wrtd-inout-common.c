@@ -74,7 +74,7 @@ void decode_log_level(char *buf, uint32_t flags)
 
 void format_ts(char *buf, struct wr_timestamp ts, int with_seconds)
 {
-    uint64_t picoseconds = (uint64_t) ts.ticks * 8000 + (uint64_t)ts.bins * 8000ULL / 4096ULL;
+    uint64_t picoseconds = (uint64_t) ts.ticks * 8000 + (uint64_t)ts.frac * 8000ULL / 4096ULL;
 
 
     if(with_seconds)
@@ -103,7 +103,7 @@ uint64_t ts_to_picos(struct wr_timestamp ts)
 {
     return (uint64_t) ts.seconds * 1000LL * 1000 * 1000 * 1000
             + (uint64_t) ts.ticks * 8000ULL +
-            + (uint64_t) ts.bins * 8000LL / 4096LL;
+            + (uint64_t) ts.frac * 8000LL / 4096LL;
 }
 
 int parse_delay(char *dly, uint64_t *delay_ps)

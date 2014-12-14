@@ -418,6 +418,27 @@ struct wrnc_smem_io {
 };
 \end{lstlisting}
 
+\subsubsection{Debug Real-Time Application}%%%%%%%%%%%%%%%%%%%%%%%%%
+Real-Time applications are able to send debug messages to the user
+through the driver. The driver export a \textit{debugfs} char device
+that allow you to read messages coming from a specific Real-Time
+application running on a CPU. On this char-device you can only
+\texttt{read(2)} and \texttt{poll(2)}. Data coming from this char-device
+are simple characters' string \texttt{NULL} terminated. In order words,
+the Real-Time application does \texttt{printf} and you can read the
+string printed by the application.
+
+You can find the char device in the \textit{debugfs} under the path:
+\begin{verbatim}
+/sys/kernel/debug/wrnc-%04x/wrnc-%04x-cpu-%02d-dbg
+\end{verbatim}
+
+Rembember that the \textit{debugfs} usually is not auto-mounted. In
+order to mount \textit{debugfs}:
+
+\begin{verbatim}
+mount -t debugfs none /sys/kernel/debug/
+\end{verbatim}
 
 \subsection{Tools}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Under the directory \texttt{tools} you can find the following

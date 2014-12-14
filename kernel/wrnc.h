@@ -7,6 +7,7 @@
 #ifndef __WRNC_H__
 #define __WRNC_H__
 
+#include <linux/circ_buf.h>
 #include "hw/mqueue.h"
 #include "wrnc-user.h"
 
@@ -65,9 +66,12 @@ struct wrnc_hmq {
  * It describes a single instance of a CPU of the WRNC
  */
 struct wrnc_cpu {
-	struct device dev; /**< device representing a single CPU */
 	int index; /**< instance number */
 
+	struct device dev; /**< device representing a single CPU */
+	struct dentry *dbg_msg; /**< debug messages interface */
+	struct circ_buf cbuf; /**< debug circular buffer */
+	struct spinlock lock;
 	struct wrnc_hmq *hmq[WRNC_MAX_HMQ_SLOT]; /**< list of HMQ slots used by
 						    this CPU */
 };
@@ -95,15 +99,19 @@ struct wrnc_dev {
 	uint32_t irq_mask; /**< IRQ mask in use */
 
 	enum wrnc_smem_modifier mod; /**< smem operation modifier */
+
+	struct dentry *dbg_dir; /**< root debug directory */
 };
 
 /* Global data */
 extern struct device *minors[WRNC_MAX_MINORS];
 /* CPU data */
+extern const struct file_operations wrnc_cpu_dbg_fops;
 extern const struct file_operations wrnc_cpu_fops;
 extern const struct attribute_group *wrnc_cpu_groups[];
 extern void wrnc_cpu_enable_set(struct wrnc_dev *wrnc, uint8_t mask);
 extern void wrnc_cpu_reset_set(struct wrnc_dev *wrnc, uint8_t mask);
+extern irqreturn_t wrnc_irq_handler_debug(int irq_core_base, void *arg);
 /* HMQ */
 extern int hmq_max_msg;
 extern const struct attribute_group *wrnc_hmq_groups[];

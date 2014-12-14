@@ -19,6 +19,17 @@ extern "C" {
 
 struct wrnc_dev;
 
+/**
+ * Debug descriptor. It is not obfuscated because it is meant for debugging
+ * purpose. This way, it leaves the user all the freedom to read/poll the
+ * debug channel as (s)he wants.
+ */
+struct wrnc_dbg {
+	struct wrnc_dev *wrnc; /**< token of the device */
+	unsigned int cpu_index; /**< CPU where read debug messages */
+	int fd; /**< file descriptor of the debug interface */
+};
+
 #define WRNC_NAME_LEN 12
 
 #define WRNC_SYSFS_PATH_LEN 128
@@ -124,6 +135,12 @@ extern int wrnc_smem_write(struct wrnc_dev *wrnc, uint32_t addr, uint32_t *data,
 			   size_t count, enum wrnc_smem_modifier mod);
 extern int wrnc_bind(struct wrnc_dev *wrnc, struct wrnc_msg_filter *flt,
 		     unsigned int length);
+
+extern struct wrnc_dbg *wrnc_debug_open(struct wrnc_dev *wrnc,
+					unsigned int index);
+extern void wrnc_debug_close(struct wrnc_dbg *dbg);
+extern int wrnc_debug_message_get(struct wrnc_dbg *dbg,
+				  char *buf, size_t count);
 
 #ifdef __cplusplus
 };

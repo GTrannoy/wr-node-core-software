@@ -27,23 +27,21 @@ void rt_set_debug_slot(int slot)
     debug_slot = slot;
 }
 
+
 int puts(const char *p)
 {
-    int i;
-    volatile uint32_t *buf = mq_map_out_buffer(0, debug_slot);
-    
-    mq_claim(0, debug_slot);
-    
-    buf[0] = 0xdeadbeef;
-    for(i=0;i<127;i++,p++)
-      {
-  	   if(*p)
-	       buf[i+1] = *p;
-	     else
-	       break;
-      }
+	char c;
+	int i = 0;
 
-    mq_send(0, debug_slot, i + 1);
-    return i;
+	while (c = *(p++)) {
+		lr_writel(c, WRN_CPU_LR_REG_DBG_CHR);
+		++i;
+	}
+
+	/* Provide a string terminator */
+	lr_writel('\0', WRN_CPU_LR_REG_DBG_CHR);
+
+	return i;
 }
+
 

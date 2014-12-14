@@ -193,6 +193,7 @@ static struct wrnc_msg *wrnc_message_pop(struct wrnc_hmq *hmq)
 		msg->data[i] = fmc_readl(fmc,
 				hmq->base_sr + MQUEUE_SLOT_DATA_START + i * 4);
 	}
+
 	/* Discard the slot content */
 	fmc_writel(fmc, MQUEUE_CMD_DISCARD, hmq->base_sr + MQUEUE_SLOT_COMMAND);
 	spin_unlock_irqrestore(&hmq->lock, flags);
@@ -226,7 +227,6 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 		return -EINVAL;
 	}
 	hmq_out = &wrnc->hmq_out[msg.index_out];
-
 	/*
 	 * Wait until the message queue is empty so we can safely enqueue
 	 * the synchronous message. Get the mutex to avoid other process

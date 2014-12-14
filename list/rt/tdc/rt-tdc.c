@@ -480,7 +480,7 @@ void init()
 main()
 {   
     int i = 0;
-    rt_set_debug_slot(TDC_OUT_SLOT_CONTROL);
+    rt_set_debug_slot(TDC_OUT_SLOT_LOGGING);
     init();
 
     pp_printf("RT_TDC firmware initialized.");

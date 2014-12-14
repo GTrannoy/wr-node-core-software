@@ -18,7 +18,6 @@
 
 typedef std::vector<uint32_t> wrn_message;
 
-
 struct wrn_mqueue_slot {
     int size;
     int width;
@@ -34,7 +33,6 @@ struct wrn_mqueue {
 struct wrn_buffer {
     int slot;
     int total;
-    
 
     wrn_buffer(int slot);
     ~wrn_buffer();
@@ -65,7 +63,7 @@ struct wrn_buffer {
     {
         return msgs.size();
     }
-    
+
     pthread_mutex_t mutex;
     std::deque<wrn_message> msgs;
 };
@@ -90,7 +88,5 @@ struct wrn_dev {
     std::map<int, wrn_connection *> fds;
     pthread_t update_thread;
 };
-
-
 
 #endif

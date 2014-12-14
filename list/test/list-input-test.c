@@ -8,6 +8,7 @@
 
 void decode_flags(char *buf, uint32_t flags)
 {
+    int l;
     strcpy(buf,"");
 
     if( flags & LIST_ENABLED )
@@ -21,7 +22,7 @@ void decode_flags(char *buf, uint32_t flags)
     if( flags & LIST_TRIGGERED )
         strcat(buf, "Triggered ");
 
-    int l = strlen(buf);
+    l = strlen(buf);
     if(l)
         buf[l-1] = 0;
 }
@@ -46,7 +47,7 @@ void decode_mode (char *buf, int mode)
 
 void decode_log_level(char *buf, uint32_t flags)
 {
-    strcpy(buf,""); 
+    strcpy(buf,"");
     if(flags == 0)
         strcpy(buf, "off");
     if (flags & LIST_LOG_RAW)
@@ -105,7 +106,7 @@ void dump_input_state ( struct list_input_state *state )
         printf("Channel %d: disabled\n", state->input );
         return;
     }
-	
+
     decode_flags(tmp,state->flags);
     printf("Channel %d state:\n", state->input );
     printf(" - Flags:                 %s\n", tmp);
@@ -130,7 +131,6 @@ void dump_input_state ( struct list_input_state *state )
         format_ts( tmp, state->last_sent.ts, 1 );
         format_id( tmp2, state->last_sent.id );
         printf(" - Last sent trigger:     %s, ID: %s, SeqNo %d\n", tmp, tmp2, state->last_sent.seq);
-        
     }
 
     printf(" - Dead time:             %d ns\n", ts_to_picos( state->dead_time ) / 1000 );
@@ -147,12 +147,16 @@ int parse_trigger_id(const char *str, struct list_id *id)
 int parse_delay (char *dly, uint64_t *delay_ps)
 {
     int l = strlen(dly);
+    char last;
+    uint64_t mult;
+    double d;
+
     if(!l)
 	return -1;
 
-    char last = dly[l-1];
-    uint64_t mult=1;
-    
+    last = dly[l-1];
+    mult=1;
+
     switch(last)
     {
 	case 'u': mult = 1000ULL * 1000; l--; break;
@@ -161,11 +165,9 @@ int parse_delay (char *dly, uint64_t *delay_ps)
 	case 'p': mult = 1; l--; break;
 	default: mult = 1; break;
     }
-    
+
     dly[l] = 0;
-    
-    double d;
-    
+
     if( sscanf(dly, "%lf", &d) != 1)
 	return -1;
 
@@ -181,25 +183,28 @@ int cmd_state(int input, int argc, char *argv[])
 {
     struct list_input_state state;
     int rv = list_in_get_state(dev, input, &state);
-    
+
     if(rv < 0)
     {
 	fprintf(stderr, "list_in_get_state(): %s\n", strerror(-rv));
 	return rv;
     }
-    
+
     dump_input_state(&state);
     return 0;
 }
 
 int cmd_assign(int input, int argc, char *argv[])
 {
+    struct list_id id;
+    int rv;
+
     if(argc < 1)
     {
 	fprintf(stderr,"assign: trigger ID expected\n");
 	return -1;
     }
-    
+
     if(argc >= 1 && !strcmp(argv[0],"-h"))
     {
 	printf("Command: assign <trigger ID>\n");
@@ -207,14 +212,12 @@ int cmd_assign(int input, int argc, char *argv[])
 	return 0;
     }
 
-    struct list_id id;
     if(parse_trigger_id(argv[0], &id) < 0)
     {
 	fprintf(stderr, "Error parsing trigger ID\n");
 	return -1;
     }
-    
-int rv = list_in_assign_trigger ( dev, input, &id );
+    rv = list_in_assign_trigger ( dev, input, &id );
 
     if(rv < 0)
 	fprintf(stderr, "list_in_assign_trigger(): %s\n", strerror(-rv));
@@ -224,7 +227,8 @@ int rv = list_in_assign_trigger ( dev, input, &id );
 
 int cmd_unassign(int input, int argc, char *argv[])
 {
-    
+    int rv;
+
     if(argc >= 1 && !strcmp(argv[0],"-h"))
     {
 	printf("Command: unassign\n");
@@ -232,7 +236,7 @@ int cmd_unassign(int input, int argc, char *argv[])
 	return 0;
     }
 
-    int rv = list_in_assign_trigger ( dev, input, NULL );
+    rv = list_in_assign_trigger ( dev, input, NULL );
 
     if(rv < 0)
 	fprintf(stderr, "list_in_assign_trigger(): %s\n", strerror(-rv));
@@ -241,6 +245,7 @@ int cmd_unassign(int input, int argc, char *argv[])
 
 int cmd_arm(int input, int argc, char *argv[])
 {
+    int rv;
 
     if(argc >= 1 && !strcmp(argv[0],"-h"))
     {
@@ -249,7 +254,7 @@ int cmd_arm(int input, int argc, char *argv[])
 	return 0;
     }
 
-    int rv = list_in_arm ( dev, input, 1 );
+    rv = list_in_arm ( dev, input, 1 );
 
     if(rv < 0)
 	fprintf(stderr, "list_in_arm(): %s\n", strerror(-rv));
@@ -258,6 +263,8 @@ int cmd_arm(int input, int argc, char *argv[])
 
 int cmd_disarm(int input, int argc, char *argv[])
 {
+    int rv;
+
     if(argc >= 1 && !strcmp(argv[0],"-h"))
     {
         printf("Command: disarm\n");
@@ -265,7 +272,7 @@ int cmd_disarm(int input, int argc, char *argv[])
 	return 0;
     }
 
-    int rv = list_in_arm ( dev, input, 0 );
+    rv = list_in_arm ( dev, input, 0 );
 
     if(rv < 0)
 	fprintf(stderr, "list_in_arm(): %s\n", strerror(-rv));
@@ -274,14 +281,16 @@ int cmd_disarm(int input, int argc, char *argv[])
 
 int cmd_enable(int input, int argc, char *argv[])
 {
+    int rv;
+
     if(argc >= 1 && !strcmp(argv[0],"-h"))
     {
 	printf("Command: enable\n");
 	printf("Enables the TDC input.\n");
 	return 0;
     }
-    
-    int rv = list_in_enable ( dev, input, 1 );
+
+    rv = list_in_enable ( dev, input, 1 );
 
     if(rv < 0)
 	fprintf(stderr, "list_in_enable(): %s\n", strerror(-rv));
@@ -290,6 +299,7 @@ int cmd_enable(int input, int argc, char *argv[])
 
 int cmd_disable(int input, int argc, char *argv[])
 {
+    int rv;
 
     if(argc >= 1 && !strcmp(argv[0],"-h"))
     {
@@ -298,7 +308,7 @@ int cmd_disable(int input, int argc, char *argv[])
 	return 0;
     }
 
-    int rv = list_in_enable ( dev, input, 0 );
+    rv = list_in_enable ( dev, input, 0 );
 
     if(rv < 0)
 	fprintf(stderr, "list_in_enable(): %s\n", strerror(-rv));
@@ -308,23 +318,24 @@ int cmd_disable(int input, int argc, char *argv[])
 int cmd_set_delay(int input, int argc, char *argv[])
 {
     uint64_t dly;
+    int rv;
 
     if(argc < 1)
     {
 	fprintf(stderr,"delay: delay value expected\n");
 	return -1;
     }
-    
+
     if(argc >= 1 && !strcmp(argv[0],"-h"))
     {
 	printf("Command: delay <delay value>\n");
 	printf("Sets trigger delay (0 s - 1 s). Default unit is 1 picosecond. Fractional values and SI suffixes are accepted (e.g. 1.2u, 10n, etc.)\n");
 	return 0;
     }
-    
+
     parse_delay(argv[0], &dly);
 
-    int rv = list_in_set_delay ( dev, input, dly );
+    rv = list_in_set_delay ( dev, input, dly );
 
     if(rv < 0)
 	fprintf(stderr, "list_in_set_delay(): %s\n", strerror(-rv));
@@ -334,13 +345,14 @@ int cmd_set_delay(int input, int argc, char *argv[])
 int cmd_set_dead_time(int input, int argc, char *argv[])
 {
     uint64_t dly;
+    int rv;
 
     if(argc < 1)
     {
 	fprintf(stderr,"deadtime: dead time value expected\n");
 	return -1;
     }
-    
+
     if(argc >= 1 && !strcmp(argv[0],"-h"))
     {
 	printf("Command: deadtime <dead time value>\n");
@@ -348,10 +360,10 @@ int cmd_set_dead_time(int input, int argc, char *argv[])
 	printf("Default unit is 1 picosecond. Fractional values and SI suffixes are accepted (e.g. 1.2u, 10n, etc.)\n");
 	return 0;
     }
-    
+
     parse_delay(argv[0], &dly);
 
-    int rv = list_in_set_dead_time ( dev, input, dly );
+    rv = list_in_set_dead_time ( dev, input, dly );
 
     if(rv < 0)
 	fprintf(stderr, "list_in_set_dead_time(): %s\n", strerror(-rv));
@@ -360,21 +372,21 @@ int cmd_set_dead_time(int input, int argc, char *argv[])
 
 int cmd_set_mode(int input, int argc, char *argv[])
 {
-    int mode;
+    int mode, rv;
 
     if(argc < 1)
     {
 	fprintf(stderr,"mode: mode expected\n");
 	return -1;
     }
-    
+
     if(argc >= 1 && !strcmp(argv[0],"-h"))
     {
 	printf("Command: mode <single|auto>\n");
 	printf("Sets triggering mode. Single = process single pulse after arming, auto = process all subsequent pulses.\n");
 	return 0;
     }
-    
+
 
     if(!strcmp(argv[0],"single"))
 	mode = LIST_TRIGGER_MODE_SINGLE;
@@ -385,7 +397,7 @@ int cmd_set_mode(int input, int argc, char *argv[])
 	return -1;
     }
 
-    int rv = list_in_set_trigger_mode ( dev, input, mode );
+    rv = list_in_set_trigger_mode ( dev, input, mode );
 
     if(rv < 0)
 	fprintf(stderr, "list_in_set_trigger_mode(): %s\n", strerror(-rv));
@@ -394,15 +406,17 @@ int cmd_set_mode(int input, int argc, char *argv[])
 
 int cmd_reset_counters(int input, int argc, char *argv[])
 {
+    int rv;
+
     if(argc >= 1 && !strcmp(argv[0],"-h"))
     {
 	printf("Command: reset\n");
 	printf("Resets statistics counters & 'last' values\n");
 	return 0;
     }
-    
-    int rv = list_in_reset_counters ( dev, input );
-        
+
+    rv = list_in_reset_counters ( dev, input );
+
     if(rv < 0)
 	fprintf(stderr, "list_in_reset_counters(): %s\n", strerror(-rv));
     return rv;
@@ -416,14 +430,14 @@ int cmd_sw_trigger(int input, int argc, char *argv[])
 	fprintf(stderr,"swtrig: trigger ID expected\n");
 	return -1;
     }
-    
+
     if(argc >= 1 && !strcmp(argv[0],"-h"))
     {
 	printf("Command: swtrig <trigger ID> [holdoff time]\n");
 	printf("Sends a software-forced trigger message with given trigger ID, after certain holdoff time from now (default = 100ms)\n");
 	return 0;
     }
-    
+
     return 0;
 }
 
@@ -451,9 +465,10 @@ struct command cmds[] = {
 
 int run_command ( int argc, char *argv[] )
 {
- 	int i;
+ 	int i, lun;
  	char *cmd;
  	int optind = 1;
+
 	if(argc < 2)
  	{
  		printf("Usage: %s [-l lun] input command [command paremeters]\n\n", argv[0]);
@@ -465,7 +480,7 @@ int run_command ( int argc, char *argv[] )
  		exit(0);
  	}
 
- 	int lun = 0;
+ 	lun = 0;
 
  	if(!strcmp(argv[1], "-l"))
  	{
@@ -494,7 +509,7 @@ int run_command ( int argc, char *argv[] )
 
  	input = atoi(argv[optind]);
  	cmd = argv[optind+1];
- 	
+
  	for(i=0; cmds[i].handler; i++)
  		if(!strcmp(cmds[i].name, cmd))
  		{

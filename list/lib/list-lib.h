@@ -11,19 +11,19 @@ struct list_trigger_handle {
     uint32_t ptr_trig;
     int channel;
 };
-  
+
 struct list_input_state {
     int input;
 
     uint32_t flags;           ///> enum list_io_flags
     uint32_t log_level;       ///> enum list_log_level
     int mode;
-    
+
     uint32_t tagged_pulses;
     uint32_t sent_triggers;
     uint32_t sent_packets;
 
-    struct list_trigger_entry last_sent;  
+    struct list_trigger_entry last_sent;
     struct list_id assigned_id;
     struct list_timestamp dead_time;
     struct list_timestamp delay;
@@ -82,7 +82,6 @@ struct list_node* list_open_node_by_lun(int lun);
 
 void list_close_node ( struct list_node *node );
 
-
 /* 3.3.1a Enable/disable the input. */
 
 //! Hardware enable/disable a LIST trigger input.
@@ -93,7 +92,6 @@ void list_close_node ( struct list_node *node );
 */
 int list_in_enable(struct list_node *dev, int input, int enable);
 int list_in_is_enabled(struct list_node *dev, int input);
-
 
 /* 3.3.1b Get/set the Trigger/System/Source Port ID. Change the IDs during operation of the node. */
 
@@ -129,7 +127,6 @@ int list_in_set_trigger_mode ( struct list_node *, int input, int mode );
 */
 
 int list_in_arm ( struct list_node *, int input, int armed );
-
 
 /*
 3.3.1h Log every trigger pulse sent out to the network. Each log message contains the input
@@ -167,7 +164,6 @@ int list_in_reset_counters ( struct list_node *dev, int input );
 
 int list_in_set_log_level ( struct list_node *, int input, uint32_t log_level);
 
-
 int list_out_enable(struct list_node *dev, int output, int enable);
 int list_out_set_dead_time ( struct list_node *dev, int output, uint64_t dead_time_ps );
 
@@ -190,4 +186,4 @@ int list_out_reset_counters ( struct list_node *dev, int output );
 int list_out_check_triggered ( struct list_node *, int output );
 //int list_out_wait_trigger ( struct list_node*, int output_mask, struct list_id *id );
 
-#endif 
+#endif

@@ -4,15 +4,17 @@
 
 void list_boot_node(struct list_node *dev);
 
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
+	int lun;
+
 	if(argc < 2)
 	{
 		printf("usage: %s <lun>\n", argv[0]);
 		return 0;
 	}
 
-	int lun = atoi(argv[1]);
+	lun = atoi(argv[1]);
 
 	printf("Booting LIST Node @ Lun %d\n", lun);
 
@@ -28,5 +30,4 @@ main(int argc, char *argv[])
 	sleep(2);
 
 	return 0;
-
 }

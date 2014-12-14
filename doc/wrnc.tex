@@ -1,0 +1,451 @@
+\documentclass[a4paper,10pt]{article}
+
+
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{color}
+\usepackage{listings}
+
+\title{White-Rabbit Node-Core Software}
+\author{Federico Vaga $<$federico.vaga@cern.ch$>$\\CERN - BE-CO-HT}
+\date{December 2014}
+
+\pdfinfo{%
+  /Title    (White-Rabbit Node-Core Software)
+  /Author   (Federico Vaga <federico.vaga@cern.ch>, CERN - BE-CO-HT)
+  /Creator  (Federico Vaga <federico.vaga@cern.ch>, CERN - BE-CO-HT)
+  /Producer ()
+  /Subject  (White-Rabbit Node-Core Software Documentation)
+  /Keywords (white rabbit node core documentation)
+}
+
+\begin{document}
+\setlength{\parindent}{0cm}
+\setlength{\parskip}{3mm}
+\maketitle
+\lstset{language=C, basicstyle=\footnotesize\bfseries, 
+keywordstyle=\color{blue},}
+
+\section{Introduction}
+This is the manual of the driver and the library for the
+\textit{White-Rabbit Node-Core} HDL core developed on the \textbf{Open
+  HardWare Repository}\footnote{http://www.ohwr.org/projects/wr-node-core-sw}
+
+The goal of this manual is to explain you how to retrieve, install
+and using the software. This manual does not explain details about
+the White-Rabbit Node-Core or its internal behavior. If you want to
+know more about the White-Rabbit Node-Core, please refer to the HDL
+documentation.
+
+Here you will not find the API details. For API documentation,
+generate the Doxygen documentation by running the following command:
+
+\begin{verbatim}
+  cd doc
+  make doxygen
+\end{verbatim}
+
+The HTML documentation will be available in the directory
+\texttt{doxy-wrnc}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Repository}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+This project is hosted on the Open HardWare Repository at the
+following link \url{http://www.ohwr.org/projects/wr-node-core-sw}
+
+You can get the git repository using the following command:
+\begin{verbatim}
+  git clone --recursive
+     git://ohwr.org/white-rabbit/wr-node-core/wr-node-core-sw.git
+\end{verbatim}
+
+The repository is organized as following:
+\begin{description}
+  \item[kernel] this directory contains all the driver's source files
+  \item[lib] this directory contains all the library source files
+  \item[tools] this directory contains the sources for a set of simple
+    tools.
+  \item[applications] this directory contains a collection of
+    applications where the White-Rabbit Node-Core is involved. Each
+    application is documented separately
+  \item[doc] this directory contains all the documentation of this
+    project. Here, you can generate the doxygen documentation of the
+    library and this manual as well.
+\end{description}
+
+
+\subsection{Dependencies}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+All the software dependencies are part of the repository as git
+sub-modules. The driver depends on the
+\texttt{fmc-bus}\footnote{\url{http://www.ohwr.org/projects/fmc-bus}},
+so you can find its git sub-module in the repository.
+
+There is also a \texttt{svec-sw} sub-module. This is not a real
+dependency but the SVEC is where probably you are going to use the
+White-Rabbit Node-Core. This facilitate the package release and
+distribution. It also allows us to give an indication about the
+carrier compatibility.
+
+Remember to use the \texttt{--recursive} option in order to clone also
+all sub-modules
+
+\begin{verbatim}
+  git clone --recursive <repo-address>
+\end{verbatim}
+
+If you did not clone with the \texttt{--recursive} option, then update
+the sub-modules with the following command
+
+\begin{verbatim}
+  git submodule update
+\end{verbatim}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Installation}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The driver depends on the \texttt{fmc-bus} driver, as well as the
+Linux kernel. Also, it must talk to a specific FPGA binary with the
+(White-Rabbit Node-Core inside) running in the carrier card. According
+to the \texttt{fmc-bus} module, you have also to load the driver of
+your carrier (\texttt{svec-sw} or \texttt{spec-sw})
+
+The library does not have any dependency with other software packages.
+
+\subsection{Gateware Installation}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The White-Rabbit Node-Core is an HDL component; so, there is not
+a dedicated gateware, but it can be part of any gateware. These
+gatewares must be placed under \texttt{/lib/firmware} and loaded with
+other fmc's drivers.
+%FIXME it will change with UAL
+
+\subsection{Software Installation}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Compilation}
+There are not special requirements for the compilation, just run
+
+\begin{verbatim}
+  make
+\end{verbatim}
+
+Optionally, you can set the following environment variables to
+customize you compilation:
+\begin{description}
+  \item[LINUX] path to a \textit{Linux} source directory
+  \item[FMC\_BUS] path to a \textit{fmc-bus} directory
+\end{description}
+
+In order to compile for different environments, in the directories
+\texttt{lib} and \texttt{tools} you can create a dedicated
+\texttt{Makefile} to configure the environment before run the
+project's \texttt{Makefile}. This dedicated \texttt{Makefile} must be
+named \texttt{Makefile.specific}.
+
+The compilation will produce the binary files in the respective
+directories.
+
+Note that the compilation process will also compile all the
+applications under the directory \texttt{applications}.
+
+\subsubsection{Library and Tools Installation}
+Once you have compiled the library and tools you can install the
+binaries in order to make them visible to the entire system.
+
+\begin{verbatim}
+  make install
+\end{verbatim}
+
+\subsubsection{Driver Loading}
+You can place the driver wherever you want and load it using
+\texttt{modporbe(8)} or \texttt{insmod(8)}.
+
+The driver support the following module parameters:
+\begin{description}
+  \item[max\_slot\_msg] Maximum number of messages to keep in the
+    driver internal queue for each slot.
+\end{description}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Software Usage}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+In figure~\ref{fig:swgenstack} you can see an overview of the software
+stack and the White-Rabbit Node-Core internal components seen by the
+driver.
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[scale=0.5]{img/sw-gen-stack.eps}
+	\caption{White-Rabbit Node-Core Software Stack}
+        \label{fig:swgenstack}
+\end{figure}
+
+Looking from the bottom to the top. The final user-space program has
+three way to access the White-Rabbit Node-Core resources:
+
+\begin{itemize}
+  \item the application specific library. It is suggested to use these
+    libraries for application-specific programs. Note that this kind of
+    libraries may hide White-Rabbit Node-Core details/architecture.
+  \item the White-Rabbit Node-Core library \texttt{libwrnc}. It can be
+    used at any time when the specific library does not provide all
+    functionality.
+  \item the driver's sysfs attributes and char devices
+\end{itemize}
+
+From the figure \ref{fig:swgenstack} is clear that the only way to
+communicate with the White-Rabbit Node-Core is through its Linux
+driver; there are not other way to access it.
+
+
+\subsection{Library Interface}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+More details about the White-Rabbit Node-Core library API are
+available through the doxygen documentation. To build the doxygen
+documentation, run the following commands:
+
+\begin{verbatim}
+  cd doc
+  make
+\end{verbatim}
+
+You will find the HTML documentation in the doxy-wrnc directory. Each
+application should provide its own library and relative doxygen
+documentation. For each application you should find a \texttt{doc}
+directory where you can build the doxygen documentation or any other
+kind of documentation.
+
+
+\subsection{Driver Interface}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The driver is the only software component in the stack that can access
+the White-Rabbit Node-Core component on the FPGA. The White-Rabbit
+Node-Core exports two communication channels: Host-Message-Queue and
+the Shared-Memory. These communication channels are used to communicate
+between a real-time application, running on the
+CPU\footnote{Internally, the White-Rabbit Node-Core has up to 8 CPUs.
+Each CPU run independently a real-time application.}, and the Linux
+driver.
+
+The device hierarchy of the driver is shown in figure 
+\ref{fig:swdrvhier}; there is a main device and then sub-devices 
+according to the White-Rabbit Node-Core configuration.
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[scale=0.5]{img/sw-drv-hier.eps}
+	\caption{White-Rabbit Node-Core Device Driver Hierarchy}
+        \label{fig:swdrvhier}
+\end{figure}
+
+The Linux device driver export two Interfaces: sysfs attributes and
+char-devices.
+
+\subsubsection{Char-Devices Interface}
+All char-devices are available under the directory \texttt{/dev/}.
+
+\begin{description}
+ \item['wrnc-\%04x', device\_id] it refers to the entire device 
+(\texttt{\%04x = device\_id}). It supports\texttt{read}, 
+\texttt{write}, \texttt{seek} and \texttt{ioctl}. It allows users to 
+read/write the internal shared memory.
+ 
+ \item['wrnc-\%04x-cpu-\%02d', device\_id, cpu\_index] it refers to a 
+single CPU in the
+ White-Rabbit Node-Core. It supports \texttt{read}, \texttt{write} and 
+\texttt{seek}. It allows users to load or to dump CPU firmware.
+ 
+ \item['wrnc-\%04x-hmq-\%c-\%02d', device\_id, direction, hmq\_index] 
+it refers to a single HMQ slot in
+the White-Rabbit Node-Core. Slot are splitted in two category: input 
+slots (\texttt{\%c = 'i'}) and output slots (\texttt{\%c = 'o'}). It 
+supports \texttt{read}\footnote{on output slots}, 
+\texttt{write}\footnote{on input slots}, \texttt{seek} and 
+\texttt{poll}
+\end{description}
+
+\subsubsection{Sysfs Interface}
+You can find all the sysfs attributes under the directory 
+\texttt{/sys/class/wr-node-core/}. Following a table of all sysfs 
+attributes available.
+
+\renewcommand{\arraystretch}{1.8}
+\begin{tabular}{c c c p{6cm}}
+  device & name & direction & description \\
+
+\hline
+  wrnc & application\_id & RO & application identifier of the WRNC 
+bitstream \\
+
+\hline
+  wrnc & n\_cpu & RO & get the number of CPUs \\
+
+\hline
+  wrnc & enable\_mask & RW & it enable/disable CPUs. It's a bit mask. 
+Actually, it means that it runs or pauses the code  \\
+
+\hline
+  wrnc & reset\_mask & RW & it (de-)assert the CPUs' reset line. It's 
+a bit mask \\
+
+\hline
+  wrnc & smem\_operation & RW & it set the default operation modo for 
+te access to the shared memory \\
+
+\hline \hline
+
+  cpu & enable & RW & it enable/disable a CPU. Actually, it means 
+that it runs or pauses the code \\
+
+\hline
+  cpu & reset & RW & it (de-)assert the CPU reset line \\
+
+\hline \hline
+
+  hmq & count & RO & number of messages in the HMQ slot \\
+
+\hline
+  hmq & empty & RO & the hardware status of the HMQ slot is empty \\
+
+\hline
+  hmq & full & RO & the hardware status of the HMQ slot is full \\
+
+\end{tabular}
+
+
+\subsubsection{Load Real-Time Programs}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Without applications the White-Rabbit Node-Core does nothing. So, to
+make it productive we must load a real-time application on the CPU.
+
+For this purpose the driver offers a dedicated char device for each
+CPU that allows you to load (dump) application to (from) the CPU
+memory.
+
+You can find these char-devices under the directory \texttt{/dev/} 
+with the following patter \textit{wrnc-\%04x-cpu-\%02d}.
+
+You can load an application by writing to the char device. You can
+dump an application by reading from the char device. With
+\texttt{lseek(2)} or \texttt{fseek(2)} you can point to different
+a memory offset.
+
+The library provides dedicated functions for these operations.
+
+
+\subsubsection{Host Message Queue}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+This is the main communication channel between the software and the
+hardware. The Host-Message-Queue has up to 32 slots. The slots are
+mono-directional, so there are up to 16 input slots and up to 16
+output slots.
+
+The driver exports these slots as char-devices. By reading/writing
+from/to these char-devices you can send/receive messages. Obviously,
+the content of the message depends on the application running on the
+White-Rabbit Node-Core CPUs.
+
+You can find these char-devices under the directory \texttt{/dev/}, 
+with following patter \textit{wrnc-\%04x-hmq-\%c-\%02d}.
+
+Here the data structures\footnote{read the doxygen 
+documentation for details} involved in the communication:
+
+\begin{lstlisting}
+struct wrnc_msg {
+	uint32_t datalen;
+	uint32_t data[WRNC_MAX_PAYLOAD_SIZE];
+};
+
+struct wrnc_msg_sync {
+  struct wrnc_msg msg;
+  uint16_t index_in;
+  uint16_t index_out;
+  unsigned int timeout_ms;
+};
+\end{lstlisting}
+
+The slot's char-devices have also \texttt{ioctl(2)} capabilities:
+\begin{description}
+  \item[msg\_sync] allow to send a message and receive an answer
+    synchronously. The ioctl command is \texttt{WRNC\_IOCTL\_MSG\_SYNC}
+    and it accepts \texttt{struct wrnc\_msg\_sync} as argument. The
+    message sent will be overwritten by the answer.
+\end{description}
+
+\subsubsection{Shared Memory}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The Shared-Memory is a secondary way to communicate with the real-time
+applications running on the White-Rabbit Node-Core. The driver exports
+this communication channel through a char device. With \texttt{lseek(2)}
+or \texttt{fseek(2)} the char-device you can point to a specific
+memory offset.
+
+The size of this Shared-Memory is 8192 bytes. The Shared-Memory
+address space is divided by ranges; each range has an associated write
+operation. The first offset range from 0 to 8192 allows you to
+directly access the Shared-Memory without any operation. All the other
+ranges perform atomic operations; the write operation is always
+executed by using as argument the current content of the memory cell:
+
+\begin{math}
+  cell = cell \left\{ \vee, \wedge, +, \dots \right\} value
+\end{math}
+
+To keep consistency between documentations, please, refer to the HDL 
+documentation for details about ranges and operations.
+
+You can find these char-devices under \texttt{/dev/} with the
+following name patter \textit{wrnc-\%04x}.
+
+The default operation of the char-device is a direct access to the 
+memory. You can change the default behaviour of the char-device by 
+writing on the sysfs attribute \texttt{smem\_operation}
+\footnote{\texttt{/sys/class/wr-node-core/wrnc-\%04x/smem\_operation}}
+ 
+
+The char-devices have also \texttt{ioctl(2)} capabilities:
+\begin{description}
+  \item[smem\_io] allow to read/write a memory cell. The ioctl command
+    is \texttt{WRNC\_IOCTL\_SMEM\_IO} and it accepts \texttt{struct
+    wrnc\_smem\_io} as argument. In case of write operation the
+    value will be overwritten with the result of the write operation.
+\end{description}
+
+Here the data structures\footnote{read the doxygen documentation for 
+details} involved in the communication using
+\texttt{ioctl(2)}:
+
+\begin{lstlisting}
+struct wrnc_smem_io {
+	uint32_t addr;
+	uint32_t value;
+	int is_input;
+	enum wrnc_smem_modifier mod;
+};
+\end{lstlisting}
+
+
+\subsection{Tools}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Under the directory \texttt{tools} you can find the following
+programs:
+
+\begin{description}
+  \item[lswrnc] it shows the available White-Rabbit Node-Core
+  \item[wrnc-count] it returns the number of available White-Rabbit
+    Node-Core
+  \item[wrnc-messages] it dumps messages from an output slot
+  \item[wrnc-smem] it reads/writes on the shared memory
+  \item[wrnc-cpu-restart] it restarts CPUs
+  \item[wrnc-loader] it loads/dumps application to/from the CPU memory
+\end{description}
+
+All these tools use the \texttt{libwrnc} library, so they are good
+example of the API usage.
+
+Each tool has an internal help page accessible using the
+command line option \texttt{-h}. Please use this help. We are not
+providing information here in order to avoid inconsistencies.
+
+\section{Bugs and Missing Features}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{itemize}
+  \item Reading a slot is an exclusive operation. More threads cannot
+    read the same message from the same slot. (It will be implemented
+    later)
+  \item filtering debug messages is not possible yet
+\end{itemize}
+
+\end{document}

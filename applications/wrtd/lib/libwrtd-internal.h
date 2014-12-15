@@ -11,7 +11,6 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <libwrtd.h>
-#include <libwrtd-internal.h>
 
 /**
  * Description of a White-Rabbit Trigger-Distribution device

@@ -99,17 +99,21 @@ uint32_t wrnc_count()
 
 /**
  * It allocates and returns the list of available WRNC devices. The user is
- * in charge to free(3) the allocated memory
- * @return a list of WRNC devices
+ * in charge to free(3) the allocated memory. The list contains
+ * @link wrnc_count() @endlink + 1 elements. The last element is an
+ * emtpy string.
+ * @return a list of WRNC device's names
  */
 char (*wrnc_list())[WRNC_NAME_LEN]
 {
 	char *list;
+	int n = wrnc_count();
 
-	list = malloc((WRNC_MAX_CARRIER + 1) * WRNC_NAME_LEN);
+	list = malloc(n * WRNC_NAME_LEN);
 	if (!list)
 		return NULL;
-	memcpy(list, wrnc_dev_list, (WRNC_MAX_CARRIER + 1) * WRNC_NAME_LEN);
+	memset(list, 0, (n + 1) * WRNC_NAME_LEN); /* To se the terminator */
+	memcpy(list, wrnc_dev_list, n * WRNC_NAME_LEN);
 
 	return (char (*)[WRNC_NAME_LEN])list;
 }

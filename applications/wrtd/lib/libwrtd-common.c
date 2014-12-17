@@ -124,7 +124,7 @@ struct wrtd_node *wrtd_open_by_lun(int lun)
 
 out:
 	free(wrtd);
-	return wrtd;
+	return (struct wrtd_node *)wrtd;
 }
 
 

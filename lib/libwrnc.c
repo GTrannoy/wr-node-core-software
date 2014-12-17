@@ -997,7 +997,7 @@ int wrnc_debug_message_get(struct wrnc_dbg *dbg, char *buf, size_t count)
 	memset(buf, 0, count);
 	do {
 		n = read(dbg->fd, buf + real_count, count - real_count);
-		if (n <= 0)
+		if (n < 0)
 		        return -1;
 
 		real_count += n;
@@ -1005,7 +1005,7 @@ int wrnc_debug_message_get(struct wrnc_dbg *dbg, char *buf, size_t count)
 	        if (buf[real_count - 1] == '\0')
 		        break;
 
-	} while (real_count < count);
+	} while (real_count < count || n == 0);
 
 	/* Put a terminator */
 	buf[real_count - 1] = '\0';

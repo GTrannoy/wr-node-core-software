@@ -59,9 +59,9 @@ static void help()
 /**
  * It retreives a message from a given slots and it prints its content
  * @param[in] wrnc device to use
- * @param[in] slot_index index of the slot to read
+ * @param[in] hmq slot to read
  */
-static int dump_message(struct wrnc_dev *wrnc, unsigned int slot_index)
+static int dump_message(struct wrnc_dev *wrnc, struct wrnc_hmq *hmq)
 {
 	struct wrnc_msg *wmsg;
         time_t tm;
@@ -75,8 +75,8 @@ static int dump_message(struct wrnc_dev *wrnc, unsigned int slot_index)
 		strftime(stime, 64,"%T", gm);
 		fprintf(stdout, "[%s] ", stime);
 	}
-	fprintf(stdout, "%s-hmq-i-%02d :", wrnc_name_get(wrnc), slot_index);
-	wmsg = wrnc_slot_receive(wrnc, slot_index);
+	fprintf(stdout, "%s-hmq-i-%02d :", wrnc_name_get(wrnc), hmq->index);
+	wmsg = wrnc_slot_receive(hmq);
 	if (!wmsg) {
 		fprintf(stdout, " error : %s\n", wrnc_strerror(errno));
 		return -1;
@@ -124,6 +124,7 @@ void *dump_thread(void *arg)
 	struct pollfd p[MAX_SLOT], p_dbg[MAX_CPU];
 	struct wrnc_dbg *wdbg[MAX_CPU];
 	struct wrnc_dev *wrnc;
+	struct wrnc_hmq *hmq[th_data->n_slot];
 	int ret, err, i;
 
 	/* Open the device */
@@ -135,14 +136,14 @@ void *dump_thread(void *arg)
 
 	/* Build the polling structures */
 	for (i = 0; i < th_data->n_slot; ++i) {
-		err = wrnc_hmq_open(wrnc, th_data->slot_index[i],
+		hmq[i] = wrnc_hmq_open(wrnc, th_data->slot_index[i],
 				    WRNC_HMQ_OUTCOMING);
-		if (err) {
+		if (!hmq[i]) {
 			fprintf(stderr, "Cannot open HMQ: %s\n",
 				wrnc_strerror(errno));
 			goto out_slot;
 		}
-		p[i].fd = th_data->slot_index[i];
+		p[i].fd = hmq[i]->fd;
 		p[i].events = POLLIN | POLLERR;
 	}
 
@@ -181,7 +182,7 @@ void *dump_thread(void *arg)
 		}
 
 		/* Polling slots */
-		ret = wrnc_slot_poll(wrnc, p, th_data->n_slot, 10000);
+		ret = poll(p, th_data->n_slot, 10000);
 		switch (ret) {
 		default:
 			/* Dump from the slot */
@@ -189,7 +190,7 @@ void *dump_thread(void *arg)
 				if (!(p[i].revents & POLLIN))
 					continue;
 
-				err = dump_message(wrnc, p[i].fd);
+				err = dump_message(wrnc, hmq[i]);
 				if (err)
 					continue;
 				pthread_mutex_lock(&mtx);
@@ -214,7 +215,7 @@ out_dbg:
 out_slot:
 	/* Close all message slots */
 	for (i = 0; i < th_data->n_slot; ++i)
-		wrnc_hmq_close(wrnc, th_data->slot_index[i], WRNC_HMQ_OUTCOMING);
+		wrnc_hmq_close(hmq[i]);
 	wrnc_close(wrnc);
 	return NULL;
 }

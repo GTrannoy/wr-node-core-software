@@ -139,10 +139,6 @@ struct wrnc_dev *wrnc_open(const char *device)
 	wrnc->fd_dev = -1;
 	for (i = 0; i < WRNC_MAX_CPU; ++i)
 		wrnc->fd_cpu[i] = -1;
-        for (i = 0; i < WRNC_MAX_HMQ_SLOT / 2; ++i)
-		wrnc->fd_hmq_in[i] = -1;
-        for (i = 0; i < WRNC_MAX_HMQ_SLOT / 2; ++i)
-		wrnc->fd_hmq_out[i] = -1;
 
 	return (struct wrnc_dev *)wrnc;
 }
@@ -199,11 +195,6 @@ void wrnc_close(struct wrnc_dev *wrnc)
 	for (i = 0; i < WRNC_MAX_CPU; ++i)
 		if (wdesc->fd_cpu[i] > 0)
 			close(wdesc->fd_cpu[i]);
-
-	for (i = 0; i < WRNC_MAX_HMQ_SLOT / 2; ++i)
-		wrnc_hmq_close(wrnc, i, 1);
-	for (i = 0; i < WRNC_MAX_HMQ_SLOT / 2; ++i)
-		wrnc_hmq_close(wrnc, i, 0);
 
 	free(wdesc);
 }

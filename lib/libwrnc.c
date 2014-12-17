@@ -1007,8 +1007,5 @@ int wrnc_debug_message_get(struct wrnc_dbg *dbg, char *buf, size_t count)
 
 	} while (real_count < count || n == 0);
 
-	/* Put a terminator */
-	buf[real_count - 1] = '\0';
-
 	return real_count;
 }

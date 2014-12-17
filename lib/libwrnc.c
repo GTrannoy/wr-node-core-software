@@ -929,22 +929,29 @@ void wrnc_debug_close(struct wrnc_dbg *dbg)
  * @return number of byte read on success, -1 otherwise and errno is set
  *         appropriately
  */
+#define N_RETRY 100
 int wrnc_debug_message_get(struct wrnc_dbg *dbg, char *buf, size_t count)
 {
-	int n = 0, real_count = 0;
+	int n = 0, real_count = 0, retry = N_RETRY;
 
 	memset(buf, 0, count);
 	do {
 		n = read(dbg->fd, buf + real_count, count - real_count);
 		if (n < 0)
 		        return -1;
-
 		real_count += n;
 		/* check if the string from the CPU is shorter */
 	        if (buf[real_count - 1] == '\0')
 		        break;
 
-	} while (real_count < count || n == 0);
+		/*
+		 * We are expecting a NULL terminated string, but there is
+		 * nothing to read now and the string is not terminated. Retry,
+		 * maybe we were too slow
+		 */
+		retry = (n == 0 ? retry - 1 : N_RETRY);
+	} while (real_count < count && retry > 0);
 
 	return real_count;
 }
+#undef N_RETRY

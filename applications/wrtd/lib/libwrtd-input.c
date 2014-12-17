@@ -532,6 +532,8 @@ int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
 int wrtd_in_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
 		     int flags, int input_mask, int count)
 {
+
+#if 0 /* TODO to be re-implemented */
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	int remaining = count;
 	int n_read = 0;
@@ -564,6 +566,9 @@ int wrtd_in_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
 	}
 
 	return n_read;
+#endif
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
 }
 
 

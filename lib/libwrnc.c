@@ -34,7 +34,7 @@ static char *wrnc_error_str[] = {
 /**
  * It returns a string messages corresponding to a given error code. If
  * it is not a libwrnc error code, it will run strerror(3)
- * @param[in] err error code
+ * @param[in] err error code. Typically 'errno' variable
  * @return a message error
  */
 char *wrnc_strerror(int err)
@@ -75,7 +75,7 @@ int wrnc_init()
 /**
  * It releases the resources allocated by wrnc_init(). It must be called when
  * you stop to use this library. Then, you cannot use functions from this
- * library
+ * library anymore.
  */
 void wrnc_exit()
 {
@@ -163,7 +163,10 @@ struct wrnc_dev *wrnc_open_by_fmc(uint32_t device_id)
 /**
  * It opens a WRNC device using its Logical Unit Number. The Logical Unit Number
  * is an instance number of a particular hardware. The LUN to use is the carrier
- * one, and not the mezzanine one (if any)
+ * one, and not the mezzanine one (if any).
+ * The driver is not aware of LUNs but only of FMC-id. So, if this function does
+ * not work it means that your installation miss symbolic link that converts LUN
+ * to FMC-id.
  * @param[in] lun Logical Unit Number of the device to use
  * @return the WRNC token, NULL on error and errno is appropriately set
  */
@@ -177,7 +180,7 @@ struct wrnc_dev *wrnc_open_by_lun(unsigned int lun)
 
 
 /**
- * It closes a WRNC device opened with one of the following function:
+ * It closes a WRNC device opened with one of the following functions:
  * wrnc_open(), wrcn_open_by_lun(), wrnc_open_by_fmc()
  * @param[in] wrnc device token
  */
@@ -200,6 +203,7 @@ void wrnc_close(struct wrnc_dev *wrnc)
 
 	free(wdesc);
 }
+
 
 /**
  * Generic function that reads from a sysfs attribute
@@ -882,7 +886,7 @@ struct wrnc_msg *wrnc_slot_receive(struct wrnc_dev *wrnc, unsigned int index)
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
 int wrnc_slot_send(struct wrnc_dev *wrnc, unsigned int index,
-			  struct wrnc_msg *msg)
+		   struct wrnc_msg *msg)
 {
 	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	int n;
@@ -913,7 +917,7 @@ int wrnc_slot_send(struct wrnc_dev *wrnc, unsigned int index,
  * @return the file descriptor number, -1 if the slot is not yet opened
  */
 int wrnc_slot_fd_get(struct wrnc_dev *wrnc, unsigned int is_input,
-			    unsigned int index)
+		     unsigned int index)
 {
 	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	int *fd;
@@ -982,10 +986,14 @@ void wrnc_debug_close(struct wrnc_dbg *dbg)
 
 
 /**
- * It retrieve a message from the debug channel. It fills the buffer with a
+ * It retrieves a message from the debug channel. It fills the buffer with a
  * NULL terminated string.
+ * It is a very rare case, but it may happen that you do not receive the entire
+ * message in one shot. This may happen when the driver, or the transmission
+ * channel, is slower then the consumer (you or this function)
  * @param[in] dbg_tkn debug token
- * @param[out] buf where store incoming message
+ * @param[out] buf where store incoming message. The message it's always
+ *                 properly terminated.
  * @param[in] count maximum number of char to read (terminator included)
  * @return number of byte read on success, -1 otherwise and errno is set
  *         appropriately

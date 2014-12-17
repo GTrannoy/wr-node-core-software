@@ -24,10 +24,8 @@ static inline int wrtd_out_send_and_receive_sync(struct wrtd_desc *wrtd,
 	if (!hmq)
 		return -1;
 
-	err = wrnc_slot_send_and_receive_sync(hmq,
-					      WRTD_OUT_FD_CONTROL,
-					      msg,
-					      WRTD_DEFAULT_TIMEOUT);
+	err = wrnc_hmq_send_and_receive_sync(hmq, WRTD_OUT_FD_CONTROL, msg,
+					     WRTD_DEFAULT_TIMEOUT);
 
 	wrnc_hmq_close(hmq);
 

@@ -614,10 +614,10 @@ void wrnc_hmq_close(struct wrnc_hmq *hmq)
  * @param[in] timeout_ms maximum ms to wait for an answer
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrnc_slot_send_and_receive_sync(struct wrnc_hmq *hmq,
-				    unsigned int index_out,
-				    struct wrnc_msg *msg,
-				    unsigned int timeout_ms)
+int wrnc_hmq_send_and_receive_sync(struct wrnc_hmq *hmq,
+				   unsigned int index_out,
+				   struct wrnc_msg *msg,
+				   unsigned int timeout_ms)
 {
 	struct wrnc_msg_sync smsg;
 	int err;
@@ -815,7 +815,7 @@ int wrnc_cpu_disable(struct wrnc_dev *wrnc, unsigned int index)
  * @param[in] hmq HMQ device descriptor
  * @return a WRNC message, NULL on error and errno is set appropriately
  */
-struct wrnc_msg *wrnc_slot_receive(struct wrnc_hmq *hmq)
+struct wrnc_msg *wrnc_hmq_receive(struct wrnc_hmq *hmq)
 {
 	struct wrnc_msg *msg;
 	int n;
@@ -846,7 +846,7 @@ struct wrnc_msg *wrnc_slot_receive(struct wrnc_hmq *hmq)
  * @param[in] msg message to send
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_slot_send(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
+int wrnc_hmq_send(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
 {
 	int n;
 

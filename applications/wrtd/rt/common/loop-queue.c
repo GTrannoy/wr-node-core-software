@@ -1,3 +1,19 @@
+/*
+ * This work is part of the White Rabbit Node Core project.
+ *
+ * Copyright (C) 2013-2014 CERN (www.cern.ch)
+ * Author: Tomasz Wlostowski <tomasz.wlostowski@cern.ch>
+ *
+ * Released according to the GNU GPL, version 2 or any later version.
+ */
+
+
+/*.
+ * WR Trigger Distribution (WRTD) Firmware.
+ *
+ * loop-queue.c: Shared Memory-based Loopback queue.
+ */
+
 #include "rt.h"
 #include "wrtd-common.h"
 
@@ -20,10 +36,11 @@ void loop_queue_push(struct wrtd_trig_id *id, uint32_t seq, struct wr_timestamp 
     buf[head].seq = seq;
     buf[head].ts = *ts;
     
-    head++;
+    smem_atomic_add(&head, 1);
     
-    if(head == LOOP_QUEUE_SIZE)
-	head = 0;
+    if (head == LOOP_QUEUE_SIZE)
+	   head = 0;
+    
     count++;
 }
 
@@ -34,9 +51,10 @@ struct wrtd_trigger_entry *loop_queue_pop()
     
     struct wrtd_trigger_entry *rv = &buf[tail];
     
-    tail++;
+    smem_atomic_add(&tail, 1);
+    
     if(tail == LOOP_QUEUE_SIZE)
-	tail = 0;
+	   tail = 0;
     count--;
     
     return rv;

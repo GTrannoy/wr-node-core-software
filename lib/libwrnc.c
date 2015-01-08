@@ -634,6 +634,10 @@ int wrnc_slot_send_and_receive_sync(struct wrnc_dev *wrnc,
 	/* Copy the answer */
 	memcpy(msg, &smsg.msg, sizeof(struct wrnc_msg));
 
+	msg->error = 0;
+	msg->offset = 0;
+	msg->direction = WRNC_MSG_DIR_RECEIVE;
+
 	return 0;
 }
 
@@ -870,6 +874,10 @@ struct wrnc_msg *wrnc_slot_receive(struct wrnc_dev *wrnc, unsigned int index)
 		free(msg);
 		return NULL;
 	}
+
+	msg->error = 0;
+	msg->offset = 0;
+	msg->direction = WRNC_MSG_DIR_RECEIVE;
 
 	return msg;
 }

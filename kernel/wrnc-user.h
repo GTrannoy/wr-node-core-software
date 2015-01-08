@@ -21,6 +21,13 @@ enum wrnc_smem_modifier {
 	WRNC_SMEM_ADD, /**< on write, atomic ADD to memory content */
 };
 
+/**
+ * Messages directions
+ */
+enum wrnc_msg_direction {
+    WRNC_MSG_DIR_SEND = 0,
+    WRNC_MSG_DIR_RECEIVE = 1
+};
 
 /**
  * Messages descriptor
@@ -28,6 +35,10 @@ enum wrnc_smem_modifier {
 struct wrnc_msg {
 	uint32_t datalen; /**< payload length*/
 	uint32_t data[WRNC_MAX_PAYLOAD_SIZE]; /**< payload */
+	uint32_t max_size; /**< maximum message size for chosen slot */
+	uint32_t offset; /**< serialization/deserialization offset */
+	enum wrnc_msg_direction direction; /**< serialization direction (used by wrnc_msg_x functions) */
+	int error; /** serialization error status */
 };
 
 /**

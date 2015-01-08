@@ -20,14 +20,6 @@
 #include "rt-mqueue.h"
 #include "rt-common.h"
 
-static int debug_slot;
-
-void rt_set_debug_slot(int slot)
-{
-    debug_slot = slot;
-}
-
-
 int puts(const char *p)
 {
 	char c;

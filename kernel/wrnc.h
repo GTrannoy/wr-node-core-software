@@ -101,6 +101,8 @@ struct wrnc_dev {
 	enum wrnc_smem_modifier mod; /**< smem operation modifier */
 
 	struct dentry *dbg_dir; /**< root debug directory */
+
+	uint32_t message_sequence; /**< message sequence number */
 };
 
 /* Global data */

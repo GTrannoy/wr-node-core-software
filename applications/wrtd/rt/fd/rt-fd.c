@@ -14,7 +14,6 @@
  * rt-fd.c: real-time CPU application for the FMC Fine Delay mezzanine (Trigger Output)
  */
 
-
 #include <string.h>
 
 #include "rt.h"
@@ -22,62 +21,100 @@
 #include "hw/fd_channel_regs.h"
 #include "hash.h"
 #include "loop-queue.h"
+#include "wrtd-serializers.h"
 
+
+/* Structure describing a single pulse in the Fine Delay software output queue */
 struct pulse_queue_entry {
-    struct wrtd_trigger_entry trig;
-    int origin_cycles;
-    struct lrt_output_rule *rule;
+/* Trigger that produced the pulse */
+	struct wrtd_trigger_entry trig;
+/* Origin timestamp cycles count (for latency statistics) */
+	int origin_cycles;
+/* Rule that produced the pulse */
+	struct lrt_output_rule *rule;
 };
 
+/* Pulse FIFO for a single Fine Delay output */
 struct lrt_pulse_queue 
 {
-    struct pulse_queue_entry data[FD_MAX_QUEUE_PULSES];
-    int head, tail, count;
-};
-struct lrt_output {
-    uint32_t base_addr;
-    int index;
-    int hits;
-    int miss_timeout, miss_deadtime, miss_overflow, miss_no_timing;
-    struct wrtd_trigger_entry last_executed;
-    struct wrtd_trigger_entry last_enqueued;
-    struct wrtd_trigger_entry last_received;
-    struct wr_timestamp last_programmed;
-    struct wrtd_trigger_entry last_lost;
-	int idle;
-    int state;
-    int mode;
-    uint32_t flags;
-    uint32_t log_level;
-    int dead_time;
-    int width_cycles;
-    struct lrt_pulse_queue queue;
-    int worst_latency;
+	struct pulse_queue_entry data[FD_MAX_QUEUE_PULSES];
+	int head, tail, count;
 };
 
+/* State of a single Trigger Output */
+struct lrt_output {
+/* Base address of the corresponding Fine Delay output block */
+	uint32_t base_addr;
+/* Index of the output */
+	int index;
+/* Executed pulses counter */
+	int hits;
+/* Missed pulses counters, due to: too big latency, exceeded dead time, queue overflow (too big delay), no WR timing */
+	int miss_timeout, miss_deadtime, miss_overflow, miss_no_timing;
+/* Last executed trigger (i.e. the last one that produced a pulse at the FD output). */
+	struct wrtd_trigger_entry last_executed;
+/* Last enqueued trigger (i.e. the last one that entered the FD output queue). */
+	struct wrtd_trigger_entry last_enqueued;
+/* Last received trigger (i.e. last received packet from Etherbone). */
+	struct wrtd_trigger_entry last_received;
+/* Last timestamp value written to FD output config */
+	struct wr_timestamp last_programmed;
+/* Last timestamp value written to FD output config */
+	struct wrtd_trigger_entry last_lost;
+/* Idle flag */
+	int idle;
+/* Arm state */
+	int state;
+/* Trigger mode */
+	int mode;
+/* Flags (logging, etc) */
+	uint32_t flags;
+/* Current logging level */
+	uint32_t log_level;
+/* Dead time (8ns cycles) */
+	int dead_time;
+/* Pulse width (8ns cycles) */
+	int width_cycles;
+/* Output pulse queue */
+	struct lrt_pulse_queue queue;
+};
+
+/* A pointer/handle to a trigger rule in the hash table. Used by the host to
+   quickly access/modify a particular trigger entry */
 struct lrt_trigger_handle {
+/* Main trigger event */
 	struct lrt_hash_entry *trig;
+/* Conditional arm event */
 	struct lrt_hash_entry *cond;
+/* CPU core for which the trigger is assigned (not used for the moment) */
 	int cpu;
+/* Output channel for which the trigger is assigned */
 	int channel;
 };
 
+/* Output state array */
+struct lrt_output outputs[FD_NUM_CHANNELS];
+/* Received message counters */
+static int rx_ebone = 0, rx_loopback = 0;
+
+/* Adjusts the timestamp in-place by adding cycles/frac value */
 static inline void ts_adjust_delay(struct wr_timestamp *ts, uint32_t cycles, uint32_t frac)
 {
-    ts->frac += frac;
+	ts->frac += frac;
 
-    if (ts->frac & 0x1000)
+	if (ts->frac & 0x1000)
 		ts->ticks++;
 
-    ts->frac &= 0xfff;
-    ts->ticks += cycles;
+	ts->frac &= 0xfff;
+	ts->ticks += cycles;
 
-    if (ts->ticks >= 125000000) {
+	if (ts->ticks >= 125000000) {
 		ts->ticks -= 125000000;
 		ts->seconds++;
-    }
+	}
 }
 
+/* Initializes an empty pulse queue */
 void pulse_queue_init(struct lrt_pulse_queue *p)
 {
 	p->head = 0;
@@ -85,25 +122,31 @@ void pulse_queue_init(struct lrt_pulse_queue *p)
 	p->count = 0;
 }
 
+/* Requests a new entry in a pulse queue. Returns pointer to the ne
+   entry or NULL if the queue is full. */
 struct pulse_queue_entry *pulse_queue_push(struct lrt_pulse_queue *p)
 {
-    if (p->count == FD_MAX_QUEUE_PULSES)
+	if (p->count == FD_MAX_QUEUE_PULSES)
 		return NULL;
 
-    p->count++;
-    struct pulse_queue_entry *ent = &p->data[p->head];
-    p->head++;
-    if (p->head == FD_MAX_QUEUE_PULSES)
-	   p->head = 0;
+	struct pulse_queue_entry *ent = &p->data[p->head];
+
+	p->count++;
+	p->head++;
+
+	if (p->head == FD_MAX_QUEUE_PULSES)
+		p->head = 0;
 
 	return ent;
 }
 
+/* Returns non-0 if pulse queue p contains any pulses. */
 int pulse_queue_empty(struct lrt_pulse_queue *p)
 {
 	return (p->count == 0);
 }
 
+/* Returns the oldest entry in the pulse queue (or NULL if empty). */
 struct pulse_queue_entry* pulse_queue_front(struct lrt_pulse_queue *p)
 {
     if (!p->count)
@@ -111,158 +154,170 @@ struct pulse_queue_entry* pulse_queue_front(struct lrt_pulse_queue *p)
     return &p->data[p->tail];
 }
 
+/* Releases the oldest entry from the pulse queue. */
 void pulse_queue_pop(struct lrt_pulse_queue *p)
 {
-    p->tail++;
-    if(p->tail == FD_MAX_QUEUE_PULSES)
-	   p->tail = 0;
-    p->count--;
+	p->tail++;
+
+	if(p->tail == FD_MAX_QUEUE_PULSES)
+		p->tail = 0;
+	p->count--;
 }
 
-
-
-
+/* Checks if the timestamp of the pulse (ts) does not violate the dead time on the output out
+   by comparing it with the last processed pulse timestamp. */
 static inline int check_dead_time( struct lrt_output *out, struct wr_timestamp *ts )
 {
-    if(out->idle)
-        return 1;
+	if(out->idle)
+		return 1;
 
 	int delta_s = ts->seconds - out->last_enqueued.ts.seconds;
 	int delta_c = ts->ticks - out->last_enqueued.ts.ticks;
 
-    if(delta_c < 0) {
-        delta_c += 125 * 1000 * 1000;
-        delta_s--;
-    }
+	if(delta_c < 0) {
+		delta_c += 125 * 1000 * 1000;
+		delta_s--;
+	}
 
-    if(delta_s < 0 || delta_c < out->dead_time)
-        return 0;
-    return 1;
+	if(delta_s < 0 || delta_c < out->dead_time)
+		return 0;
+
+	return 1;
 }
 
-
-struct lrt_output outputs[FD_NUM_CHANNELS];
-static int rx_ebone = 0, rx_loopback = 0;
-
-void init_outputs()
-{
-    int i;
-
-	for (i = 0; i < FD_NUM_CHANNELS; i++) {
-		memset(&outputs[i], 0, sizeof(struct lrt_output));
-        outputs[i].base_addr = 0x100 + i * 0x100;
-        outputs[i].index = i;
-        outputs[i].idle = 1;
-        outputs[i].dead_time = 80000 / 8; // 80 us
-        outputs[i].width_cycles = 1250; // 1us
-    }
-}
-
+/* Writes to FD output registers for output (out) */
 static inline void fd_ch_writel(struct lrt_output *out, uint32_t value,
 				 uint32_t reg)
 {
 	dp_writel( value , reg + out->base_addr );
 }
 
+/* Reads from FD output registers for output (out) */
 static inline uint32_t fd_ch_readl (struct lrt_output *out,  uint32_t reg)
 {
 	return dp_readl( reg + out->base_addr );
 }
 
-void do_output( struct lrt_output *out )
+static int check_output_timeout (struct lrt_output *out)
 {
-    struct lrt_pulse_queue *q = &out->queue;
-    uint32_t dcr = fd_ch_readl(out, FD_REG_DCR);
+	struct wr_timestamp tc;
 
-    if(!out->idle) {
-        if (!(dcr & FD_DCR_PG_TRIG)) { // still waiting for trigger
-            struct wr_timestamp tc;
+	/* Read the current WR time, order is important: first seconds, then cycles (cycles
+	   get latched on reading secs register. */
+	tc.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
+	tc.ticks = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
 
-			// order is important: first seconds, then cycles (cycles
-			// get latched on reading secs regi
-            tc.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
-            tc.ticks = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
+	int delta = tc.seconds - out->last_programmed.seconds;
+	delta *= 125 * 1000 * 1000;
+	delta += tc.ticks - out->last_programmed.ticks;
 
-			int delta = tc.seconds - out->last_programmed.seconds;
-			delta *= 125000000;
-			delta += tc.ticks - out->last_programmed.ticks;
+	/* Current time exceeds FD setpoint? */
+	return (delta > 0);
+}
 
-			if (delta > 0) {
-        		pulse_queue_pop(q);
-		        out->miss_timeout ++;
+void update_latency_stats (struct pulse_queue_entry *pq_ent)
+{
+/* Read the time and calculate the latency */
+	volatile uint32_t dummy = lr_readl (WRN_CPU_LR_REG_TAI_SEC);
+	int latency = lr_readl (WRN_CPU_LR_REG_TAI_CYCLES) - pq_ent->origin_cycles;
+
+	if (latency < 0)
+		latency += 125 * 1000 * 1000;
+
+	struct lrt_output_rule *rule = pq_ent->rule;
+
+	if (latency > rule->latency_worst)
+		rule->latency_worst = latency;
+
+	if(rule->latency_avg_sum > 2000 * 1000 * 1000)
+	{
+		rule->latency_avg_sum = 0;
+		rule->latency_avg_nsamples = 0;
+	}
+
+	rule->latency_avg_sum += latency;
+	rule->latency_avg_nsamples++;
+}
+
+/* Output driving function. Reads pulses from the output queue, 
+   programs the output and updates the output statistics. */
+void do_output (struct lrt_output *out)
+{
+	struct lrt_pulse_queue *q = &out->queue;
+	uint32_t dcr = fd_ch_readl(out, FD_REG_DCR);
+
+	/* Check if the output has triggered */
+	if(!out->idle) {
+		if (!(dcr & FD_DCR_PG_TRIG)) { /* Nope, armed but still waiting for trigger */
+			if (check_output_timeout (out))
+			{
+				/* Drop the pulse */
+				pulse_queue_pop(q);
+				out->miss_timeout ++;
 				out->idle = 1;
-	        	fd_ch_writel(out, FD_DCR_MODE, FD_REG_DCR);
-	    	}
+				/* Disarm the FD output */
+				fd_ch_writel(out, FD_DCR_MODE, FD_REG_DCR);
+			}
 		} else {
-		    out->last_executed = pulse_queue_front(q)->trig;
-		    pulse_queue_pop(q);
+			out->last_executed = pulse_queue_front(q)->trig;
+			pulse_queue_pop(q);
 			out->hits++;
 			out->idle = 1;
 		}
 		return;
 	}
-    
-    if(pulse_queue_empty(q))
-        return;
+
+	/* Output is idle: check if there's something in the queue to execute */
+	if(pulse_queue_empty(q))
+        	return;
 
 	struct pulse_queue_entry *pq_ent = pulse_queue_front(q);
 	struct wr_timestamp *ts = &pq_ent->trig.ts;
 
-	// left intentionally for debugging purposes
-    gpio_set(0);
-    gpio_clear(0);
+	/* Program the output start time */
+	fd_ch_writel(out, ts->seconds, FD_REG_U_STARTL);
+	fd_ch_writel(out, ts->ticks, FD_REG_C_START);
+	fd_ch_writel(out, ts->frac, FD_REG_F_START);
 
-    fd_ch_writel(out, ts->seconds, FD_REG_U_STARTL);
-    fd_ch_writel(out, ts->ticks, FD_REG_C_START);
-    fd_ch_writel(out, ts->frac, FD_REG_F_START);
-    
-    ts->ticks += out->width_cycles;
+	/* Adjust pulse width and program the output end time */
+	ts->ticks += out->width_cycles;
 	if (ts->ticks >= 125000000) {
 		ts->ticks -= 125000000;
 		ts->seconds++;
 	}
 
-    fd_ch_writel(out, ts->seconds, FD_REG_U_ENDL);
-    fd_ch_writel(out, ts->ticks, FD_REG_C_END);
-    fd_ch_writel(out, ts->frac, FD_REG_F_END);
-    fd_ch_writel(out, 0, FD_REG_RCR);
-    fd_ch_writel(out, FD_DCR_MODE, FD_REG_DCR);
-    fd_ch_writel(out, FD_DCR_MODE | FD_DCR_UPDATE, FD_REG_DCR);
-    fd_ch_writel(out, FD_DCR_MODE | FD_DCR_PG_ARM | FD_DCR_ENABLE, FD_REG_DCR);
+	fd_ch_writel(out, ts->seconds, FD_REG_U_ENDL);
+	fd_ch_writel(out, ts->ticks, FD_REG_C_END);
+	fd_ch_writel(out, ts->frac, FD_REG_F_END);
+	fd_ch_writel(out, 0, FD_REG_RCR);
+	fd_ch_writel(out, FD_DCR_MODE, FD_REG_DCR);
+	fd_ch_writel(out, FD_DCR_MODE | FD_DCR_UPDATE, FD_REG_DCR);
+	fd_ch_writel(out, FD_DCR_MODE | FD_DCR_PG_ARM | FD_DCR_ENABLE, FD_REG_DCR);
 
-    ts->ticks += 1000;
+	ts->ticks += 1000;
 	if (ts->ticks >= 125000000) {
 		ts->ticks -= 125000000;
 		ts->seconds++;
 	}
 
-	volatile uint32_t dummy = lr_readl (WRN_CPU_LR_REG_TAI_SEC);
-	int latency = lr_readl (WRN_CPU_LR_REG_TAI_CYCLES) - pq_ent->origin_cycles;
+	/* Store the last programmed timestamp (+ some margin) and mark the output as busy */
+	out->last_programmed = *ts;
+	out->idle = 0;
 
-	if (latency < 0)
-		latency += 125000000;
-
-    if (pq_ent->rule->worst_latency < latency)
-		pq_ent->rule->worst_latency = latency;
-
-    out->last_programmed = *ts;
-    out->idle = 0;
-
-    gpio_set(0);
-    gpio_clear(0);
+	update_latency_stats (pq_ent);
 }
 
 void enqueue_trigger(int output, struct lrt_output_rule *rule,
 		       struct wrtd_trig_id *id, struct wr_timestamp *ts, int seq)
 {
-    struct lrt_output *out = &outputs[output];
-    struct wr_timestamp adjusted = *ts;
+	struct lrt_output *out = &outputs[output];
+	struct wr_timestamp adjusted = *ts;
 	struct pulse_queue_entry *pq_ent;
 
-    ts_adjust_delay (&adjusted, rule->delay_cycles, rule->delay_frac);
-
-//    if(!rule->enabled)
+//	if(!rule->enabled)
 //	return;
+
+	ts_adjust_delay (&adjusted, rule->delay_cycles, rule->delay_frac);
 
 	if (!check_dead_time(out, &adjusted)) {
 		out->miss_deadtime ++;
@@ -270,9 +325,9 @@ void enqueue_trigger(int output, struct lrt_output_rule *rule,
 	}
 
 	if ((pq_ent = pulse_queue_push (&out->queue)) == NULL) {
-        out->miss_overflow ++;
-        return;
-    }
+		out->miss_overflow ++;
+		return;
+	}
 
 	pq_ent->trig.ts = adjusted;
 	pq_ent->trig.id = *id;
@@ -283,64 +338,91 @@ void enqueue_trigger(int output, struct lrt_output_rule *rule,
 	out->last_enqueued.ts = *ts;
 	out->last_enqueued.id = *id;
 	out->last_enqueued.seq = seq;
-
-    gpio_set(0);
-    gpio_clear(0);
-
 }
 
 static inline void filter_trigger(struct wrtd_trigger_entry *trig)
 {
-    struct lrt_hash_entry *ent = hash_search (&trig->id, NULL);
-    int j;
+	struct lrt_hash_entry *ent = hash_search (&trig->id, NULL);
+	int j;
 
-    if(ent)
-    {
-        struct wr_timestamp ts = trig->ts;
-        struct wrtd_trig_id id = trig->id;
-        int seq = trig->seq;
-        for(j = 0; j < FD_NUM_CHANNELS; j++)
-	    if(ent->ocfg[j].state != HASH_ENT_EMPTY)
-    	    {
-        	gpio_set(0);
-                gpio_clear(0);
-                enqueue_trigger ( j, &ent->ocfg[j], &id, &ts, seq );
-            }
-    }
+	if(ent)
+	{
+		struct wr_timestamp ts = trig->ts;
+		struct wrtd_trig_id id = trig->id;
+		int seq = trig->seq;
+		for(j = 0; j < FD_NUM_CHANNELS; j++)
+			if(ent->ocfg[j])
+				enqueue_trigger (j, ent->ocfg[j], &id, &ts, seq);
+	}
 }
 
 void do_rx()
 {
-    if (rmq_poll( WRTD_REMOTE_IN_FD)) {
+	if (rmq_poll( WRTD_REMOTE_IN_FD)) {
 		struct wrtd_trigger_message *msg = mq_map_in_buffer (1, WRTD_REMOTE_IN_FD) - sizeof(struct rmq_message_addr);
-        int i, cnt = msg->count;
+		int i, cnt = msg->count;
 
 		for (i = 0; i < cnt; i++)
-    	    filter_trigger (&msg->triggers[i]);
+			filter_trigger (&msg->triggers[i]);
 
 		mq_discard (1, WRTD_REMOTE_IN_FD);
 		rx_ebone++;
 	}
 
 	struct wrtd_trigger_entry *ent = loop_queue_pop();
-    
-    if (ent) {
+
+	if (ent) {
 		filter_trigger (ent);
 		rx_loopback++;
-    }
-	
-    gpio_set(1);
-    gpio_clear(1);
+	}
 }
 
 void do_outputs()
 {
 	int i;
-
 	for (i = 0;i < FD_NUM_CHANNELS; i++)
 		do_output(&outputs[i]);
 }
 
+/*.
+ * WRTD Command Handlers
+ */
+
+
+/* Creates a hmq_buf serializing object for the control output slot */
+static inline struct wrnc_msg ctl_claim_out_buf()
+{
+    return hmq_msg_claim_out (WRTD_OUT_FD_CONTROL, 128);
+}
+
+/* Creates a hmq_buf deserializing object for the control input slot */
+static inline struct wrnc_msg ctl_claim_in_buf()
+{
+    return hmq_msg_claim_in (WRTD_IN_FD_CONTROL, 16);
+}
+
+
+#if 0
+/* Sends an acknowledgement reply */
+static inline void ctl_ack( uint32_t seq )
+{
+    struct wrnc_msg buf = ctl_claim_out_buf();
+    uint32_t id_ack = WRTD_REP_ACK_ID;
+
+    wrnc_msg_header (&buf, &id_ack, &seq);
+    hmq_msg_send (&buf);
+}
+
+static inline void ctl_nack( uint32_t seq, int err )
+{
+    struct wrnc_msg buf = ctl_claim_out_buf();
+    uint32_t id_nack = WRTD_REP_NACK;
+
+    wrnc_msg_header (&buf, &id_ack, &seq);
+    wrnc_msg_int32 (&buf, &err);
+    hmq_msg_send (&buf);
+}
+#endif
 
 static inline uint32_t *ctl_claim_out()
 {
@@ -357,6 +439,7 @@ static inline void ctl_ack( uint32_t seq )
 	buf[1] = seq;
 	mq_send(0, WRTD_OUT_FD_CONTROL, 2);
 }
+
 static inline void ctl_nack( uint32_t seq, int err )
 {
 	uint32_t *buf = ctl_claim_out();
@@ -366,6 +449,7 @@ static inline void ctl_nack( uint32_t seq, int err )
 	buf[2] = err;
 	mq_send(0, WRTD_OUT_FD_CONTROL, 3);
 }
+
 
 static inline void ctl_chan_assign_trigger (int seq, uint32_t *buf)
 {
@@ -467,29 +551,34 @@ static inline void ctl_read_hash(int seq, uint32_t *buf)
 
     struct lrt_hash_entry *ent = hash_get_entry (bucket, pos);
     struct lrt_hash_entry *cond = NULL;
+
+
     
     obuf[0] = WRTD_REP_HASH_ENTRY;
     obuf[1] = seq;
-    obuf[2] = ent ? 1 : 0;
+   
+    int entry_ok = ent && ent->ocfg[ch];
+    
+	obuf[2] = entry_ok;
 
-	if(ent) {
-		cond = (struct lrt_hash_entry *) ent->ocfg[ch].cond_ptr;
+	if(entry_ok) {
+		cond = (struct lrt_hash_entry *) ent->ocfg[ch]->cond_ptr;
 		obuf[9] = (uint32_t) cond;
 		obuf[10] = (uint32_t) ent;
 		if(cond) {
 			bag_id(obuf + 3, &cond->id);
-			obuf[6] = cond->ocfg[ch].delay_cycles;
-			obuf[7] = cond->ocfg[ch].delay_frac;
-			obuf[8] = (ent->ocfg[ch].state & HASH_ENT_DISABLED) | HASH_ENT_CONDITION;
+			obuf[6] = cond->ocfg[ch]->delay_cycles;
+			obuf[7] = cond->ocfg[ch]->delay_frac;
+			obuf[8] = (ent->ocfg[ch]->state & HASH_ENT_DISABLED) | HASH_ENT_CONDITION;
 			bag_id(obuf+11, &ent->id);
-			obuf[14] = ent->ocfg[ch].delay_cycles;
-			obuf[15] = ent->ocfg[ch].delay_frac;
+			obuf[14] = ent->ocfg[ch]->delay_cycles;
+			obuf[15] = ent->ocfg[ch]->delay_frac;
 			obuf[16] = HASH_ENT_CONDITIONAL;
 		} else {
 			bag_id(obuf + 3, &ent->id);
-			obuf[6] = ent->ocfg[ch].delay_cycles;
-			obuf[7] = ent->ocfg[ch].delay_frac;
-			obuf[8] = ent->ocfg[ch].state;
+			obuf[6] = ent->ocfg[ch]->delay_cycles;
+			obuf[7] = ent->ocfg[ch]->delay_frac;
+			obuf[8] = ent->ocfg[ch]->state;
 		}
 	}
 
@@ -518,8 +607,9 @@ static inline void ctl_chan_set_delay (int seq, uint32_t *buf)
     
     struct lrt_hash_entry *ent = (struct lrt_hash_entry *) buf[1];
     
-    ent->ocfg[channel].delay_cycles = buf[2];
-    ent->ocfg[channel].delay_frac = buf[3];
+	// review this!    
+    ent->ocfg[channel]->delay_cycles = buf[2];
+    ent->ocfg[channel]->delay_frac = buf[3];
 
     ctl_ack(seq);
 }
@@ -551,7 +641,7 @@ static inline void ctl_chan_get_state(int seq, uint32_t *buf)
 	obuf[23] = st->log_level;
 	obuf[24] = st->dead_time;
 	obuf[25] = st->width_cycles;
-	obuf[26] = st->worst_latency;
+//	obuf[26] = st->worst_latency;
 	obuf[27] = rx_ebone;
 	obuf[28] = rx_loopback;
 
@@ -619,7 +709,7 @@ static inline void do_control()
 	switch(cmd) {
         _CMD(WRTD_CMD_FD_CHAN_ASSIGN_TRIGGER,                ctl_chan_assign_trigger)
         _CMD(WRTD_CMD_FD_CHAN_REMOVE_TRIGGER,                ctl_chan_remove_trigger)
-        _CMD(WRTD_CMD_FD_CHAN_SET_DELAY,	                   ctl_chan_set_delay)
+        _CMD(WRTD_CMD_FD_CHAN_SET_DELAY,	              ctl_chan_set_delay)
         _CMD(WRTD_CMD_FD_READ_HASH,                 	   ctl_read_hash)
         _CMD(WRTD_CMD_FD_CHAN_SET_MODE,                      ctl_chan_set_mode)
         _CMD(WRTD_CMD_FD_CHAN_ARM,                           ctl_chan_arm)
@@ -629,41 +719,52 @@ static inline void do_control()
     }
 
     mq_discard(0, WRTD_IN_FD_CONTROL);
+
+
+}
+
+void init_outputs()
+{
+    int i;
+
+	for (i = 0; i < FD_NUM_CHANNELS; i++) {
+	memset(&outputs[i], 0, sizeof(struct lrt_output));
+        outputs[i].base_addr = 0x100 + i * 0x100;
+        outputs[i].index = i;
+        outputs[i].idle = 1;
+        outputs[i].dead_time = 80000 / 8; // 80 us
+        outputs[i].width_cycles = 1250; // 1us
+    }
 }
 
 void init() 
 {
-    hash_init();
-    init_outputs();
-}
+	hash_init();
+	init_outputs();
 
+	/* reset Fine Delay */
+	dp_writel( (0xdead << 16) | 0x0, 0x0);
+	delay(1000);
+	dp_writel( (0xdead << 16) | 0x3, 0x0);
+	delay(1000);
 
-main()
-{   
-//	rt_set_debug_slot(FD_OUT_SLOT_LOGGING);
-    init();
-
-    gpio_set(24);
-    gpio_set(25);
-    gpio_set(26);
-
-    int loops =0;    
-
-    /* reset Fine Delay */
-    dp_writel( (0xdead << 16) | 0x0, 0x0);
-    delay(1000);
-    dp_writel( (0xdead << 16) | 0x3, 0x0);
-    delay(1000);
-
-	pp_printf("RT_FD locking WR");
+	pp_printf("RT_FD locking WR\n");
 	/* Lock to white-rabbit */
 	dp_writel((1 << 1), 0xC);
 
-	pp_printf("RT_FD firmware initialized.");
+	pp_printf("RT_FD firmware initialized.\n");
+
+}
+
+int main()
+{
+	init();
 
 	for(;;) {
 		do_rx();
 		do_outputs();
 		do_control();
 	}
+
+	return 0;
 }

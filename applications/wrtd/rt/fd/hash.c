@@ -27,13 +27,22 @@ struct blockpool {
     void *pool;
 };
 
-static uint32_t hash_pool_mem [ FD_HASH_ENTRIES * sizeof(struct lrt_hash_entry) / 4 ];
-static uint16_t hash_pool_queue [ FD_HASH_ENTRIES +1 ];
-static struct blockpool hash_blockpool;
+/* a helper macro to declare a blockpool of given data type and reserve the memory
+   for storage */
+#define DECLARE_BLOCK_POOL(name, entry_type, entries_count )                            \
+    static uint32_t name##_pool_mem [ (entries_count) * (sizeof (entry_type) + 3) / 4 ];     \
+    static uint16_t name##_pool_queue [ (entries_count ) + 1];                               \
+    static struct blockpool name##_blockpool;
 
+/* Hash table entry block pool */
+DECLARE_BLOCK_POOL ( hash, struct lrt_hash_entry, FD_HASH_ENTRIES )
+/* Separate pool for output rule allocation (to save memory) */
+DECLARE_BLOCK_POOL ( rules, struct lrt_output_rule, FD_HASH_ENTRIES )
+/* The hash table itself */
 struct lrt_hash_entry* htab [ FD_HASH_ENTRIES ];
 
-void blockpool_init( struct blockpool *bp, int blk_size, int blk_count, void *data, void *queue )
+/* Initializes an empty blockpool structure */
+void blockpool_init (struct blockpool *bp, int blk_size, int blk_count, void *data, void *queue)
 {
     int i;
 
@@ -45,61 +54,69 @@ void blockpool_init( struct blockpool *bp, int blk_size, int blk_count, void *da
     bp->fq_tail = 0;
     bp->fq_count = blk_count;
 
+    /* Fill in the free queue with all available blocks */
     for(i=0;i<bp->blk_count;i++)
-	bp->fq[i] = i;
+	   bp->fq[i] = i;
 }
 
-void *blockpool_alloc( struct  blockpool *bp )
+/* Returns a new block from the blockpool bp (or null if none available) */
+void *blockpool_alloc(struct blockpool *bp)
 {
-    if(bp->fq_head == bp->fq_tail)
-    {
-	return NULL;
-    }
-
-    void *blk = bp->pool + bp->blk_size * (int)bp->fq[bp->fq_tail];
+    if (bp->fq_head == bp->fq_tail)
+       return NULL;
+    
+    void *blk = bp->pool + bp->blk_size * (int)bp->fq [bp->fq_tail];
+    
     if(bp->fq_tail == bp->blk_count)
-	bp->fq_tail = 0;
+	   bp->fq_tail = 0;
     else
-	bp->fq_tail++;
+	   bp->fq_tail++;
 
     bp->fq_count--;
-
-    
 
     return blk;
 }
 
+/* Releases a block back into the blockpool */
 void blockpool_free( struct blockpool *bp, void *ptr )
 {
     int blk_id = (ptr - bp->pool) / bp->blk_size;
-    bp->fq[bp->fq_head] = blk_id;
+    bp->fq [bp->fq_head] = blk_id;
 
     if(bp->fq_head == bp->blk_count)
-	bp->fq_head = 0;
+	    bp->fq_head = 0;
     else
-	bp->fq_head++;
-    bp->fq_count++;
+	    bp->fq_head++;
+        bp->fq_count++;
 }
 
-
+/* Initializes the hash table & blockpools */
 void hash_init()
 {
-    blockpool_init(&hash_blockpool, sizeof(struct lrt_hash_entry), FD_HASH_ENTRIES, hash_pool_mem, hash_pool_queue);
-    memset(&htab, 0, sizeof(htab) );
+    blockpool_init (&hash_blockpool, sizeof(struct lrt_hash_entry), FD_HASH_ENTRIES, hash_pool_mem, hash_pool_queue);
+    blockpool_init (&rules_blockpool, sizeof(struct lrt_output_rule), FD_HASH_ENTRIES, rules_pool_mem, rules_pool_queue);
+
+    memset (&htab, 0, sizeof (htab));
 }
 
+/* Creates an empty entry in the hash bucket (pos) */
 struct lrt_hash_entry *hash_alloc( int pos )
 {
     struct lrt_hash_entry *prev = NULL, *current = htab[pos];
-    
-    while(current)
-    {
-	prev = current;
-	current = current->next;
-    }
-	
-    current = blockpool_alloc(&hash_blockpool);
 
+    /* Is there already something @ pos? Iterate to the end
+       of the linked list if so */     
+    while (current)
+    {
+    	prev = current;
+    	current = current->next;
+    }
+
+    /* Allocate memory for new entry */
+    current = blockpool_alloc(&hash_blockpool);
+    memset(current->ocfg, 0, FD_NUM_CHANNELS * sizeof (struct lrt_output_rule *));
+
+    /* And link it to the bucket/list */
     if(!prev)
         htab[pos] = current;
     else
@@ -109,6 +126,7 @@ struct lrt_hash_entry *hash_alloc( int pos )
     return current;
 }
 
+/* Adds a new output rule for given trigger ID and output pair or overwrites an existing one. */
 struct lrt_hash_entry *hash_add ( struct wrtd_trig_id *id, int output, struct lrt_output_rule *rule )
 {
     int pos;
@@ -120,22 +138,41 @@ struct lrt_hash_entry *hash_add ( struct wrtd_trig_id *id, int output, struct lr
     if(!ent)
        return NULL;
 
-    rule->worst_latency = 0;
+    rule->latency_worst = 0;
+    rule->latency_avg_sum = 0 ;
+    rule->latency_avg_nsamples = 0 ;
+    rule->hits = 0;
+    rule->misses = 0;
 
     ent->id = *id;
-    ent->ocfg[output] = *rule;
+    
+    struct lrt_output_rule *orule = ent->ocfg[output];
+    if(orule == NULL) /* no memory allocated yet */
+    {
+        orule = blockpool_alloc(&rules_blockpool);
+        if(!orule)
+            return NULL; // should never happen as hashes are of same size
+    }
+
+    ent->ocfg[output] = orule;
+
     return ent;
 }
 
+/* Removes an output rule from the hash. */
 int hash_remove ( struct lrt_hash_entry *ent, int output )
 {
     int pos, i;
-    ent->ocfg[output].state = HASH_ENT_EMPTY;
 
+    /* release the rule */
+    blockpool_free(&rules_blockpool, ent->ocfg[output]);
+    ent->ocfg[output] = NULL;
+    
     for(i = 0; i < FD_NUM_CHANNELS; i++)
-        if(ent->ocfg[i].state != HASH_ENT_EMPTY) // the same ID is assigned to another output
+        if(ent->ocfg[i]) /* Same ID is assigned to another output? */
             return 0;
 
+    /* The ID has no longer any output associated? Remove the whole hash entry */
     if (ent == htab[pos])
         htab[pos] = ent->next;
     else {
@@ -145,25 +182,29 @@ int hash_remove ( struct lrt_hash_entry *ent, int output )
     }
 
     blockpool_free(&hash_blockpool, ent);
+
     return 0;
 }
 
+/* Returns a pos-th hash entry in given hash bucket. */
 struct lrt_hash_entry *hash_get_entry (int bucket, int pos)
 {
     int i;
-    if(bucket < 0 || bucket >= FD_HASH_ENTRIES)
-	return NULL;
+    
+    if (bucket < 0 || bucket >= FD_HASH_ENTRIES)
+	   return NULL;
 
     struct lrt_hash_entry *l = htab[bucket];
 
-    for(i = 0; l != NULL && i < pos; i++, l=l->next)
-	if(!l)
-	    return NULL;
+    for (i = 0; l != NULL && i < pos; i++, l = l->next)
+	   if (!l)
+	        return NULL;
 
     return l;
 }
 
+/* Returns the number of free hash entries */
 int hash_free_count()
 {
-    return hash_blockpool.fq_count;
+    return hash_blockpool.fq_count ;
 }

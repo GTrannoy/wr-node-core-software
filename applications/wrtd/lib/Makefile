@@ -4,15 +4,16 @@
 -include Makefile.specific
 
 WRNC ?= ../../../
+LIBTDC ?= ../fmc-tdc-sw/lib
+LIBFD ?= ../fine-delay-sw/lib
 
 LIB = libwrtd.a
 LOBJ := libwrtd-internal.o
 LOBJ += libwrtd-common.o
 LOBJ += libwrtd-input.o
 LOBJ += libwrtd-output.o
-LOBJ += $(WRNC)/lib/libwrnc.o
 
-CFLAGS += -Wall -ggdb -O2 -I. -I../include -I$(WRNC)/lib -I$(WRNC)/kernel $(EXTRACFLAGS)
+CFLAGS += -Wall -ggdb -O2 -I. -I../common -I$(WRNC)/lib -I$(WRNC)/kernel -I$(LIBFD) -I$(LIBTDC) $(EXTRACFLAGS)
 LDLIBS += -L. -lwrtd
 
 

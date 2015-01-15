@@ -18,19 +18,17 @@
 static inline int wrtd_in_send_and_receive_sync(struct wrtd_desc *wrtd,
 						struct wrnc_msg *msg)
 {
+	struct wrnc_hmq *hmq;
 	int err;
 
-	err = wrnc_hmq_open(wrtd->wrnc, WRTD_IN_TDC_CONTROL, WRNC_HMQ_INCOMING);
-	if (err)
-		return err;
+	hmq = wrnc_hmq_open(wrtd->wrnc, WRTD_IN_TDC_CONTROL, WRNC_HMQ_INCOMING);
+	if (!hmq)
+		return -1;
 
 	/* Send the message and get answer */
-        err = wrnc_slot_send_and_receive_sync(wrtd->wrnc,
-					      WRTD_IN_TDC_CONTROL,
-					      WRTD_OUT_TDC_CONTROL,
-					      msg,
-					      WRTD_DEFAULT_TIMEOUT);
-	wrnc_hmq_close(wrtd->wrnc, WRTD_IN_TDC_CONTROL, WRNC_HMQ_INCOMING);
+        err = wrnc_hmq_send_and_receive_sync(hmq, WRTD_OUT_TDC_CONTROL, msg,
+					     WRTD_DEFAULT_TIMEOUT);
+	wrnc_hmq_close(hmq);
 
 	return err;
 }
@@ -544,6 +542,8 @@ int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
 int wrtd_in_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
 		     int flags, int input_mask, int count)
 {
+
+#if 0 /* TODO to be re-implemented */
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	int remaining = count;
 	int n_read = 0;
@@ -551,7 +551,7 @@ int wrtd_in_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
 	struct wrnc_msg *msg;
 
 	while (remaining) {
-		msg = wrnc_slot_receive(wrtd->wrnc, WRTD_OUT_FD_LOGGING);
+		msg = wrnc_hmq_receive(wrtd->wrnc, WRTD_OUT_FD_LOGGING);
 		if (!msg)
 			break;
 
@@ -576,6 +576,9 @@ int wrtd_in_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
 	}
 
 	return n_read;
+#endif
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
 }
 
 

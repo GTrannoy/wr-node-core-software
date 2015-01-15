@@ -34,7 +34,7 @@ static char *wrnc_error_str[] = {
 /**
  * It returns a string messages corresponding to a given error code. If
  * it is not a libwrnc error code, it will run strerror(3)
- * @param[in] err error code
+ * @param[in] err error code. Typically 'errno' variable
  * @return a message error
  */
 char *wrnc_strerror(int err)
@@ -75,7 +75,7 @@ int wrnc_init()
 /**
  * It releases the resources allocated by wrnc_init(). It must be called when
  * you stop to use this library. Then, you cannot use functions from this
- * library
+ * library anymore.
  */
 void wrnc_exit()
 {
@@ -99,17 +99,21 @@ uint32_t wrnc_count()
 
 /**
  * It allocates and returns the list of available WRNC devices. The user is
- * in charge to free(3) the allocated memory
- * @return a list of WRNC devices
+ * in charge to free(3) the allocated memory. The list contains
+ * @link wrnc_count() @endlink + 1 elements. The last element is an
+ * emtpy string.
+ * @return a list of WRNC device's names
  */
 char (*wrnc_list())[WRNC_NAME_LEN]
 {
 	char *list;
+	int n = wrnc_count();
 
-	list = malloc((WRNC_MAX_CARRIER + 1) * WRNC_NAME_LEN);
+	list = malloc(n * WRNC_NAME_LEN);
 	if (!list)
 		return NULL;
-	memcpy(list, wrnc_dev_list, (WRNC_MAX_CARRIER + 1) * WRNC_NAME_LEN);
+	memset(list, 0, (n + 1) * WRNC_NAME_LEN); /* To se the terminator */
+	memcpy(list, wrnc_dev_list, n * WRNC_NAME_LEN);
 
 	return (char (*)[WRNC_NAME_LEN])list;
 }
@@ -135,10 +139,6 @@ struct wrnc_dev *wrnc_open(const char *device)
 	wrnc->fd_dev = -1;
 	for (i = 0; i < WRNC_MAX_CPU; ++i)
 		wrnc->fd_cpu[i] = -1;
-        for (i = 0; i < WRNC_MAX_HMQ_SLOT / 2; ++i)
-		wrnc->fd_hmq_in[i] = -1;
-        for (i = 0; i < WRNC_MAX_HMQ_SLOT / 2; ++i)
-		wrnc->fd_hmq_out[i] = -1;
 
 	return (struct wrnc_dev *)wrnc;
 }
@@ -163,7 +163,10 @@ struct wrnc_dev *wrnc_open_by_fmc(uint32_t device_id)
 /**
  * It opens a WRNC device using its Logical Unit Number. The Logical Unit Number
  * is an instance number of a particular hardware. The LUN to use is the carrier
- * one, and not the mezzanine one (if any)
+ * one, and not the mezzanine one (if any).
+ * The driver is not aware of LUNs but only of FMC-id. So, if this function does
+ * not work it means that your installation miss symbolic link that converts LUN
+ * to FMC-id.
  * @param[in] lun Logical Unit Number of the device to use
  * @return the WRNC token, NULL on error and errno is appropriately set
  */
@@ -177,7 +180,7 @@ struct wrnc_dev *wrnc_open_by_lun(unsigned int lun)
 
 
 /**
- * It closes a WRNC device opened with one of the following function:
+ * It closes a WRNC device opened with one of the following functions:
  * wrnc_open(), wrcn_open_by_lun(), wrnc_open_by_fmc()
  * @param[in] wrnc device token
  */
@@ -193,13 +196,9 @@ void wrnc_close(struct wrnc_dev *wrnc)
 		if (wdesc->fd_cpu[i] > 0)
 			close(wdesc->fd_cpu[i]);
 
-	for (i = 0; i < WRNC_MAX_HMQ_SLOT / 2; ++i)
-		wrnc_hmq_close(wrnc, i, 1);
-	for (i = 0; i < WRNC_MAX_HMQ_SLOT / 2; ++i)
-		wrnc_hmq_close(wrnc, i, 0);
-
 	free(wdesc);
 }
+
 
 /**
  * Generic function that reads from a sysfs attribute
@@ -548,86 +547,85 @@ int wrnc_cpu_dump_application_file(struct wrnc_dev *wrnc,
  * @param[in] flags HMQ flags
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrnc_hmq_open(struct wrnc_dev *wrnc, unsigned int index,
-		  unsigned long flags)
+struct wrnc_hmq *wrnc_hmq_open(struct wrnc_dev *wrnc, unsigned int index,
+			       unsigned long flags)
 {
 	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
+	struct wrnc_hmq *hmq;
 	char path[64];
-	int *fd, dir = flags & WRNC_HMQ_INCOMING;
+	int fd, dir = flags & WRNC_HMQ_INCOMING;
 
 	if (index >= WRNC_MAX_HMQ_SLOT / 2) {
 		errno = EWRNC_INVAL_SLOT;
-		return -1;
+		return NULL;
 	}
 
-	fd = dir ? wdesc->fd_hmq_in : wdesc->fd_hmq_out;
+	snprintf(path, 64, "/dev/%s-hmq-%c-%02d",
+		 wdesc->name, (dir ? 'i' : 'o'), index);
+	fd = open(path, (dir ? O_WRONLY : O_RDONLY));
+	if (fd < 0)
+		return NULL;
 
-	/* Do not open if it is already opened */
-	if (fd[index] < 0) {
-		snprintf(path, 64, "/dev/%s-hmq-%c-%02d",
-			 wdesc->name, (dir ? 'i' : 'o'), index);
-		fd[index] = open(path, (dir ? O_WRONLY : O_RDONLY));
-		if (fd[index] < 0)
-			return -1;
+	hmq = malloc(sizeof(struct wrnc_hmq));
+	if (!hmq) {
+		close(fd);
+		return NULL;
 	}
 
-	return 0;
+	hmq->wrnc = wrnc;
+	hmq->index = index;
+	hmq->flags = flags;
+	hmq->fd = fd;
+
+	return (struct wrnc_hmq *)hmq;
 }
 
 
 /**
  * It closes a HMQ slot
- * @param[in] wdesc device token
- * @param[in] index HMQ index
- * @param[in] flags HMQ flags
+ * @param[in] hmq HMQ device descriptor
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-void wrnc_hmq_close(struct wrnc_dev *wrnc, unsigned int index,
-		   unsigned long flags)
+void wrnc_hmq_close(struct wrnc_hmq *hmq)
 {
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
-	int *fd;
-
-	fd = flags & WRNC_HMQ_INCOMING ? wdesc->fd_hmq_in : wdesc->fd_hmq_out;
-	if (fd[index] > 0)
-		close(fd[index]);
+	if (hmq && hmq->fd > 0) {
+		close(hmq->fd);
+		free(hmq);
+	}
 }
 
 
 /**
  * It sends a synchronous message. The slots are uni-directional, so you must
  * specify where write the message and where the answer is expected.
- * @param[in] wrnc device token
- * @param[in] index_in index of the HMQ input slot
+ * @param[in] hmq HMQ device descriptor on the input slot
  * @param[in] index_out index of the HMQ output slot
  * @param[in,out] msg it contains the message to be sent; the answer will
  *                overwrite the message
  * @param[in] timeout_ms maximum ms to wait for an answer
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrnc_slot_send_and_receive_sync(struct wrnc_dev *wrnc,
-				    unsigned int index_in,
-				    unsigned int index_out,
-				    struct wrnc_msg *msg,
-				    unsigned int timeout_ms)
+int wrnc_hmq_send_and_receive_sync(struct wrnc_hmq *hmq,
+				   unsigned int index_out,
+				   struct wrnc_msg *msg,
+				   unsigned int timeout_ms)
 {
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	struct wrnc_msg_sync smsg;
 	int err;
 
-	if (wdesc->fd_hmq_in[index_in] < 0) {
+	if (!hmq || hmq->fd < 0) {
 		errno = EWRNC_HMQ_CLOSE;
 		return -1;
 	}
 
 	/* Build the message */
-	smsg.index_in = index_in;
+	smsg.index_in = hmq->index;
 	smsg.index_out = index_out;
 	smsg.timeout_ms = timeout_ms;
 	memcpy(&smsg.msg, msg, sizeof(struct wrnc_msg));
 
 	/* Send the message */
-	err = ioctl(wdesc->fd_hmq_in[index_in], WRNC_IOCTL_MSG_SYNC, &smsg);
+	err = ioctl(hmq->fd, WRNC_IOCTL_MSG_SYNC, &smsg);
 	if (err)
 		return -1;
 
@@ -641,46 +639,6 @@ int wrnc_slot_send_and_receive_sync(struct wrnc_dev *wrnc,
 	return 0;
 }
 
-
-/**
- * It is a wrapper of poll(2) for a wrnc slot device.
- * @param[in] wrnc device token
- * @param[in] p see poll(2), instead of the real FD use the HMQ slot index.
- *              This, in order to work only with slots' indexes.
- * @param[in] nfds see poll(2).
- * @param[in] timeout see poll(2)
- * @return see poll(2)
- */
-int wrnc_slot_poll(struct wrnc_dev *wrnc, struct pollfd *p, nfds_t nfds,
-		   int timeout)
-{
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
-	struct pollfd lp[nfds];
-	int ret, i, index;
-
-	/* Copy requested events and retrieve fd */
-	for (i = 0; i < nfds; ++i) {
-		lp[i].events = p[i].events;
-		index = p[i].fd;
-		if (p[i].events & POLLIN) {
-			lp[i].fd = wdesc->fd_hmq_out[index];
-		}
-		if (p[i].events & POLLOUT) {
-			lp[i].fd = wdesc->fd_hmq_in[index];
-		}
-	}
-
-
-
-        ret = poll(lp, nfds, timeout);
-
-	/* Copy back the return events */
-	for (i = 0; i < nfds; i++)
-		p[i].revents = lp[i].revents;
-
-
-	return ret;
-}
 
 /**
  * It opens a WRNC device
@@ -849,17 +807,15 @@ int wrnc_cpu_disable(struct wrnc_dev *wrnc, unsigned int index)
 /**
  * It allocates and returns a message from an output message queue slot.
  * The user of this function is in charge to release the memory.
- * @param[in] wrnc device to use
- * @param[in] index HMQ slot to read
+ * @param[in] hmq HMQ device descriptor
  * @return a WRNC message, NULL on error and errno is set appropriately
  */
-struct wrnc_msg *wrnc_slot_receive(struct wrnc_dev *wrnc, unsigned int index)
+struct wrnc_msg *wrnc_hmq_receive(struct wrnc_hmq *hmq)
 {
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	struct wrnc_msg *msg;
 	int n;
 
-	if (wdesc->fd_hmq_out[index] < 0) {
+	if (!hmq || hmq->fd < 0) {
 		errno = EWRNC_HMQ_CLOSE;
 		return NULL;
 	}
@@ -869,7 +825,7 @@ struct wrnc_msg *wrnc_slot_receive(struct wrnc_dev *wrnc, unsigned int index)
 		return NULL;
 
 	/* Get a message from the driver */
-	n = read(wdesc->fd_hmq_out[index], msg, sizeof(struct wrnc_msg));
+	n = read(hmq->fd, msg, sizeof(struct wrnc_msg));
 	if (n != sizeof(struct wrnc_msg)) {
 		free(msg);
 		return NULL;
@@ -885,17 +841,15 @@ struct wrnc_msg *wrnc_slot_receive(struct wrnc_dev *wrnc, unsigned int index)
 
 /**
  * It sends a message to an input message queue slot.
- * @param[in] wrnc device to use
- * @param[in] index HMQ slot to write
+ * @param[in] hmq HMQ device descriptor
+ * @param[in] msg message to send
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_slot_send(struct wrnc_dev *wrnc, unsigned int index,
-			  struct wrnc_msg *msg)
+int wrnc_hmq_send(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
 {
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	int n;
 
-	if (wdesc->fd_hmq_in[index] < 0) {
+	if (!hmq || hmq->fd < 0) {
 		errno = EWRNC_HMQ_CLOSE;
 		return -1;
 	}
@@ -905,30 +859,11 @@ int wrnc_slot_send(struct wrnc_dev *wrnc, unsigned int index,
 		return -1;
 
 	/* Get a message from the driver */
-	n = write(wdesc->fd_hmq_in[index], msg, sizeof(struct wrnc_msg));
+	n = write(hmq->fd, msg, sizeof(struct wrnc_msg));
 	if (n != sizeof(struct wrnc_msg))
 		return -1;
 
 	return 0;
-}
-
-
-/**
- * It retreives the file descriptor of a slot
- * @param[in] wrnc device token
- * @param[in] is_input direction of the slot, 1 for input, 0 for output
- * @param[in] index HMQ slot index
- * @return the file descriptor number, -1 if the slot is not yet opened
- */
-int wrnc_slot_fd_get(struct wrnc_dev *wrnc, unsigned int is_input,
-			    unsigned int index)
-{
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
-	int *fd;
-
-	fd = is_input ? wdesc->fd_hmq_in : wdesc->fd_hmq_out;
-
-	return fd[index];
 }
 
 
@@ -990,33 +925,41 @@ void wrnc_debug_close(struct wrnc_dbg *dbg)
 
 
 /**
- * It retrieve a message from the debug channel. It fills the buffer with a
+ * It retrieves a message from the debug channel. It fills the buffer with a
  * NULL terminated string.
+ * It is a very rare case, but it may happen that you do not receive the entire
+ * message in one shot. This may happen when the driver, or the transmission
+ * channel, is slower then the consumer (you or this function)
  * @param[in] dbg_tkn debug token
- * @param[out] buf where store incoming message
+ * @param[out] buf where store incoming message. The message it's always
+ *                 properly terminated.
  * @param[in] count maximum number of char to read (terminator included)
  * @return number of byte read on success, -1 otherwise and errno is set
  *         appropriately
  */
+#define N_RETRY 100
 int wrnc_debug_message_get(struct wrnc_dbg *dbg, char *buf, size_t count)
 {
-	int n = 0, real_count = 0;
+	int n = 0, real_count = 0, retry = N_RETRY;
 
 	memset(buf, 0, count);
 	do {
 		n = read(dbg->fd, buf + real_count, count - real_count);
-		if (n <= 0)
+		if (n < 0)
 		        return -1;
-
 		real_count += n;
 		/* check if the string from the CPU is shorter */
 	        if (buf[real_count - 1] == '\0')
 		        break;
 
-	} while (real_count < count);
-
-	/* Put a terminator */
-	buf[real_count - 1] = '\0';
+		/*
+		 * We are expecting a NULL terminated string, but there is
+		 * nothing to read now and the string is not terminated. Retry,
+		 * maybe we were too slow
+		 */
+		retry = (n == 0 ? retry - 1 : N_RETRY);
+	} while (real_count < count && retry > 0);
 
 	return real_count;
 }
+#undef N_RETRY

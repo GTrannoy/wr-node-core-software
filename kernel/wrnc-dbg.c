@@ -83,7 +83,7 @@ static ssize_t wrnc_dbg_read(struct file *f, char __user *buf,
 	cpu->cbuf.tail = (cpu->cbuf.tail + lcount) & (dbg_max_msg - 1);
 	spin_unlock(&cpu->lock);
 
-	return count;
+	return lcount;
 }
 
 static unsigned int wrnc_dbg_poll(struct file *f, struct poll_table_struct *w)

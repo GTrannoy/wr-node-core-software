@@ -60,6 +60,7 @@ struct wrtd_input_state {
     struct wr_timestamp dead_time;
     struct wr_timestamp delay;
     struct wr_timestamp last;
+    struct wr_timestamp tdc_timebase_offset;
 };
 
 struct wrtd_output_trigger_state {
@@ -70,7 +71,10 @@ struct wrtd_output_trigger_state {
     struct wr_timestamp delay_trig;
     struct wr_timestamp delay_cond;
     struct wrtd_trigger_handle handle;
-    int worst_latency_us;
+    int latency_worst_us;
+    int latency_average_us;
+    int executed;
+    int missed;
 };
 
 struct wrtd_output_state {
@@ -80,17 +84,19 @@ struct wrtd_output_state {
     uint32_t missed_pulses_late;
     uint32_t missed_pulses_deadtime;
     uint32_t missed_pulses_overflow;
+    uint32_t missed_pulses_no_timing;
 
     struct wrtd_trigger_entry last_executed;
-    struct wrtd_trigger_entry last_programmed;
+    struct wrtd_trigger_entry last_received;
     struct wrtd_trigger_entry last_enqueued;
+    struct wrtd_trigger_entry last_lost;
 
     uint32_t flags;           ///> enum list_io_flags
     uint32_t log_level;       ///> enum list_log_level
     int mode;
     uint32_t dead_time;
     uint32_t pulse_width;
-    struct wr_timestamp worst_rx_delay;
+
     uint32_t rx_packets;
     uint32_t rx_loopback;
 };

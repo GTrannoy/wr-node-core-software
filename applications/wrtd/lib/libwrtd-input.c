@@ -10,6 +10,7 @@
 #include <libwrnc.h>
 #include "libwrtd-internal.h"
 
+#include "wrtd-serializers.h"
 
 /**
  * Internal helper to send and recevie synchronous messages to/from the TDC
@@ -58,10 +59,12 @@ int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 		      struct wrtd_input_state *state)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg;
+	struct wrnc_msg msg = wrnc_msg_init (16);
 	int err;
+	uint32_t id, seq = 0;
+	uint32_t dead_time_cycles;
 
-  	if (input >= WRTD_IN_MAX) {
+	if (input >= WRTD_IN_MAX) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -72,41 +75,50 @@ int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 	}
 
 	/* Build the message */
-	msg.datalen = 3;
-	msg.data[0] = WRTD_CMD_TDC_CHAN_GET_STATE;
-	msg.data[1] = 0;
-	msg.data[2] = input;
+	id = WRTD_CMD_TDC_CHAN_GET_STATE;
+	wrnc_msg_header (&msg, &id, &seq);
+        wrnc_msg_uint32 (&msg, &input);
+
 
 	/* Send the message and get answer */
 	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
-        if (err || msg.datalen != 29 || msg.data[0] != WRTD_REP_STATE) {
+        if (err) {
 		errno = EWRTD_INVALD_ANSWER_STATE;
 		return -1;
 	}
 
-	/* Copy status information */
-	state->input = input;
-	state->flags = msg.data[15];
-	state->log_level = msg.data[16];
-	state->mode = msg.data[17];
-	state->tagged_pulses = msg.data[18];
-	state->sent_triggers = msg.data[19];
+	/* Deserialize and check the answer */
+	wrnc_msg_header(&msg, &id, &seq);
+
+	if(id != WRTD_REP_STATE)
+	{
+		errno = EWRTD_INVALD_ANSWER_STATE;
+		return -1;
+	}
+
+	wrnc_msg_int32		(&msg, &state->input);
+	wrtd_msg_trig_id   	(&msg, &state->assigned_id);
+	wrtd_msg_timestamp 	(&msg, &state->delay);
+	wrtd_msg_timestamp 	(&msg, &state->tdc_timebase_offset);
+	wrtd_msg_timestamp 	(&msg, &state->last_sent.ts);
+	wrnc_msg_uint32    	(&msg, &state->flags);
+	wrnc_msg_uint32    	(&msg, &state->log_level);
+	wrnc_msg_int32 	   	(&msg, (int *) &state->mode);
+	wrnc_msg_uint32 	(&msg, &state->tagged_pulses);
+	wrnc_msg_uint32 	(&msg, &state->sent_triggers);
+	wrnc_msg_uint32 	(&msg, &dead_time_cycles);
+	wrtd_msg_trigger_entry 	(&msg, &state->last_sent);
+	wrnc_msg_uint32 	(&msg, &state->sent_packets);
+
 	state->dead_time.seconds = 0;
 	state->dead_time.frac = 0;
-	state->dead_time.ticks = msg.data[20] * 2;
+	state->dead_time.ticks = dead_time_cycles * 2;
 
-	state->assigned_id.system = msg.data[3];
-	state->assigned_id.source_port = msg.data[4];
-	state->assigned_id.trigger = msg.data[5];
-
-	unbag_ts(msg.data, 6, &state->delay);
-	unbag_ts(msg.data, 12, &state->last);
-	unbag_ts(msg.data, 21, &state->last_sent.ts);
-	state->last_sent.id.system = msg.data[24];
-	state->last_sent.id.source_port = msg.data[25];
-	state->last_sent.id.trigger = msg.data[26];
-	state->last_sent.seq = msg.data[27];
-	state->sent_packets = msg.data[28];
+	/* Check for deserialization errors (buffer underflow/overflow) */
+	if ( wrnc_msg_check_error(&msg) ) {
+		errno = EWRTD_INVALD_ANSWER_STATE;
+		return -1;
+	}
 
 	return 0;
 }

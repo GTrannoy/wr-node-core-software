@@ -40,17 +40,17 @@ static void dump_output_state(struct wrtd_output_state *state)
 {
 	char tmp[1024], tmp2[1024];
 
-/*    if(! (state->flags & LIST_ENABLED))
-      {
-        printf("Channel %d: disabled\n", state->input );
-        return;
-    }*/
+	if(! (state->flags & WRTD_ENABLED))
+        {
+		printf("Channel %d: disabled\n", state->output);
+    		return;
+	}
 
-//    decode_flags(tmp,state->flags);
+	decode_flags(tmp, state->flags);
 	printf("Output %d state:\n", state->output);
-//    printf(" - Flags:                 %s\n", tmp);
-//    decode_mode(tmp,state->mode);
-//    printf(" - Mode:                  %s\n", tmp    );
+    	printf(" - Flags:                 %s\n", tmp);
+	decode_mode(tmp, state->mode);
+	printf(" - Mode:                  %s\n", tmp);
 	printf(" - Executed pulses:           %-10d\n",
 		       state->executed_pulses);
 	printf(" - Missed pulses (latency):   %-10d\n",
@@ -59,23 +59,31 @@ static void dump_output_state(struct wrtd_output_state *state)
 		       state->missed_pulses_deadtime);
 	printf(" - Missed pulses (overflow):  %-10d\n",
 		       state->missed_pulses_overflow);
+	printf(" - Missed pulses (no WR timing):  %-10d\n",
+		       state->missed_pulses_no_timing);
+
 	format_ts(tmp, state->last_executed.ts, 1);
 	format_id(tmp2, state->last_executed.id);
 	printf(" - Last executed trigger:     %s, ID: %s, SeqNo %d\n",
 		       tmp, tmp2, state->last_executed.seq);
 
-	format_ts(tmp, state->last_programmed.ts, 1);
-	format_id(tmp2, state->last_programmed.id);
-	printf(" - Last pgm	     trigger:     %s, ID: %s, SeqNo %d\n",
-		       tmp, tmp2, state->last_programmed.seq);
-
 	format_ts(tmp, state->last_enqueued.ts, 1);
 	format_id(tmp2, state->last_enqueued.id);
-	printf(" - Last enq	     trigger:     %s, ID: %s, SeqNo %d\n",
+	printf(" - Last enqueued trigger:     %s, ID: %s, SeqNo %d\n",
 		       tmp, tmp2, state->last_enqueued.seq);
 
-	/*printf(" - Total RX packets:          %-10d\n",
-	  state->total_rx_packets);*/
+	format_ts(tmp, state->last_received.ts, 1);
+	format_id(tmp2, state->last_received.id);
+	printf(" - Last received trigger:     %s, ID: %s, SeqNo %d\n",
+		       tmp, tmp2, state->last_received.seq);
+
+	format_ts(tmp, state->last_lost.ts, 1);
+	format_id(tmp2, state->last_lost.id);
+	printf(" - Last missed/lost trigger:  %s, ID: %s, SeqNo %d\n",
+		       tmp, tmp2, state->last_lost.seq);
+
+	printf(" - Total RX messages:          %-10d\n", state->rx_packets);
+	printf(" - Total loopback messages:    %-10d\n", state->rx_loopback);
 
 }
 

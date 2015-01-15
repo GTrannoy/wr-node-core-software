@@ -113,7 +113,7 @@ void dump_input_state(struct wrtd_input_state *state)
 		       tmp, tmp2, state->last_sent.seq);
 	}
 
-	printf(" - Dead time:             %" PRIu64 "ld ns\n",
+	printf(" - Dead time:             %" PRIu64 " ns\n",
 	       ts_to_picos( state->dead_time ) / 1000 );
 
 	decode_log_level(tmp,state->log_level);
@@ -243,7 +243,7 @@ static int wrtd_cmd_sw_trigger(struct wrtd_node *wrtd, int input,
 	int ret;
 
 	if (argc != 1 || argv[0] == NULL) {
-		fprintf(stderr, "Missing deadtime value\n");
+		fprintf(stderr, "Missing ID value.\n");
 		return -1;
 	}
 

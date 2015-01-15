@@ -26,8 +26,6 @@
 static inline int _wrnc_msg_check_buffer( struct wrnc_msg *buf, int n_words )
 {
 #ifndef WRNODE_RT
-    printf("n_words %d datalenm %d maxsize %d err %d\n", n_words, buf->datalen, buf->max_size, buf->error);
-#endif
     if(buf->error) 
 	return -1;
 
@@ -46,6 +44,7 @@ static inline int _wrnc_msg_check_buffer( struct wrnc_msg *buf, int n_words )
 	buf->error = 1;
 	return -1;
     }
+#endif
 
     return 0;
 }
@@ -67,10 +66,34 @@ static inline int wrnc_msg_int32 ( struct wrnc_msg *buf, int *value )
     return 0;
 }
 
+
+static inline int wrnc_msg_int16 ( struct wrnc_msg *buf, int16_t *value )
+{
+    if ( _wrnc_msg_check_buffer ( buf, 1 ) < 0 )
+	return -1;
+
+    if (buf->direction == WRNC_MSG_DIR_SEND)
+    {
+	buf->data[buf->datalen] = *value;
+	buf->datalen++;
+    } else {
+	*value = (int16_t) buf->data[buf->offset];
+	buf->offset++;
+    }
+
+    return 0;
+}
+
 static inline int wrnc_msg_uint32 ( struct wrnc_msg *buf, uint32_t *value )
 {
     return wrnc_msg_int32( buf, (int *) value);
 }
+
+static inline int wrnc_msg_uint16 ( struct wrnc_msg *buf, uint16_t *value )
+{
+    return wrnc_msg_int16( buf, (int16_t *) value);
+}
+
 
 static inline int wrnc_msg_header ( struct wrnc_msg *buf, uint32_t *id, uint32_t *seq_no )
 {

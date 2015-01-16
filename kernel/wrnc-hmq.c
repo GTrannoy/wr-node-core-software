@@ -123,12 +123,16 @@ static int wrnc_hmq_simple_open(struct inode *inode, struct file *file)
 /**
  * It writes message in the drive message queue. The messages will be sent on
  * IRQ signal
- * @TODO to be done!
+ * @TODO to be tested! WRTD is using only sync messages
  */
 static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 			      size_t count, loff_t *offp)
 {
 	struct wrnc_hmq *hmq = f->private_data;
+	struct wrnc_msg_element *msgel;
+	unsigned int i, n, free_slot;
+	char *curbuf = buf;
+	int err = 0;
 
 	if (!(hmq->flags & WRNC_FLAG_HMQ_DIR)) {
 		dev_err(&hmq->dev, "cannot write on an output queue\n");
@@ -140,8 +144,61 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 		return -EINVAL;
 	}
 
-	/* TODO ... */
-	return count;
+	if (hmq->count >= hmq_max_msg) {
+		return -EBUSY;
+	}
+
+	/* Get number of free slots */
+	n = count / sizeof(struct wrnc_msg);
+	free_slot = hmq_max_msg - hmq->count;
+	n = free_slot < n ? free_slot : n;
+
+	/* Write all the messages */
+	count = 0;
+	mutex_lock(&hmq->mtx);
+	for (i = 0; i < n; i++, curbuf += sizeof(struct wrnc_msg)) {
+		/* Allocate and fill message structure */
+		msgel = kmalloc(sizeof(struct wrnc_msg_element), GFP_KERNEL);
+		if (msgel) {
+			err = -ENOMEM;
+			break;
+		}
+
+		msgel->msg = kmalloc(sizeof(struct wrnc_msg), GFP_KERNEL);
+		if (!msgel->msg) {
+			kfree(msgel);
+			err = -ENOMEM;
+			break;
+		}
+
+		if (copy_from_user(msgel->msg, curbuf, sizeof(struct wrnc_msg))) {
+			kfree(msgel->msg);
+			kfree(msgel);
+			err = -EFAULT;
+			break;
+		}
+
+		spin_lock(&hmq->lock);
+		list_add_tail(&msgel->list, &hmq->list_msg);
+		hmq->count++;
+		spin_unlock(&hmq->lock);
+	}
+	mutex_unlock(&hmq->mtx);
+
+	/* Update counter */
+	count = i * sizeof(struct wrnc_msg);
+	*offp += count;
+
+	/*
+	 * If `count` is not 0, it means that we saved at least one message, even
+	 * if we got an error on the second message. So, in this case notifiy the
+	 * user space about how many messages where stored and ignore errors.
+	 * Return the error only when we did not save any message.
+	 *
+	 * I choosed this solution because we do not have any dangerous error here,
+	 * and it simplify the code.
+	 */
+	return count ? count : err;
 }
 
 /**

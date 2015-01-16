@@ -9,7 +9,7 @@ LIBTDC ?= ../fmc-tdc-sw/lib
 LIBFD ?= ../fine-delay-sw/lib
 WRNC ?= ../../../
 
-CFLAGS += -Wall -ggdb -I. -I../common -I$(WRNC)/lib -I$(WRNC)/kernel -I../lib $(EXTRACFLAGS)
+CFLAGS += -Wall -ggdb -I. -I../include -I$(WRNC)/lib -I$(WRNC)/kernel -I../lib $(EXTRACFLAGS)
 LDLIBS += -L$(LIBFD) -lfdelay -L$(LIBTDC) -lfmctdc -L../lib -lwrtd -L$(WRNC)/lib -lwrnc
 
 PROGS := wrtd-boot

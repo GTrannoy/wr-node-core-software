@@ -90,7 +90,7 @@ static int wrtd_out_trig_get(struct wrtd_node *dev, unsigned int output,
 	trigger->delay_trig.ticks = msg.data[6];
 	trigger->delay_trig.frac = msg.data[7];
 	trigger->is_conditional = 0;
-	trigger->worst_latency_us = (msg.data[17] + 124) / 125;
+	trigger->latency_worst_us = (msg.data[17] + 124) / 125;
 
 	if(msg.data[9]) { /* condition assigned? */
 		trigger->is_conditional = 1;

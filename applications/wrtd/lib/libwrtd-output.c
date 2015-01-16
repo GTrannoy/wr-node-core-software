@@ -162,7 +162,6 @@ int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 
 	unbag_ts(msg.data, 10, &state->last_executed.ts);
 	unbag_ts(msg.data, 13, &state->last_enqueued.ts);
-	unbag_ts(msg.data, 16, &state->last_programmed.ts);
 
 	return 0;
 }

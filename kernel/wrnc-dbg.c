@@ -90,7 +90,7 @@ static unsigned int wrnc_dbg_poll(struct file *f, struct poll_table_struct *w)
 {
 	struct wrnc_cpu *cpu = f->private_data;
 
-	dev_dbg(&cpu->dev, "%s  head=%d, tail=%d\n",
+	dev_dbg(&cpu->dev, "%s  head=%d, tail=%d\n", __func__,
 		cpu->cbuf.head, cpu->cbuf.tail);
 	if (CIRC_CNT(cpu->cbuf.head, cpu->cbuf.tail, dbg_max_msg))
 		return POLLIN | POLLRDNORM;

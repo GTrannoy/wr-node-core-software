@@ -237,7 +237,7 @@ static int wrnc_retr_message(struct wrnc_hmq *hmq, uint32_t sequence,
  */
 static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 {
-	struct wrnc_msg_element *msgel;
+	struct wrnc_msg_element *msgel = NULL;
 	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
 	struct wrnc_msg_sync msg;
 	struct wrnc_hmq *hmq_out;

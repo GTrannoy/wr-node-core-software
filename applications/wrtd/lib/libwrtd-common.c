@@ -10,8 +10,8 @@
 #include <errno.h>
 #include <libwrnc.h>
 #include <libwrtd-internal.h>
-#include <fmctdc-lib.h>
-#include <fdelay-lib.h>
+//#include <fmctdc-lib.h>
+//#include <fdelay-lib.h>
 
 static const uint32_t application_id[] = {
 	0x115790de,
@@ -19,15 +19,17 @@ static const uint32_t application_id[] = {
 
 const char *wrtd_errors[] = {
 	"Received an invalid answer from white-rabbit-node-code CPU",
-	"Cannot read channel state",
+	"Cannot read channel/trigger state",
 	"You are using an invalid binary",
 	"Invalid dead time value",
+	"Invalid delay value",
 	"Invalid trigger identifier",
 	"Invalid channel number",
 	"Function not yet implemented",
-	"Received an invalid answer from trigger",
-	"Received an invalid answer from HASH",
-	"Received an invalid HASH content",
+	"Received an invalid trigger entry",
+	"Received an invalid hash entry",
+	"Received an invalid hash chain",
+	"Received an invalid trigger handle",
 };
 
 
@@ -39,10 +41,10 @@ const char *wrtd_errors[] = {
  */
 const char *wrtd_strerror(int err)
 {
-	if (err < EWRTD_INVALD_ANSWER_ACK || err >= __EWRTD_MAX_ERROR_NUMBER)
+	if (err < EWRTD_INVALID_ANSWER_ACK || err >= __EWRTD_MAX_ERROR_NUMBER)
 		return wrnc_strerror(err);
 
-	return wrtd_errors[err - EWRTD_INVALD_ANSWER_ACK];
+	return wrtd_errors[err - EWRTD_INVALID_ANSWER_ACK];
 }
 
 
@@ -161,6 +163,8 @@ struct wrnc_dev *wrtd_get_wrnc_dev(struct wrtd_node *dev)
 }
 
 
+#if 0
+
 /**
  * It synchronize the mezzanines with the white rabbit network
  * @param[in] dev device token
@@ -246,6 +250,8 @@ out_fd:
 	return -1;
 }
 
+#endif
+
 /**
  * It loads a set of real-time applications for TDC and FD
  * @param[in] dev device token
@@ -260,7 +266,7 @@ int wrtd_load_application(struct wrtd_node *dev, char *rt_tdc,
 	int err;
 
 	if (!rt_tdc || !rt_fd) {
-		errno = EWRTD_INVALD_BINARY;
+		errno = EWRTD_INVALID_BINARY;
 		return -1;
 	}
 	err = wrnc_cpu_reset_get(wrtd->wrnc, &reg_old);

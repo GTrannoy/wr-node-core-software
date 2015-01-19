@@ -153,7 +153,8 @@ struct lrt_hash_entry *hash_add ( struct wrtd_trig_id *id, int output, struct lr
         if(!orule)
             return NULL; // should never happen as hashes are of same size
     }
-
+    
+    memcpy(orule, rule, sizeof(struct lrt_output_rule));
     ent->ocfg[output] = orule;
 
     return ent;

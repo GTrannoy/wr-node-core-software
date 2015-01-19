@@ -75,13 +75,13 @@ int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 	/* Build the message */
 	id = WRTD_CMD_TDC_CHAN_GET_STATE;
 	wrnc_msg_header (&msg, &id, &seq);
-        wrnc_msg_uint32 (&msg, &input);
+   	wrnc_msg_uint32 (&msg, &input);
 
 
 	/* Send the message and get answer */
 	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
         if (err) {
-		errno = EWRTD_INVALD_ANSWER_STATE;
+		errno = EWRTD_INVALID_ANSWER_STATE;
 		return -1;
 	}
 
@@ -90,7 +90,7 @@ int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 
 	if(id != WRTD_REP_STATE)
 	{
-		errno = EWRTD_INVALD_ANSWER_STATE;
+		errno = EWRTD_INVALID_ANSWER_STATE;
 		return -1;
 	}
 
@@ -98,7 +98,7 @@ int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 	wrtd_msg_trig_id   	(&msg, &state->assigned_id);
 	wrtd_msg_timestamp 	(&msg, &state->delay);
 	wrtd_msg_timestamp 	(&msg, &state->tdc_timebase_offset);
-	wrtd_msg_timestamp 	(&msg, &state->last_sent.ts);
+	wrtd_msg_timestamp 	(&msg, &state->last_tagged_pulse);
 	wrnc_msg_uint32    	(&msg, &state->flags);
 	wrnc_msg_uint32    	(&msg, &state->log_level);
 	wrnc_msg_int32 	   	(&msg, (int *) &state->mode);
@@ -114,7 +114,7 @@ int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 
 	/* Check for deserialization errors (buffer underflow/overflow) */
 	if ( wrnc_msg_check_error(&msg) ) {
-		errno = EWRTD_INVALD_ANSWER_STATE;
+		errno = EWRTD_INVALID_ANSWER_STATE;
 		return -1;
 	}
 
@@ -359,7 +359,7 @@ int wrtd_in_dead_time_set(struct wrtd_node *dev, unsigned int input,
 	/* Convert dead-times in cycles/ticks */
 	dead_time_cycles = dead_time_ps / 16000;
 	if(dead_time_cycles < 5000 || dead_time_cycles > 10000000 ) {
-		errno = EWRTD_INVALD_DEAD_TIME;
+		errno = EWRTD_INVALID_DEAD_TIME;
 		return -1;
 	}
 

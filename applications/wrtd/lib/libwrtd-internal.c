@@ -19,7 +19,7 @@
 int wrtd_validate_acknowledge(struct wrnc_msg *msg)
 {
 	if (msg->datalen != 2 || msg->data[0] != WRTD_REP_ACK_ID) {
-		errno = EWRTD_INVALD_ANSWER_ACK;
+		errno = EWRTD_INVALID_ANSWER_ACK;
 		return -1;
 	}
 

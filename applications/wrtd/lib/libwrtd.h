@@ -16,25 +16,22 @@ struct wrtd_node;
 
 #define WRTD_DEFAULT_TIMEOUT	1000
 
-/*
- * FIXME Structure are not documented because tehy depends on the RT
- * applications and I'm waiting for their final version
- */
-
 /**
  * White Rabbit Trigger Distribution errors
  */
 enum wrtd_error_list {
-	EWRTD_INVALD_ANSWER_ACK = 3276,
-	EWRTD_INVALD_ANSWER_STATE,
-	EWRTD_INVALD_BINARY,
-	EWRTD_INVALD_DEAD_TIME,
+	EWRTD_INVALID_ANSWER_ACK = 3276,
+	EWRTD_INVALID_ANSWER_STATE,
+	EWRTD_INVALID_BINARY,
+	EWRTD_INVALID_DEAD_TIME,
+	EWRTD_INVALID_DELAY,
 	EWRTD_INVALID_TRIG_ID,
 	EWRTD_INVALID_CHANNEL,
 	EWRTD_NO_IMPLEMENTATION,
-	EWRTD_INVALD_ANSWER_TRIG,
-	EWRTD_INVALD_ANSWER_HASH,
-	EWRTD_INVALD_ANSWER_HASH_CONT,
+	EWRTD_INVALID_ANSWER_TRIG,
+	EWRTD_INVALID_ANSWER_HASH,
+	EWRTD_INVALID_ANSWER_HASH_CONT,
+	EWRTD_INVALID_ANSWER_HANDLE,
 	__EWRTD_MAX_ERROR_NUMBER,
 };
 
@@ -59,7 +56,7 @@ struct wrtd_input_state {
     struct wrtd_trig_id assigned_id;
     struct wr_timestamp dead_time;
     struct wr_timestamp delay;
-    struct wr_timestamp last;
+    struct wr_timestamp last_tagged_pulse;
     struct wr_timestamp tdc_timebase_offset;
 };
 
@@ -73,8 +70,8 @@ struct wrtd_output_trigger_state {
     struct wrtd_trigger_handle handle;
     int latency_worst_us;
     int latency_average_us;
-    int executed;
-    int missed;
+    uint32_t executed_pulses;
+    uint32_t missed_pulses;
 };
 
 struct wrtd_output_state {
@@ -94,11 +91,11 @@ struct wrtd_output_state {
     uint32_t flags;           ///> enum list_io_flags
     uint32_t log_level;       ///> enum list_log_level
     int mode;
-    uint32_t dead_time;
-    uint32_t pulse_width;
-
-    uint32_t rx_packets;
-    uint32_t rx_loopback;
+    struct wr_timestamp dead_time;
+    struct wr_timestamp pulse_width;
+    
+    uint32_t received_messages;
+    uint32_t received_loopback;
 };
 
 /**
@@ -157,7 +154,7 @@ extern int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 			     struct wrtd_output_state *state);
 extern int wrtd_out_enable(struct wrtd_node *dev, unsigned int output,
 			   int enable);
-extern int wrtd_out_trig_assign(struct wrtd_node *dev, int output,
+extern int wrtd_out_trig_assign(struct wrtd_node *dev, unsigned int output,
 				struct wrtd_trigger_handle *handle,
 				struct wrtd_trig_id *trig,
 				struct wrtd_trig_id *condition);

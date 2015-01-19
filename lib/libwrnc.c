@@ -887,6 +887,29 @@ int wrnc_hmq_send(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
 
 
 /**
+ * It adds a new filter to the given hmq descriptor
+ * @param[in] hmq HMQ device descriptor
+ * @param[in] filter filter to add
+ * @return 0 on success, -1 otherwise and errno is set appropriately
+ */
+int wrnc_hmq_filter_add(struct wrnc_hmq *hmq, struct wrnc_msg_filter *filter)
+{
+	return ioctl(hmq->fd, WRNC_IOCTL_MSG_FILTER_ADD, filter);
+}
+
+
+/**
+ * It removes all filters from the given hmq descriptor
+ * @param[in] hmq HMQ device descriptor
+ * @return 0 on success, -1 otherwise and errno is set appropriately
+ */
+int wrnc_hmq_filter_clean(struct wrnc_hmq *hmq)
+{
+	return ioctl(hmq->fd, WRNC_IOCTL_MSG_FILTER_CLEAN, NULL);
+}
+
+
+/**
  * It returns the name of the device
  * @param[in] wrnc device token
  * @return the string representing the name of the device

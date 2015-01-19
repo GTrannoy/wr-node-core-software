@@ -147,20 +147,16 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 /**
  * It writes a message to a FPGA HMQ
  */
-static uint32_t wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
+static void wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
 {
 	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
 	unsigned long flags;
-	uint32_t seq;
 	int i;
 
 	spin_lock_irqsave(&hmq->lock, flags);
 	/* Get the slot in order to write into it */
 	fmc_writel(fmc, MQUEUE_CMD_CLAIM, hmq->base_sr + MQUEUE_SLOT_COMMAND);
-	seq = ++wrnc->message_sequence;
-	/* Assign a sequence number to the message */
-	msg->data[1] = seq;
 	/* Write data into the slot */
 	for (i = 0; i < msg->datalen; ++i) {
 		fmc_writel(fmc, msg->data[i],
@@ -169,8 +165,6 @@ static uint32_t wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
 	/* The slot is ready to be sent to the CPU */
 	fmc_writel(fmc, MQUEUE_CMD_READY, hmq->base_sr + MQUEUE_SLOT_COMMAND);
 	spin_unlock_irqrestore(&hmq->lock, flags);
-
-	return seq;
 }
 
 /**
@@ -207,31 +201,6 @@ static struct wrnc_msg *wrnc_message_pop(struct wrnc_hmq *hmq)
 	return msg;
 }
 
-
-/**
- * Look for a particular message
- */
-static int wrnc_retr_message(struct wrnc_hmq *hmq, uint32_t sequence,
-			    struct wrnc_msg_element *msg_out)
-{
-	struct wrnc_msg_element *tmp;
-	int found = 0;
-
-	spin_lock(&hmq->lock);
-	list_for_each_entry_safe(msg_out, tmp, &hmq->list_msg, list) {
-		if (msg_out->msg->data[1] == sequence) {
-			/* We found the message, return it */
-			list_del(&msg_out->list);
-			hmq->count--;
-			found = 1;  /* found */
-			break;
-		}
-	}
-	spin_unlock(&hmq->lock);
-
-	return found;  /* not found */
-}
-
 /**
  * Send a message and wait for the answer
  */
@@ -241,7 +210,6 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
 	struct wrnc_msg_sync msg;
 	struct wrnc_hmq *hmq_out;
-	uint32_t seq;
 	int err = 0, to;
 
 	/* Copy the message from user space*/
@@ -259,16 +227,37 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 		return -EINVAL;
 	}
 	hmq_out = &wrnc->hmq_out[msg.index_out];
+	/*
+	 * Wait until the message queue is empty so we can safely enqueue
+	 * the synchronous message. Get the mutex to avoid other process
+	 * to write while we are waiting to empty the list.
+	 * Sync messages does not have higher priority than the others, so
+	 * we'll wait here until is our turn
+	 */
+	mutex_lock(&hmq->mtx);
+	to = wait_event_interruptible(hmq->q_msg, list_empty(&hmq->list_msg));
+	if (unlikely(to < 0))
+		goto out;
+
+	/*
+	 * Wait for the CPU-out queue is empty. Then get the mutex to avoid
+	 * other processes to read our synchronous answer
+	 */
+	to = wait_event_interruptible(hmq_out->q_msg,
+				      list_empty(&hmq_out->list_msg));
+	if (unlikely(to < 0))
+		goto out;
+	mutex_lock(&hmq_out->mtx);
 
 	/* Send the message */
-	seq = wrnc_message_push(hmq, &msg.msg);
+	wrnc_message_push(hmq, &msg.msg);
 
 	/*
 	 * Wait our synchronous answer. If after 1000ms we don't receive
 	 * an answer, something is seriously broken
 	 */
 	to = wait_event_interruptible_timeout(hmq_out->q_msg,
-					      wrnc_retr_message(hmq_out, seq, msgel),
+					      !list_empty(&hmq_out->list_msg),
 					      msecs_to_jiffies(1000));
 	if (unlikely(to <= 0)) {
 		if (to == 0)
@@ -277,6 +266,13 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 		memset(&msg.msg, 0, sizeof(struct wrnc_msg));
 		goto out_sync;
 	}
+	/* We have at least one message in the buffer, return it */
+	spin_lock(&hmq_out->lock);
+	msgel = list_entry(hmq_out->list_msg.next,
+			   struct wrnc_msg_element, list);
+	list_del(&msgel->list);
+	hmq_out->count--;
+	spin_unlock(&hmq_out->lock);
 
 	/* Copy the answer message back to user space */
 	memcpy(&msg.msg, msgel->msg, sizeof(struct wrnc_msg));
@@ -284,6 +280,10 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	kfree(msgel);
 
 out_sync:
+	mutex_unlock(&hmq_out->mtx);
+out:
+	mutex_unlock(&hmq->mtx);
+
 	return copy_to_user(uarg, &msg, sizeof(struct wrnc_msg_sync));
 }
 

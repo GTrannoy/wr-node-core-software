@@ -138,8 +138,8 @@ enum wrtd_log_level {
 
 struct wr_timestamp {
 	uint64_t seconds;
-	uint64_t ticks;
-	uint64_t frac;
+	uint32_t ticks;
+	uint32_t frac;
 };
 
 struct wrtd_trig_id {
@@ -170,6 +170,7 @@ struct wrtd_trigger_message {
   uint32_t transmit_cycles;
   int count;
   struct wrtd_trigger_entry triggers[TDC_TRIGGER_COALESCE_LIMIT];
+  uint32_t pad; // stupid Etherbone for some reasons drops the last entry on TX
 };
 #endif
 

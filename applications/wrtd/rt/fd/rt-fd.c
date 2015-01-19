@@ -23,6 +23,10 @@
 #include "loop-queue.h"
 #include "wrtd-serializers.h"
 
+#define OUT_ST_IDLE 0
+#define OUT_ST_ARMED 1
+#define OUT_ST_TEST_PENDING 2
+#define OUT_ST_CONDITION_HIT 3
 
 /* Structure describing a single pulse in the Fine Delay software output queue */
 struct pulse_queue_entry {
@@ -55,8 +59,6 @@ struct lrt_output {
 	struct wrtd_trigger_entry last_executed;
 /* Last enqueued trigger (i.e. the last one that entered the FD output queue). */
 	struct wrtd_trigger_entry last_enqueued;
-/* Last received trigger (i.e. last received packet from Etherbone). */
-	struct wrtd_trigger_entry last_received;
 /* Last timestamp value written to FD output config */
 	struct wr_timestamp last_programmed;
 /* Last timestamp value written to FD output config */
@@ -75,6 +77,8 @@ struct lrt_output {
 	int dead_time;
 /* Pulse width (8ns cycles) */
 	int width_cycles;
+/* Pending conditonal trigger */
+	struct lrt_output_rule *pending_trig;
 /* Output pulse queue */
 	struct lrt_pulse_queue queue;
 };
@@ -93,9 +97,12 @@ struct lrt_trigger_handle {
 };
 
 /* Output state array */
-struct lrt_output outputs[FD_NUM_CHANNELS];
+static struct lrt_output outputs[FD_NUM_CHANNELS];
 /* Received message counters */
 static int rx_ebone = 0, rx_loopback = 0;
+/* Last received trigger (i.e. last received packet from Etherbone). */
+static struct wrtd_trigger_entry last_received;
+
 
 /* Adjusts the timestamp in-place by adding cycles/frac value */
 static inline void ts_adjust_delay(struct wr_timestamp *ts, uint32_t cycles, uint32_t frac)
@@ -252,6 +259,7 @@ void update_latency_stats (struct pulse_queue_entry *pq_ent)
 void do_output (struct lrt_output *out)
 {
 	struct lrt_pulse_queue *q = &out->queue;
+	struct pulse_queue_entry *pq_ent = pulse_queue_front(q);
 	uint32_t dcr = fd_ch_readl(out, FD_REG_DCR);
 
 	/* Check if the output has triggered */
@@ -261,13 +269,18 @@ void do_output (struct lrt_output *out)
 			{
 				/* Drop the pulse */
 				pulse_queue_pop(q);
+				pq_ent->rule->misses ++;
+				
 				out->miss_timeout ++;
+				out->last_lost = pq_ent->trig;
 				out->idle = 1;
+				
 				/* Disarm the FD output */
 				fd_ch_writel(out, FD_DCR_MODE, FD_REG_DCR);
 			}
 		} else {
-			out->last_executed = pulse_queue_front(q)->trig;
+			out->last_executed = pq_ent->trig;
+			pq_ent->rule->hits ++;
 			pulse_queue_pop(q);
 			out->hits++;
 			out->idle = 1;
@@ -279,7 +292,7 @@ void do_output (struct lrt_output *out)
 	if(pulse_queue_empty(q))
         	return;
 
-	struct pulse_queue_entry *pq_ent = pulse_queue_front(q);
+	pq_ent = pulse_queue_front(q);
 	struct wr_timestamp *ts = &pq_ent->trig.ts;
 
 	/* Program the output start time */
@@ -355,6 +368,8 @@ static inline void filter_trigger(struct wrtd_trigger_entry *trig)
 	struct lrt_hash_entry *ent = hash_search (&trig->id, NULL);
 	int j;
 
+	last_received = *trig;	
+
 	if(ent)
 	{
 		struct wr_timestamp ts = trig->ts;
@@ -378,6 +393,7 @@ void do_rx()
 		mq_discard (1, WRTD_REMOTE_IN_FD);
 		rx_ebone++;
 	}
+
 
 	struct wrtd_trigger_entry *ent = loop_queue_pop();
 
@@ -441,6 +457,7 @@ static inline void ctl_chan_enable (uint32_t seq, struct wrnc_msg *ibuf)
 
 	struct lrt_output *out = &outputs[ch];
 
+
 	if(enabled) {
 		out->flags |= WRTD_ENABLED;
 	} else {
@@ -449,6 +466,9 @@ static inline void ctl_chan_enable (uint32_t seq, struct wrnc_msg *ibuf)
 		pulse_queue_init ( &out->queue );
 		fd_ch_writel(out, FD_DCR_MODE, FD_REG_DCR);
 	}
+	
+//	pp_printf("chan-enable %d %d flags %x\n", ch, enabled, out->flags);
+
 	ctl_ack (seq);
 }
 
@@ -461,6 +481,9 @@ static inline void ctl_chan_assign_trigger (uint32_t seq, struct wrnc_msg *ibuf)
 	struct lrt_trigger_handle handle;
 
 	wrnc_msg_int32(ibuf, &ch);
+
+	/* Get the trigger ID (direct) */
+	wrtd_msg_trig_id(ibuf, &id);
 	wrnc_msg_int32(ibuf, &is_cond);
 
 	int n_req = is_cond ? 2 : 1;
@@ -470,10 +493,6 @@ static inline void ctl_chan_assign_trigger (uint32_t seq, struct wrnc_msg *ibuf)
 		ctl_nack(seq, -1);
 		return;
 	}
-
-	/* Get the trigger ID (direct) */
-	wrtd_msg_trig_id(ibuf, &id);
-
 	/* Create an empty rule with default delay of 100 us */
 	rule.delay_cycles = 100000000 / 8000;
 	rule.delay_frac = 0;
@@ -553,9 +572,24 @@ static inline void ctl_chan_enable_trigger (uint32_t seq, struct wrnc_msg *ibuf)
 	ctl_ack(seq);
 }
 
+static inline void bag_hash_entry ( struct wrtd_trig_id *id, struct lrt_output_rule *rule, struct wrnc_msg *obuf )
+{
+	pp_printf("%p %x:%x:%x %x\n", id, id->system, id->source_port,id->trigger, rule->state);
+	
+	wrnc_msg_uint16 (obuf, &rule->state);
+	wrtd_msg_trig_id (obuf, id);
+	wrnc_msg_uint32 (obuf, &rule->delay_cycles);
+	wrnc_msg_uint16 (obuf, &rule->delay_frac);	
+	wrnc_msg_uint32 (obuf, &rule->latency_worst);
+	wrnc_msg_uint32 (obuf, &rule->latency_avg_sum);
+	wrnc_msg_uint32 (obuf, &rule->latency_avg_nsamples);
+	wrnc_msg_int32 (obuf, &rule->hits);
+	wrnc_msg_int32 (obuf, &rule->misses);
+}
+
 static inline void ctl_read_hash (uint32_t seq, struct wrnc_msg *ibuf)
 {
-	int ch, bucket, pos;
+	int ch, bucket, pos, is_conditional = 0;
 	uint32_t state_tmp;
 
 	wrnc_msg_int32(ibuf, &bucket);
@@ -575,32 +609,22 @@ static inline void ctl_read_hash (uint32_t seq, struct wrnc_msg *ibuf)
 
 	wrnc_msg_int32(&obuf, &entry_ok);
 
-	if(entry_ok) {
+	if(entry_ok)
 		cond = (struct lrt_hash_entry *) ent->ocfg[ch]->cond_ptr;
+	
+	is_conditional = (cond ? 1 : 0);
+
+	wrnc_msg_int32(&obuf, &is_conditional);
+
+	if(entry_ok) {
+		wrnc_msg_uint32(&obuf, (uint32_t *) &ent);
+		wrnc_msg_uint32(&obuf, (uint32_t *) &cond);
+
 		if(cond)
-		{
-			state_tmp = (ent->ocfg[ch]->state & HASH_ENT_DISABLED) | HASH_ENT_CONDITION;
+			bag_hash_entry(&cond->id, cond->ocfg[ch], &obuf);
 
-			wrtd_msg_trig_id(&obuf, &cond->id);
-			wrnc_msg_uint32(&obuf, &cond->ocfg[ch]->delay_cycles);
-			wrnc_msg_uint16(&obuf, &cond->ocfg[ch]->delay_frac);
-			wrnc_msg_uint32(&obuf, &state_tmp);
-			wrnc_msg_uint32(&obuf, (uint32_t *) ent);
-			wrnc_msg_uint32(&obuf, (uint32_t *) cond);
-			wrtd_msg_trig_id(&obuf, &ent->id);
-			wrnc_msg_uint32(&obuf, &ent->ocfg[ch]->delay_cycles);
-			wrnc_msg_uint16(&obuf, &ent->ocfg[ch]->delay_frac);
-
-    			state_tmp = HASH_ENT_CONDITIONAL;
-			wrnc_msg_uint32(&obuf, &state_tmp);
-		} else {
-			wrtd_msg_trig_id(&obuf, &ent->id);
-			wrnc_msg_uint32(&obuf, &ent->ocfg[ch]->delay_cycles);
-			wrnc_msg_uint16(&obuf, &ent->ocfg[ch]->delay_frac);
-			wrnc_msg_uint16(&obuf, &ent->ocfg[ch]->state);
-			wrnc_msg_uint32(&obuf, (uint32_t *) ent);
-			wrnc_msg_uint32(&obuf, (uint32_t *) cond);
-		}
+		pp_printf("ch %d ocfg %p\n", ch, ent->ocfg[ch]);
+		bag_hash_entry (&ent->id, ent->ocfg[ch], &obuf);
 	}
 
 	hmq_msg_send (&obuf);
@@ -639,14 +663,15 @@ static inline void ctl_chan_set_delay (uint32_t seq, struct wrnc_msg *ibuf)
 
 static inline void ctl_chan_get_state (uint32_t seq, struct wrnc_msg *ibuf)
 {
-	int ch;;
+	int ch;
+
 	wrnc_msg_int32(ibuf, &ch);
 
 	struct lrt_output *st = &outputs[ch];
 	struct wrnc_msg obuf = ctl_claim_out_buf();
 
 	uint32_t id_state = WRTD_REP_STATE;
-
+	
 	/* Create the response */
 	wrnc_msg_header(&obuf, &id_state, &seq);
 	wrnc_msg_int32(&obuf, &ch);
@@ -659,7 +684,7 @@ static inline void ctl_chan_get_state (uint32_t seq, struct wrnc_msg *ibuf)
 
 	wrtd_msg_trigger_entry(&obuf, &st->last_executed);
 	wrtd_msg_trigger_entry(&obuf, &st->last_enqueued);
-	wrtd_msg_trigger_entry(&obuf, &st->last_received);
+	wrtd_msg_trigger_entry(&obuf, &last_received);
 	wrtd_msg_trigger_entry(&obuf, &st->last_lost);
 
 	wrnc_msg_int32(&obuf, &st->idle);
@@ -788,6 +813,8 @@ static inline void do_control()
 
 	wrnc_msg_header(&ibuf, &cmd, &seq);
 
+//	pp_printf("cmd %x\n", cmd);
+
 #define _CMD(id, func)          \
     case id:                    \
     {                           \
@@ -819,12 +846,15 @@ void init_outputs()
     int i;
 
 	for (i = 0; i < FD_NUM_CHANNELS; i++) {
-	memset(&outputs[i], 0, sizeof(struct lrt_output));
-        outputs[i].base_addr = 0x100 + i * 0x100;
-        outputs[i].index = i;
-        outputs[i].idle = 1;
-        outputs[i].dead_time = 80000 / 8; // 80 us
-        outputs[i].width_cycles = 1250; // 1us
+		memset(&outputs[i], 0, sizeof(struct lrt_output));
+	        outputs[i].base_addr = 0x100 + i * 0x100;
+	        outputs[i].index = i;
+	        outputs[i].mode = WRTD_TRIGGER_MODE_AUTO;
+	        outputs[i].pending_trig = NULL;
+	        outputs[i].state = OUT_ST_IDLE;
+	        outputs[i].idle = 1;
+	        outputs[i].dead_time = 80000 / 8; // 80 us
+	        outputs[i].width_cycles = 1250; // 1us
     }
 }
 

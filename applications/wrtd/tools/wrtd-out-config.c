@@ -20,19 +20,35 @@ static int wrtd_cmd_state(struct wrtd_node *wrtd, int output,
 				  int argc, char *argv[]);
 static int wrtd_cmd_delay(struct wrtd_node *wrtd, int output,
 				  int argc, char *argv[]);
+static int wrtd_cmd_enable(struct wrtd_node *wrtd, int output,
+				  int argc, char *argv[]);
+static int wrtd_cmd_disable(struct wrtd_node *wrtd, int output,
+				  int argc, char *argv[]);
 static int wrtd_cmd_assign(struct wrtd_node *wrtd, int output,
 				  int argc, char *argv[]);
 static int wrtd_cmd_unassign(struct wrtd_node *wrtd, int output,
 				  int argc, char *argv[]);
 static int wrtd_cmd_show(struct wrtd_node *wrtd, int output,
 				  int argc, char *argv[]);
+static int wrtd_cmd_trig_enable(struct wrtd_node *wrtd, int output,
+				  int argc, char *argv[]);
+static int wrtd_cmd_trig_disable(struct wrtd_node *wrtd, int output,
+				  int argc, char *argv[]);
+static int wrtd_cmd_trig_stats(struct wrtd_node *wrtd, int output,
+				  int argc, char *argv[]);
 
 static struct wrtd_commands cmds[] = {
 	{ "state", "shows output state", wrtd_cmd_state },
-	{ "delay", "sets the out put delay", wrtd_cmd_delay },
 	{ "assign", "assigns a trigger", wrtd_cmd_assign },
 	{ "unassign", "un-assigns a given trigger", wrtd_cmd_unassign },
 	{ "show", "shows assigned triggers", wrtd_cmd_show },
+	{ "enable", "enables an output", wrtd_cmd_enable },
+	{ "disable", "disables an output", wrtd_cmd_disable },
+	{ "trig_enable", "enables a particular trigger", wrtd_cmd_trig_enable },
+	{ "trig_disable", "disables a particular trigger", wrtd_cmd_trig_disable },
+	{ "trig_stats", "shows per-trigger statistics", wrtd_cmd_trig_stats },
+	{ "trig_delay", "sets the delay for a particular trigger", wrtd_cmd_delay },
+	
 	{ NULL }
 };
 
@@ -82,9 +98,55 @@ static void dump_output_state(struct wrtd_output_state *state)
 	printf(" - Last missed/lost trigger:  %s, ID: %s, SeqNo %d\n",
 		       tmp, tmp2, state->last_lost.seq);
 
-	printf(" - Total RX messages:          %-10d\n", state->rx_packets);
-	printf(" - Total loopback messages:    %-10d\n", state->rx_loopback);
+	printf(" - Total RX messages:          %-10d\n", state->received_messages);
+	printf(" - Total loopback messages:    %-10d\n", state->received_loopback);
 
+}
+
+static int trig_enable(struct wrtd_node *wrtd, int output,
+			   int argc, char *argv[], int enable)
+{
+	int index, err;
+	struct wrtd_output_trigger_state trig;
+
+	if (argc != 1 || argv[0] == NULL) {
+		fprintf(stderr,
+			"Missing arguments: trig_%s <trig-index>\n", enable ? "enable" : "disable");
+		return -1;
+	}
+	index = atoi(argv[0]);
+
+	/* Get a trigger */
+	err = wrtd_out_trig_get_by_index(wrtd, index, output, &trig);
+	if (err)
+		return err;
+
+	return wrtd_out_trig_enable(wrtd, &trig.handle, enable);
+
+}
+
+static int wrtd_cmd_trig_enable(struct wrtd_node *wrtd, int output,
+			   int argc, char *argv[])
+{
+	return trig_enable(wrtd, output, argc, argv, 1);
+}
+
+static int wrtd_cmd_trig_disable(struct wrtd_node *wrtd, int output,
+			    int argc, char *argv[])
+{
+	return trig_enable(wrtd, output, argc, argv, 0);
+}
+
+static int wrtd_cmd_enable(struct wrtd_node *wrtd, int output,
+			   int argc, char *argv[])
+{
+	return wrtd_out_enable(wrtd, output, 1);
+}
+
+static int wrtd_cmd_disable(struct wrtd_node *wrtd, int output,
+			    int argc, char *argv[])
+{
+	return wrtd_out_enable(wrtd, output, 0);
 }
 
 static int wrtd_cmd_state(struct wrtd_node *wrtd, int output,
@@ -172,14 +234,13 @@ static int wrtd_cmd_unassign(struct wrtd_node *wrtd, int output,
 	return wrtd_out_trig_unassign(wrtd, &trig.handle);
 }
 
-static int wrtd_cmd_show(struct wrtd_node *wrtd, int output,
-				  int argc, char *argv[])
+static int wrtd_show_triggers(struct wrtd_node *wrtd, int output,
+			    int argc, char *argv[], int latency_stats)
 {
-	struct wrtd_output_trigger_state trigs[256];
-	char ts[1024], id [1024];
 	int ret, i;
-
-
+	char ts[1024], id[1024];
+	struct wrtd_output_trigger_state trigs[256];
+	
 	ret = wrtd_out_trig_get_all(wrtd, output, trigs, 256);
 	if (ret < 0)
 		return -1;
@@ -194,9 +255,28 @@ static int wrtd_cmd_show(struct wrtd_node *wrtd, int output,
 			format_id(id, trigs[i].condition);
 			printf("     (condition ID: %s, delay: %s)\n", id, ts);
 		}
+		if(latency_stats)
+		{
+			printf("  - executed pulses:      %d\n", trigs[i].executed_pulses);
+			printf("  - missed pulses:        %d\n", trigs[i].missed_pulses);
+			printf("  - latency (worst case): %d us\n", trigs[i].latency_worst_us);
+			printf("  - latency (average):    %d us\n", trigs[i].latency_average_us);
+		}
 	}
-
 	return 0;
+}
+
+
+static int wrtd_cmd_show(struct wrtd_node *wrtd, int output,
+				  int argc, char *argv[])
+{
+	return wrtd_show_triggers (wrtd, output, argc, argv, 0);
+}
+
+static int wrtd_cmd_trig_stats(struct wrtd_node *wrtd, int output,
+				  int argc, char *argv[])
+{
+	return wrtd_show_triggers (wrtd, output, argc, argv, 1);
 }
 
 static void help()
@@ -259,9 +339,14 @@ int main(int argc, char *argv[])
  		if(!strcmp(cmds[i].name, cmd)) {
 			err = cmds[i].handler(wrtd, chan, argc - optind,
 					      argv + optind);
-		   if (err)
-			   break;
+		 	break;
  		}
+	}
+
+	if(!cmds[i].handler)
+	{
+		fprintf(stderr,"Unrecognized command: '%s'\n", cmd);
+		exit(1);
 	}
 
 	if (err) {

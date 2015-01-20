@@ -102,7 +102,7 @@ void dump_input_state(struct wrtd_input_state *state)
 	       state->flags & WRTD_TRIGGER_ASSIGNED ? tmp : "none" );
 
 	if( state-> flags & WRTD_LAST_VALID ) {
-		format_ts( tmp, state->last, 1 );
+		format_ts( tmp, state->last_tagged_pulse, 1 );
 		printf(" - Last input pulse:      %s\n", tmp );
 	}
 
@@ -314,8 +314,6 @@ int main(int argc, char *argv[])
 	if (err) {
 		fprintf(stderr, "Error while executing command '%s': %s\n",
 			cmd, wrtd_strerror(errno));
-	} else {
-		fprintf(stdout, "Command executed!\n");
 	}
 
 	wrtd_close(wrtd);

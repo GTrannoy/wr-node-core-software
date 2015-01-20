@@ -126,11 +126,13 @@ struct wrtd_node *wrtd_open_by_lun(int lun)
 	if (!wrtd->wrnc)
 		goto out;
 
+	wrtd->dev_id = lun;
+
 	return (struct wrtd_node *)wrtd;
 
 out:
 	free(wrtd);
-	return (struct wrtd_node *)wrtd;
+	return NULL;
 }
 
 

@@ -34,7 +34,7 @@ struct tdc_channel_state {
    Not exposed to the public, set from the internal calibration data of the TDC driver. */
     struct wr_timestamp timebase_offset;
 /* Timestamp of the last tagged pulse */
-    struct wr_timestamp last;
+    struct wr_timestamp last_tagged;
 /* Last transmitted trigger */
     struct wrtd_trigger_entry last_sent;
 /* Channel flags (enum wrnc_io_flags) */
@@ -106,7 +106,6 @@ static inline void send_trigger (struct tdc_channel_state *ch, struct wr_timesta
     
     loop_queue_push(&ch->id, ch->seq, ts);
     
-    ch->last = *ts;
     coalesce_count++;
 }
 
@@ -143,13 +142,12 @@ static inline void do_channel (int channel, struct wr_timestamp *ts)
 
 /* Apply timebase offset to align TDC time with WR timebase */
     ts_sub(ts, &ch->timebase_offset);    
-    ch->last = *ts;
+    ch->last_tagged = *ts;
 
 /* Log raw value if needed */
 	if(ch->log_level & WRTD_LOG_RAW)
         log_raw_timestamp(ch, ts);
 
-    ch->last = *ts;
     ch->total_pulses++;
 
 /* Apply trigger delay */
@@ -340,7 +338,7 @@ static inline void ctl_chan_get_state (uint32_t seq, struct wrnc_msg *ibuf)
     wrtd_msg_trig_id (&obuf, &st->id);
     wrtd_msg_timestamp (&obuf, &st->delay);
     wrtd_msg_timestamp (&obuf, &st->timebase_offset);
-    wrtd_msg_timestamp (&obuf, &st->last);
+    wrtd_msg_timestamp (&obuf, &st->last_tagged);
     wrnc_msg_uint32 (&obuf, &st->flags);
     wrnc_msg_uint32 (&obuf, &st->log_level);
     wrnc_msg_int32 (&obuf, (int *) &st->mode);

@@ -110,6 +110,8 @@ extern void wrtd_close(struct wrtd_node *dev);
 extern struct wrnc_dev *wrtd_get_wrnc_dev(struct wrtd_node *dev);
 extern int wrtd_load_application(struct wrtd_node *dev, char *rt_tdc,
 					 char *rt_fd);
+extern int wrtd_white_rabbit_sync(struct wrtd_node *dev,
+				  unsigned long timeout_s);
 
 /**
  * @file libwrtd-input.c

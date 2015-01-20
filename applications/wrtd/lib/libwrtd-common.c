@@ -10,8 +10,8 @@
 #include <errno.h>
 #include <libwrnc.h>
 #include <libwrtd-internal.h>
-//#include <fmctdc-lib.h>
-//#include <fdelay-lib.h>
+#include <fmctdc-lib.h>
+#include <fdelay-lib.h>
 
 static const uint32_t application_id[] = {
 	0x115790de,

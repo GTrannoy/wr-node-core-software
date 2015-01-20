@@ -268,10 +268,10 @@ static struct wrnc_msg *wrnc_message_pop(struct wrnc_hmq *hmq)
 /**
  * Look for a particular message
  */
-static int wrnc_retr_message(struct wrnc_hmq *hmq, uint32_t sequence,
-			    struct wrnc_msg_element *msg_out)
+static struct wrnc_msg_element *wrnc_retr_message(struct wrnc_hmq *hmq,
+						  uint32_t sequence)
 {
-	struct wrnc_msg_element *tmp;
+	struct wrnc_msg_element *tmp, *msg_out;
 	int found = 0;
 
 	spin_lock(&hmq->lock);
@@ -286,7 +286,7 @@ static int wrnc_retr_message(struct wrnc_hmq *hmq, uint32_t sequence,
 	}
 	spin_unlock(&hmq->lock);
 
-	return found;  /* not found */
+	return found ? msg_out : 0;  /* not found */
 }
 
 /**
@@ -325,8 +325,9 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	 * an answer, something is seriously broken
 	 */
 	to = wait_event_interruptible_timeout(hmq_out->q_msg,
-					      wrnc_retr_message(hmq_out, seq, msgel),
-					      msecs_to_jiffies(1000));
+					      msgel = wrnc_retr_message(hmq_out,
+									seq),
+					      msecs_to_jiffies(5000));
 	if (unlikely(to <= 0)) {
 		if (to == 0)
 			dev_err(&hmq->dev,
@@ -335,6 +336,8 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 		goto out_sync;
 	}
 
+	if (!msgel)
+		return -EINVAL;
 	/* Copy the answer message back to user space */
 	memcpy(&msg.msg, msgel->msg, sizeof(struct wrnc_msg));
 	kfree(msgel->msg);

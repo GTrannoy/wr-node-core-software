@@ -59,3 +59,46 @@ void unbag_ts(uint32_t *buf, int offset, struct wr_timestamp *ts)
     ts->ticks = buf[offset + 1];
     ts->frac = buf[offset + 2];
 }
+
+
+/**
+ * It reads one or more log entry from a given hmq_log. The user of this function
+ * must check that the hmq_log used correspond to a logging interface
+ * @param[in] hmq_log logging HMQ
+ * @param[out] log log message
+ * @param[in] count number of messages to read
+ * @return number of read messages on success, -1 on error and errno is set
+ *         appropriately
+ */
+int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
+		  int count)
+{
+	struct wrtd_log_entry *cur = log;
+	struct wrnc_msg *msg;
+	int remaining = count;
+	int n_read = 0;
+
+	while (remaining) {
+		msg = wrnc_hmq_receive(hmq_log);
+		if (!msg)
+			break;
+		/*FIXME optimize with serialization */
+		cur->type = msg->data[0];
+		cur->channel = msg->data[2];
+
+		cur->seq = msg->data[1];
+		cur->id.system = msg->data[3];
+		cur->id.source_port = msg->data[4];
+		cur->id.trigger = msg->data[5];
+		cur->ts.seconds = msg->data[6];
+		cur->ts.ticks = msg->data[7];
+		cur->ts.frac = msg->data[8];
+
+		remaining--;
+		n_read++;
+		cur++;
+		free(msg);
+	}
+
+	return n_read ? n_read : -1;
+}

@@ -564,21 +564,39 @@ int wrtd_out_trig_enable(struct wrtd_node *dev,
 
 
 /**
- * Log every trigger pulse sent out to the network. Each log message contains
- * the input number, sequence ID, trigger ID, trigger counter (since arm) and
- * origin timestamp.
+ * It opens the logging interface for the output device
+ * @param[in] dev device token
+ * @return a HMQ token on success, NULL on error and errno is set appropriately
+ */
+struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev)
+{
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+
+	return wrnc_hmq_open(wrtd->wrnc, WRTD_OUT_FD_LOGGING, 0);
+}
+
+
+/**
+ * It closes the logging interface
+ */
+void wrtd_out_log_close(struct wrnc_hmq *out)
+{
+	wrnc_hmq_close(out);
+}
+
+
+/**
+ * It reads input log events.
  * @param[in] dev device token
  * @param[out] log log message
- * @param[in] flags
- * @param[in] input_mask bit mask of channel where read
  * @param[in] count number of messages to read
- * @return 0 on success, -1 on error and errno is set appropriately
+ * @return number of read messages on success, -1 on error and errno is set
+ *         appropriately
  */
-int wrtd_out_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
-		      int flags, unsigned int output_mask, int count)
+int wrtd_out_log_read(struct wrnc_hmq *out, struct wrtd_log_entry *log,
+		      int count)
 {
-	errno = EWRTD_NO_IMPLEMENTATION;
-	return -1;
+	return wrtd_log_read(out, log, count);
 }
 
 /**

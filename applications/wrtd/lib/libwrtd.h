@@ -137,9 +137,10 @@ extern int wrtd_in_timebase_offset_set(struct wrtd_node *dev,
 extern int wrtd_in_counters_reset(struct wrtd_node *dev, unsigned int input);
 extern int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
 				 uint32_t log_level);
-extern int wrtd_in_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
-			      int flags, int input_mask, int count);
-
+extern struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev);
+extern void wrtd_in_log_close(struct wrnc_hmq *in);
+extern int wrtd_in_log_read(struct wrnc_hmq *in, struct wrtd_log_entry *log,
+			    int count);
 
 /* TODO implements the following prototypes */
 extern int wrtd_in_is_enabled(struct wrtd_node *dev, unsigned int input);
@@ -184,8 +185,10 @@ extern int wrtd_out_trig_get_state(struct wrtd_node *dev,
 				   struct wrtd_output_trigger_state *state);
 extern int wrtd_out_trig_enable(struct wrtd_node *dev,
 				struct wrtd_trigger_handle *handle, int enable);
-extern int wrtd_out_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
-			     int flags, unsigned int output_mask, int count);
+extern struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev);
+extern void wrtd_out_log_close(struct wrnc_hmq *out);
+extern int wrtd_out_log_read(struct wrnc_hmq *out, struct wrtd_log_entry *log,
+			     int count);
 extern int wrtd_out_set_log_level(struct wrtd_node *dev, unsigned int output,
 				  uint32_t log_level);
 extern int wrtd_out_set_trigger_mode(struct wrtd_node *dev,

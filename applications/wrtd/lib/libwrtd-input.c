@@ -527,60 +527,41 @@ int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
 	return wrtd_validate_acknowledge(&msg);
 }
 
-
 /**
- * Log every trigger pulse sent out to the network. Each log message contains
- * the input number, sequence ID, trigger ID, trigger counter (since arm) and
- * origin timestamp.
+ * It opens the logging interface for the input device
  * @param[in] dev device token
- * @param[out] log log message
- * @param[in] flags
- * @param[in] input_mask bit mask of channel where read
- * @param[in] count number of messages to read
- * @return 0 on success, -1 on error and errno is set appropriately
+ * @return a HMQ token on success, NULL on error and errno is set appropriately
  */
-int wrtd_in_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
-		     int flags, int input_mask, int count)
+struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev)
 {
-
-#if 0 /* TODO to be re-implemented */
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	int remaining = count;
-	int n_read = 0;
-	struct wrtd_log_entry *cur = log;
-	struct wrnc_msg *msg;
 
-	while (remaining) {
-		msg = wrnc_hmq_receive(wrtd->wrnc, WRTD_OUT_FD_LOGGING);
-		if (!msg)
-			break;
-
-		cur->type = msg->data[0];
-		cur->channel = msg->data[2];
-
-
-		if ((cur->type & flags) && (cur->channel & input_mask)) {
-			cur->seq = msg->data[1];
-    			cur->id.system = msg->data[3];
-    			cur->id.source_port = msg->data[4];
-    			cur->id.trigger = msg->data[5];
-    			cur->ts.seconds = msg->data[6];
-    			cur->ts.ticks = msg->data[7];
-    			cur->ts.frac = msg->data[8];
-
-    			remaining--;
-			n_read++;
-			cur++;
-		}
-		free(msg);
-	}
-
-	return n_read;
-#endif
-	errno = EWRTD_NO_IMPLEMENTATION;
-	return -1;
+	return wrnc_hmq_open(wrtd->wrnc, WRTD_OUT_TDC_LOGGING, 0);
 }
 
+
+/**
+ * It closes the logging interface
+ */
+void wrtd_in_log_close(struct wrnc_hmq *in)
+{
+	wrnc_hmq_close(in);
+}
+
+
+/**
+ * It reads input log events.
+ * @param[in] dev device token
+ * @param[out] log log message
+ * @param[in] count number of messages to read
+ * @return number of read messages on success, -1 on error and errno is set
+ *         appropriately
+ */
+int wrtd_in_log_read(struct wrnc_hmq *in, struct wrtd_log_entry *log,
+		     int count)
+{
+	return wrtd_log_read(in, log, count);
+}
 
 
 /**

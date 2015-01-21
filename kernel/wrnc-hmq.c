@@ -31,6 +31,10 @@ int hmq_max_con = 8; /**< Maximum number connection for each slot */
 module_param_named(max_slot_con, hmq_max_con, int, 0444);
 MODULE_PARM_DESC(max_slot_con, "Maximum number connection for each slot.");
 
+int hmq_sync_timeout = 1000; /**< Milli-seconds to wait for a synchronous answer */
+module_param_named(sync_timeout, hmq_sync_timeout, int, 0444);
+MODULE_PARM_DESC(sync_timeout, "Milli-seconds to wait for a synchronous answer.");
+
 
 /**
  * It return 1 if the message quque slot is full
@@ -327,7 +331,7 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	to = wait_event_interruptible_timeout(hmq_out->q_msg,
 					      msgel = wrnc_retr_message(hmq_out,
 									seq),
-					      msecs_to_jiffies(5000));
+					      msecs_to_jiffies(hmq_sync_timeout));
 	if (unlikely(to <= 0)) {
 		if (to == 0)
 			dev_err(&hmq->dev,

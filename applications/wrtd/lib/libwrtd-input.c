@@ -541,30 +541,6 @@ struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev)
 
 
 /**
- * It closes the logging interface
- */
-void wrtd_in_log_close(struct wrnc_hmq *in)
-{
-	wrnc_hmq_close(in);
-}
-
-
-/**
- * It reads input log events.
- * @param[in] dev device token
- * @param[out] log log message
- * @param[in] count number of messages to read
- * @return number of read messages on success, -1 on error and errno is set
- *         appropriately
- */
-int wrtd_in_log_read(struct wrnc_hmq *in, struct wrtd_log_entry *log,
-		     int count)
-{
-	return wrtd_log_read(in, log, count);
-}
-
-
-/**
  * Check the enable status on a trigger input.
  * @param[in] dev device token
  * @param[in] input index (0-based) of input channel

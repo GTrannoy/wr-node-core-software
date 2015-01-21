@@ -112,6 +112,9 @@ extern int wrtd_load_application(struct wrtd_node *dev, char *rt_tdc,
 					 char *rt_fd);
 extern int wrtd_white_rabbit_sync(struct wrtd_node *dev,
 				  unsigned long timeout_s);
+extern int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
+			 int count);
+extern void wrtd_log_close(struct wrnc_hmq *hmq);
 
 /**
  * @file libwrtd-input.c
@@ -138,9 +141,6 @@ extern int wrtd_in_counters_reset(struct wrtd_node *dev, unsigned int input);
 extern int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
 				 uint32_t log_level);
 extern struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev);
-extern void wrtd_in_log_close(struct wrnc_hmq *in);
-extern int wrtd_in_log_read(struct wrnc_hmq *in, struct wrtd_log_entry *log,
-			    int count);
 
 /* TODO implements the following prototypes */
 extern int wrtd_in_is_enabled(struct wrtd_node *dev, unsigned int input);

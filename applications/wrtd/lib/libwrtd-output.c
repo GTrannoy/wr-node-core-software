@@ -577,29 +577,6 @@ struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev)
 
 
 /**
- * It closes the logging interface
- */
-void wrtd_out_log_close(struct wrnc_hmq *out)
-{
-	wrnc_hmq_close(out);
-}
-
-
-/**
- * It reads input log events.
- * @param[in] dev device token
- * @param[out] log log message
- * @param[in] count number of messages to read
- * @return number of read messages on success, -1 on error and errno is set
- *         appropriately
- */
-int wrtd_out_log_read(struct wrnc_hmq *out, struct wrtd_log_entry *log,
-		      int count)
-{
-	return wrtd_log_read(out, log, count);
-}
-
-/**
  * @param[in] dev device token
  * @param[in] output index (0-based) of output channel
  * @param[in] log_level log level to apply to the logging messages

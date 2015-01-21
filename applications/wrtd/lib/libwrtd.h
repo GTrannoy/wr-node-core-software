@@ -176,12 +176,12 @@ extern int wrtd_out_trig_get_by_index(struct wrtd_node *dev, unsigned int index,
 extern int wrtd_out_trig_delay_set(struct wrtd_node *dev,
 				   struct wrtd_trigger_handle *handle,
 				   uint64_t delay_ps);
-
-
 extern int wrtd_out_dead_time_set(struct wrtd_node *dev, unsigned int output,
 				  uint64_t dead_time_ps);
 extern int wrtd_out_set_log_level(struct wrtd_node *dev, unsigned int output,
 				  uint32_t log_level);
+extern int wrtd_out_trig_enable(struct wrtd_node *dev,
+				struct wrtd_trigger_handle *handle, int enable);
 
 /* TODO implements the following prototypes */
 extern int wrtd_out_trig_condition_delay_set(struct wrtd_node *dev,
@@ -190,8 +190,6 @@ extern int wrtd_out_trig_condition_delay_set(struct wrtd_node *dev,
 extern int wrtd_out_trig_get_state(struct wrtd_node *dev,
 				   struct wrtd_trigger_handle *handle,
 				   struct wrtd_output_trigger_state *state);
-extern int wrtd_out_trig_enable(struct wrtd_node *dev,
-				struct wrtd_trigger_handle *handle, int enable);
 extern int wrtd_out_set_trigger_mode(struct wrtd_node *dev,
 				     unsigned int output, int mode);
 extern int wrtd_out_arm(struct wrtd_node *dev, unsigned int input, int armed);

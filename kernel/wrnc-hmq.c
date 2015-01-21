@@ -329,9 +329,8 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	 * an answer, something is seriously broken
 	 */
 	to = wait_event_interruptible_timeout(hmq_out->q_msg,
-					      msgel = wrnc_retr_message(hmq_out,
-									seq),
-					      msecs_to_jiffies(hmq_sync_timeout));
+				 (msgel = wrnc_retr_message(hmq_out, seq)),
+				 msecs_to_jiffies(hmq_sync_timeout));
 	if (unlikely(to <= 0)) {
 		if (to == 0)
 			dev_err(&hmq->dev,

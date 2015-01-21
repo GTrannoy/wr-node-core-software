@@ -8,6 +8,10 @@
 #ifndef __WRTD_LIB_H__
 #define __WRTD_LIB_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <stdio.h>
 #include <wrtd-common.h>
@@ -199,5 +203,9 @@ extern int wrtd_out_check_triggered(struct wrtd_node *dev, unsigned int output);
  * @file libwrtd-internal.c
  */
 extern struct wr_timestamp picos_to_ts(uint64_t p);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif

@@ -544,11 +544,11 @@ int wrtd_out_trig_enable(struct wrtd_node *dev,
 	struct wrnc_msg msg = wrnc_msg_init (16);
 	uint32_t id = WRTD_CMD_FD_CHAN_ENABLE_TRIGGER, seq = 0;
 	int err;
-	
+
 	wrnc_msg_header (&msg, &id, &seq);
 	wrnc_msg_int32 (&msg, &handle->channel);
 	wrnc_msg_int32 (&msg, &enable);
-	
+
 	if(handle->ptr_cond)
 		wrnc_msg_uint32 (&msg, (uint32_t *) &handle->ptr_cond);
 	else
@@ -623,7 +623,7 @@ int wrtd_out_arm(struct wrtd_node *dev, unsigned int ouput, int armed)
  * @param[in] output index (0-based) of output channel
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrtd_out_reset_counters_reset(struct wrtd_node *dev, unsigned int output)
+int wrtd_out_counters_reset(struct wrtd_node *dev, unsigned int output)
 {
 	errno = EWRTD_NO_IMPLEMENTATION;
 	return -1;

@@ -194,7 +194,7 @@ extern int wrtd_out_set_log_level(struct wrtd_node *dev, unsigned int output,
 extern int wrtd_out_set_trigger_mode(struct wrtd_node *dev,
 				     unsigned int output, int mode);
 extern int wrtd_out_arm(struct wrtd_node *dev, unsigned int input, int armed);
-extern int wrtd_out_reset_counters(struct wrtd_node *dev, unsigned int output);
+extern int wrtd_out_counters_reset(struct wrtd_node *dev, unsigned int output);
 extern int wrtd_out_check_triggered(struct wrtd_node *dev, unsigned int output);
 //int wrtd_out_wait_trigger(struct wrtd_node*, int output_mask, struct wrtd_trig_id *id);
 

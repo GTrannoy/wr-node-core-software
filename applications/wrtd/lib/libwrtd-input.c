@@ -57,7 +57,7 @@ int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 		      struct wrtd_input_state *state)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg = wrnc_msg_init (16);
+	struct wrnc_msg msg = wrnc_msg_init(16);
 	int err;
 	uint32_t id, seq = 0;
 	uint32_t dead_time_cycles;

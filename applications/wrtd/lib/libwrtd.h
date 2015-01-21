@@ -144,7 +144,8 @@ extern int wrtd_in_timebase_offset_set(struct wrtd_node *dev,
 extern int wrtd_in_counters_reset(struct wrtd_node *dev, unsigned int input);
 extern int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
 				 uint32_t log_level);
-extern struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev);
+extern struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev,
+					 enum wrtd_log_level lvl);
 extern int wrtd_in_seq_counter_set (struct wrtd_node *dev, unsigned int input);
 
 /* TODO implements the following prototypes */
@@ -180,6 +181,8 @@ extern int wrtd_out_dead_time_set(struct wrtd_node *dev, unsigned int output,
 				  uint64_t dead_time_ps);
 extern int wrtd_out_set_log_level(struct wrtd_node *dev, unsigned int output,
 				  uint32_t log_level);
+extern struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev,
+					  enum wrtd_log_level lvl);
 extern int wrtd_out_trig_enable(struct wrtd_node *dev,
 				struct wrtd_trigger_handle *handle, int enable);
 

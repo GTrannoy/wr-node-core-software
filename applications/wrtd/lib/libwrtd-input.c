@@ -528,13 +528,23 @@ int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
 }
 
 /**
- * It opens the logging interface for the input device
+ * It opens the logging interface for the input device. You can provide a
+ * default logging level.
  * @param[in] dev device token
+ * @param[in] lvl default logging level
  * @return a HMQ token on success, NULL on error and errno is set appropriately
  */
-struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev)
+struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev, enum wrtd_log_level lvl)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	int i, err;
+
+	/* Set the same logging level to all channels */
+	for (i = 0; i < TDC_NUM_CHANNELS; ++i) {
+		err = wrtd_in_log_level_set(dev, i, lvl);
+		if (err)
+			return NULL;
+	}
 
 	return wrnc_hmq_open(wrtd->wrnc, WRTD_OUT_TDC_LOGGING, 0);
 }

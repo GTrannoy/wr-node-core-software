@@ -564,13 +564,24 @@ int wrtd_out_trig_enable(struct wrtd_node *dev,
 
 
 /**
- * It opens the logging interface for the output device
+ * It opens the logging interface for the output device. You can provide a
+ * default logging level.
  * @param[in] dev device token
+ * @param[in] lvl default logging level
  * @return a HMQ token on success, NULL on error and errno is set appropriately
  */
-struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev)
+struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev,
+				   enum wrtd_log_level lvl)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	int i, err;
+
+	/* Set the same logging level to all channels */
+	for (i = 0; i < FD_NUM_CHANNELS; ++i) {
+		err = wrtd_out_log_level_set(dev, i, lvl);
+		if (err)
+			return NULL;
+	}
 
 	return wrnc_hmq_open(wrtd->wrnc, WRTD_OUT_FD_LOGGING, 0);
 }

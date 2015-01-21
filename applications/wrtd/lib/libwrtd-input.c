@@ -608,6 +608,7 @@ int wrtd_in_seq_counter_set(struct wrtd_node *dev, unsigned int input,
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrnc_msg msg = wrnc_msg_init(4);
 	uint32_t id, seq = 0;
+	int err;
 
 	if (input >= TDC_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
@@ -616,8 +617,8 @@ int wrtd_in_seq_counter_set(struct wrtd_node *dev, unsigned int input,
 
 	id = WRTD_CMD_TDC_CHAN_SET_SEQ;
 	wrnc_msg_header(&msg, &id, &seq);
-	wrnc_msg_int32 (&msg, &input);
-	wrnc_msg_uint32 (&msg, &value);
+	wrnc_msg_uint32(&msg, &input);
+	wrnc_msg_uint32(&msg, &value);
 
 	/* Send the message and get answer */
 	err = wrtd_in_send_and_receive_sync(wrtd, &msg);

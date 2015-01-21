@@ -598,7 +598,7 @@ int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrnc_msg msg = wrnc_msg_init(4);
-	uint32_t seq = 0;
+	uint32_t seq = 0, id;
 	int err;
 
 	if (output >= FD_NUM_CHANNELS) {
@@ -609,11 +609,11 @@ int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
 	/* Build the message */
 	id = WRTD_CMD_FD_CHAN_SET_LOG_LEVEL;
 	wrnc_msg_header(&msg, &id, &seq);
-	wrnc_msg_int32 (&msg, &input);
-	wrnc_msg_uint32 (&msg, &log_level);
+	wrnc_msg_uint32(&msg, &output);
+	wrnc_msg_uint32(&msg, &log_level);
 
 	/* Send the message and get answer */
-	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
+	err = wrtd_out_send_and_receive_sync(wrtd, &msg);
         if (err)
 		return err;
 

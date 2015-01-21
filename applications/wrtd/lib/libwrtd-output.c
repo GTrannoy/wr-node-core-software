@@ -585,8 +585,28 @@ struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev)
 int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
 			   uint32_t log_level)
 {
-	errno = EWRTD_NO_IMPLEMENTATION;
-	return -1;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrnc_msg msg = wrnc_msg_init(4);
+	uint32_t seq = 0;
+	int err;
+
+	if (input >= WRTD_IN_MAX) {
+		errno = EWRTD_INVALID_CHANNEL;
+		return -1;
+	}
+
+	/* Build the message */
+	id = WRTD_CMD_FD_CHAN_SET_LOG_LEVEL;
+	wrnc_msg_header(&msg, &id, &seq);
+	wrnc_msg_int32 (&msg, &input);
+	wrnc_msg_uint32 (&msg, &log_level);
+
+	/* Send the message and get answer */
+	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
+        if (err)
+		return err;
+
+	return wrtd_validate_acknowledge(&msg);
 }
 
 /**

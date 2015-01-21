@@ -592,8 +592,29 @@ int wrtd_in_delay_get(struct wrtd_node *dev, unsigned int input,
  * @param[in] input index (0-based) of input channel
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrtd_in_seq_counter_set(struct wrtd_node *dev, unsigned int input)
+int wrtd_in_seq_counter_set(struct wrtd_node *dev, unsigned int input,
+			    unsigned int value)
 {
-	errno = EWRTD_NO_IMPLEMENTATION;
-	return -1;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrnc_msg msg = wrnc_msg_init(4);
+	uint32_t id, seq = 0;
+
+	if (input >= WRTD_IN_MAX) {
+		errno = EWRTD_INVALID_CHANNEL;
+		return -1;
+	}
+
+	id = WRTD_CMD_TDC_CHAN_SET_SEQ;
+	wrnc_msg_header(&msg, &id, &seq);
+	wrnc_msg_int32 (&msg, &input);
+	wrnc_msg_uint32 (&msg, &value);
+
+	/* Send the message and get answer */
+	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
+        if (err) {
+		errno = EWRTD_INVALID_ANSWER_STATE;
+		return -1;
+	}
+
+	return wrtd_validate_acknowledge(&msg);
 }

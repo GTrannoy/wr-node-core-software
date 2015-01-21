@@ -62,7 +62,7 @@ int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 	uint32_t id, seq = 0;
 	uint32_t dead_time_cycles;
 
-	if (input >= WRTD_IN_MAX) {
+	if (input >= TDC_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -135,7 +135,7 @@ int wrtd_in_enable(struct wrtd_node *dev, unsigned int input, int enable)
 	struct wrnc_msg msg;
 	int err;
 
-	if (input >= WRTD_IN_MAX) {
+	if (input >= TDC_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -173,7 +173,7 @@ int wrtd_in_trigger_assign(struct wrtd_node *dev, unsigned int input,
 	struct wrnc_msg msg;
 	int err;
 
-	if (input >= WRTD_IN_MAX) {
+	if (input >= TDC_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -232,7 +232,7 @@ int wrtd_in_trigger_mode_set(struct wrtd_node *dev, unsigned int input,
 	struct wrnc_msg msg;
 	int err;
 
-	if (input >= WRTD_IN_MAX) {
+	if (input >= TDC_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -302,7 +302,7 @@ int wrtd_in_arm(struct wrtd_node *dev, unsigned int input, int armed)
 	struct wrnc_msg msg;
 	int err;
 
-	if (input >= WRTD_IN_MAX) {
+	if (input >= TDC_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -351,7 +351,7 @@ int wrtd_in_dead_time_set(struct wrtd_node *dev, unsigned int input,
 	struct wrnc_msg msg;
 	int err, dead_time_cycles;
 
-	if (input >= WRTD_IN_MAX) {
+	if (input >= TDC_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -396,7 +396,7 @@ int wrtd_in_delay_set(struct wrtd_node *dev, unsigned int input,
 	struct wrnc_msg msg;
 	int err;
 
-	if (input >= WRTD_IN_MAX) {
+	if (input >= TDC_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -473,7 +473,7 @@ int wrtd_in_counters_reset(struct wrtd_node *dev, unsigned int input)
 	struct wrnc_msg msg;
 	int err;
 
-	if (input >= WRTD_IN_MAX) {
+	if (input >= TDC_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -507,7 +507,7 @@ int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
 	struct wrnc_msg msg;
 	int err;
 
-  	if (input >= WRTD_IN_MAX) {
+	if (input >= TDC_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -599,7 +599,7 @@ int wrtd_in_seq_counter_set(struct wrtd_node *dev, unsigned int input,
 	struct wrnc_msg msg = wrnc_msg_init(4);
 	uint32_t id, seq = 0;
 
-	if (input >= WRTD_IN_MAX) {
+	if (input >= TDC_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}

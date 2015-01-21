@@ -24,15 +24,15 @@
 #include "wrnc.h"
 
 int hmq_max_msg = 32; /**< Maximum number of messages in driver queue */
-module_param_named(max_slot_msg, hmq_max_msg, int, 0444);
+module_param_named(max_slot_msg, hmq_max_msg, int, 0644);
 MODULE_PARM_DESC(max_slot_msg, "Maximum number of messages in driver queue.");
 
 int hmq_max_con = 8; /**< Maximum number connection for each slot */
-module_param_named(max_slot_con, hmq_max_con, int, 0444);
+module_param_named(max_slot_con, hmq_max_con, int, 0644);
 MODULE_PARM_DESC(max_slot_con, "Maximum number connection for each slot.");
 
 int hmq_sync_timeout = 1000; /**< Milli-seconds to wait for a synchronous answer */
-module_param_named(sync_timeout, hmq_sync_timeout, int, 0444);
+module_param_named(sync_timeout, hmq_sync_timeout, int, 0644);
 MODULE_PARM_DESC(sync_timeout, "Milli-seconds to wait for a synchronous answer.");
 
 

@@ -394,6 +394,7 @@ static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 	struct wrnc_hmq *hmq = f->private_data;
 	struct wrnc_msg_element *msgel;
 	unsigned int i, n;
+	int err = 0;
 
 	if (hmq->flags & WRNC_FLAG_HMQ_DIR) {
 		dev_err(&hmq->dev, "cannot read from an input queue\n");
@@ -410,7 +411,7 @@ static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 
 	count = 0;
 	/* read as much as we can */
-	for (i = 0; i < n; ++i) {
+	for (i = 0; i < n && !err; ++i) {
 		if (list_empty(&hmq->list_msg)) {
 			*offp = 0;
 			break;
@@ -426,7 +427,7 @@ static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 		/* Copy to user space buffer */
 		if (copy_to_user(buf + count, msgel->msg,
 				 sizeof(struct wrnc_msg)))
-			return -EFAULT;
+			err = -EFAULT;
 
 		count = (i + 1) * sizeof(struct wrnc_msg);
 		kfree(msgel->msg);
@@ -434,8 +435,7 @@ static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 	}
 
 	*offp += count;
-
-	return count;
+	return count ? count : err;
 }
 
 /**

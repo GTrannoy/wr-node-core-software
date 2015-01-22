@@ -513,7 +513,7 @@ int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
 	}
 
 	/* Build the message */
-	msg.datalen = 3;
+	msg.datalen = 4;
 	msg.data[0] = WRTD_CMD_TDC_CHAN_SET_LOG_LEVEL;
 	msg.data[1] = 0;
 	msg.data[2] = input;

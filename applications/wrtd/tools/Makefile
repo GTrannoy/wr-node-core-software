@@ -15,6 +15,7 @@ LDLIBS += -L$(LIBFD) -lfdelay -L$(LIBTDC) -lfmctdc -L../lib -lwrtd -L$(WRNC)/lib
 PROGS := wrtd-boot
 PROGS += wrtd-in-config
 PROGS += wrtd-out-config
+PROGS += wrtd-logging
 
 all: $(PROGS)
 

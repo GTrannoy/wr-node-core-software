@@ -24,6 +24,8 @@ static int wrtd_cmd_enable(struct wrtd_node *wrtd, int output,
 				  int argc, char *argv[]);
 static int wrtd_cmd_disable(struct wrtd_node *wrtd, int output,
 				  int argc, char *argv[]);
+static int wrtd_cmd_pulse_width(struct wrtd_node *wrtd, int output,
+				  int argc, char *argv[]);
 static int wrtd_cmd_assign(struct wrtd_node *wrtd, int output,
 				  int argc, char *argv[]);
 static int wrtd_cmd_unassign(struct wrtd_node *wrtd, int output,
@@ -44,6 +46,7 @@ static struct wrtd_commands cmds[] = {
 	{ "show", "shows assigned triggers", wrtd_cmd_show },
 	{ "enable", "enables an output", wrtd_cmd_enable },
 	{ "disable", "disables an output", wrtd_cmd_disable },
+	{ "pulse_width", "sets the output pulse width", wrtd_cmd_pulse_width },
 	{ "trig_enable", "enables a particular trigger", wrtd_cmd_trig_enable },
 	{ "trig_disable", "disables a particular trigger", wrtd_cmd_trig_disable },
 	{ "trig_stats", "shows per-trigger statistics", wrtd_cmd_trig_stats },
@@ -64,42 +67,47 @@ static void dump_output_state(struct wrtd_output_state *state)
 
 	decode_flags(tmp, state->flags);
 	printf("Output %d state:\n", state->output);
-    	printf(" - Flags:                 %s\n", tmp);
+    	printf(" - Flags:                         %s\n", tmp);
 	decode_mode(tmp, state->mode);
-	printf(" - Mode:                  %s\n", tmp);
-	printf(" - Executed pulses:           %-10d\n",
+	printf(" - Mode:                          %s\n", tmp);
+	format_ts(tmp, state->pulse_width, 0);
+	printf(" - Pulse width:                   %s\n", tmp);
+	format_ts(tmp, state->dead_time, 1);
+	printf(" - Dead time:                     %s\n", tmp);
+	
+	printf(" - Executed pulses:               %-10d\n",
 		       state->executed_pulses);
-	printf(" - Missed pulses (latency):   %-10d\n",
+	printf(" - Missed pulses (latency):       %-10d\n",
 		       state->missed_pulses_late);
-	printf(" - Missed pulses (dead time): %-10d\n",
+	printf(" - Missed pulses (dead time):     %-10d\n",
 		       state->missed_pulses_deadtime);
-	printf(" - Missed pulses (overflow):  %-10d\n",
+	printf(" - Missed pulses (overflow):      %-10d\n",
 		       state->missed_pulses_overflow);
 	printf(" - Missed pulses (no WR timing):  %-10d\n",
 		       state->missed_pulses_no_timing);
 
 	format_ts(tmp, state->last_executed.ts, 1);
 	format_id(tmp2, state->last_executed.id);
-	printf(" - Last executed trigger:     %s, ID: %s, SeqNo %d\n",
+	printf(" - Last executed trigger:         %s, ID: %s, SeqNo %d\n",
 		       tmp, tmp2, state->last_executed.seq);
 
 	format_ts(tmp, state->last_enqueued.ts, 1);
 	format_id(tmp2, state->last_enqueued.id);
-	printf(" - Last enqueued trigger:     %s, ID: %s, SeqNo %d\n",
+	printf(" - Last enqueued trigger:         %s, ID: %s, SeqNo %d\n",
 		       tmp, tmp2, state->last_enqueued.seq);
 
 	format_ts(tmp, state->last_received.ts, 1);
 	format_id(tmp2, state->last_received.id);
-	printf(" - Last received trigger:     %s, ID: %s, SeqNo %d\n",
+	printf(" - Last received trigger:         %s, ID: %s, SeqNo %d\n",
 		       tmp, tmp2, state->last_received.seq);
 
 	format_ts(tmp, state->last_lost.ts, 1);
 	format_id(tmp2, state->last_lost.id);
-	printf(" - Last missed/lost trigger:  %s, ID: %s, SeqNo %d\n",
+	printf(" - Last missed/lost trigger:      %s, ID: %s, SeqNo %d\n",
 		       tmp, tmp2, state->last_lost.seq);
 
-	printf(" - Total RX messages:          %-10d\n", state->received_messages);
-	printf(" - Total loopback messages:    %-10d\n", state->received_loopback);
+	printf(" - Total RX messages:             %-10d\n", state->received_messages);
+	printf(" - Total loopback messages:       %-10d\n", state->received_loopback);
 
 }
 
@@ -165,7 +173,7 @@ static int wrtd_cmd_state(struct wrtd_node *wrtd, int output,
 }
 
 static int wrtd_cmd_delay(struct wrtd_node *wrtd, int output,
-				  int argc, char *argv[])
+			  int argc, char *argv[])
 {
 	struct wrtd_output_trigger_state trig;
 	uint64_t dtime = 0;
@@ -186,6 +194,23 @@ static int wrtd_cmd_delay(struct wrtd_node *wrtd, int output,
 	parse_delay(argv[1], &dtime);
 
 	return wrtd_out_trig_delay_set(wrtd, &trig.handle, dtime);
+}
+
+static int wrtd_cmd_pulse_width(struct wrtd_node *wrtd, int output,
+			  int argc, char *argv[])
+{
+	uint64_t dtime = 0;
+
+	if (argc != 1 || argv[0] == NULL) {
+		fprintf(stderr,
+			"Missing arguments: width <pulse width>\n");
+		return -1;
+	}
+	
+	/* Get a trigger */
+	parse_delay(argv[0], &dtime);
+
+	return wrtd_out_pulse_width_set(wrtd, output, dtime);
 }
 
 static int wrtd_cmd_assign(struct wrtd_node *wrtd, int output,

@@ -483,6 +483,51 @@ int wrtd_out_trig_delay_set(struct wrtd_node *dev,
 	return wrtd_validate_acknowledge(&msg);
 }
 
+/**
+ * Sets the pulse width for a given output channel. 
+ * @param[in] dev device token
+ * @param[in] output index (0-based) of output channel
+ * @param[in] width_ps pulse width in pico-seconds (from 1us to 1s)
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_out_pulse_width_set(struct wrtd_node *dev, unsigned int output,
+			   uint64_t width_ps)
+{
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrnc_msg msg = wrnc_msg_init (16);
+	int err, tmp = 0;
+	uint32_t seq = 0, id;
+	
+	if (output >= WRTD_OUT_MAX) {
+		errno = EWRTD_INVALID_CHANNEL;
+		return -1;
+	}
+
+	if (width_ps < 1000ULL * 250 || width_ps >= 1000ULL * 1000 * 1000 * 1000 )
+	{
+		//fixme : add errno
+		return -1;
+	}
+
+	/* Build the message */
+	id = WRTD_CMD_FD_CHAN_SET_WIDTH;
+	wrnc_msg_header (&msg, &id, &seq);
+   	wrnc_msg_uint32 (&msg, &output);
+   	
+   	tmp = width_ps / 8000ULL;
+
+   	wrnc_msg_int32 (&msg, &tmp);
+
+	/* Send the message and get answer */
+	err = wrtd_out_send_and_receive_sync(wrtd, &msg);
+	if (err) {
+		errno = EWRTD_INVALID_ANSWER_STATE;
+		return -1;
+	}
+	
+	return wrtd_validate_acknowledge(&msg);
+}
+
 
 /**
  * It set the dead time for a given output channel. so, it applies on all

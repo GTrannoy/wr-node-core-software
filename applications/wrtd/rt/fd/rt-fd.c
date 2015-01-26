@@ -770,6 +770,17 @@ static inline void ctl_chan_set_mode (uint32_t seq, struct wrnc_msg *ibuf)
 	ctl_ack(seq);
 }
 
+static inline void ctl_chan_set_width (uint32_t seq, struct wrnc_msg *ibuf)
+{
+	int ch;
+	wrnc_msg_int32(ibuf, &ch);
+
+	struct lrt_output *st = &outputs[ch];
+	wrnc_msg_int32(ibuf, &st->width_cycles);
+
+	ctl_ack(seq);
+}
+
 
 static inline void ctl_chan_arm (uint32_t seq, struct wrnc_msg *ibuf)
 {
@@ -833,6 +844,8 @@ static inline void do_control()
 	_CMD(WRTD_CMD_FD_CHAN_ARM,		ctl_chan_arm)
 	_CMD(WRTD_CMD_FD_CHAN_GET_STATE,	ctl_chan_get_state)
 	_CMD(WRTD_CMD_FD_CHAN_SET_LOG_LEVEL,	ctl_chan_set_log_level)
+	_CMD(WRTD_CMD_FD_CHAN_SET_WIDTH,	ctl_chan_set_width)
+
 	default:
 	break;
 	}

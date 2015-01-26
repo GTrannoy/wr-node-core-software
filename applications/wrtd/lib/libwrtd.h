@@ -173,6 +173,9 @@ extern int wrtd_out_trig_delay_set(struct wrtd_node *dev,
 
 extern int wrtd_out_dead_time_set(struct wrtd_node *dev, unsigned int output,
 				  uint64_t dead_time_ps);
+extern int wrtd_out_pulse_width_set(struct wrtd_node *dev, unsigned int output,
+				  uint64_t pulse_width_ps);
+
 /* TODO implements the following prototypes */
 extern int wrtd_out_trig_condition_delay_set(struct wrtd_node *dev,
 					     struct wrtd_trigger_handle *handle,

@@ -13,8 +13,10 @@
  */
 struct wrnc_desc {
 	char name[WRNC_NAME_LEN]; /**< Name of the device */
+	char path[WRNC_PATH_LEN]; /**< path to device */
 	int fd_dev; /**< File Descriptor of the device */
 	int fd_cpu[WRNC_MAX_CPU];  /**< File Descriptor of the CPUs */
+
 };
 
 #endif

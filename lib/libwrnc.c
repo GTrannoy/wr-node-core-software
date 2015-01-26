@@ -58,13 +58,16 @@ int wrnc_init()
 
 	err = glob("/dev/wrnc-[A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9]",
 		   GLOB_NOSORT, NULL, &g);
+	if (err != GLOB_NOMATCH)
+		return -1;
+	err = glob("/dev/wr-node-core/wrnc-[A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9]",
+		   GLOB_NOSORT | GLOB_APPEND, NULL, &g);
 	if (err)
 		return -1;
 
 	count = g.gl_pathc;
 	for (i = 0; i < count; ++i)
-		strncpy(wrnc_dev_list[i], basename(g.gl_pathv[i]),
-			WRNC_NAME_LEN);
+		strncpy(wrnc_dev_list[i], basename(g.gl_pathv[i]), WRNC_NAME_LEN);
 	for (i = count; i < WRNC_MAX_CARRIER; ++i)
 		wrnc_dev_list[i][0] = '\0';
 
@@ -128,13 +131,27 @@ char (*wrnc_list())[WRNC_NAME_LEN]
 struct wrnc_dev *wrnc_open(const char *device)
 {
 	struct wrnc_desc *wrnc;
-	int i;
+	char path[WRNC_PATH_LEN + WRNC_NAME_LEN];
+	int i, err;
+	struct stat sb;
 
 	wrnc = malloc(sizeof(struct wrnc_desc));
 	if (!wrnc)
 		return NULL;
-
 	strncpy(wrnc->name, device, WRNC_NAME_LEN);
+
+	snprintf(path, WRNC_PATH_LEN + WRNC_NAME_LEN, "/dev/%s", wrnc->name);
+	err = stat(path, &sb);
+	if (!err) {
+		strncpy(wrnc->path, "/dev", WRNC_PATH_LEN);
+	} else {
+		snprintf(path, WRNC_PATH_LEN + WRNC_NAME_LEN,
+			 "/dev/wr-node-core/%s", wrnc->name);
+		err = stat(path, &sb);
+		if (err)
+			return NULL;
+		strncpy(wrnc->path, "/dev/wr-node-core", WRNC_PATH_LEN);
+	}
 
 	wrnc->fd_dev = -1;
 	for (i = 0; i < WRNC_MAX_CPU; ++i)
@@ -411,8 +428,8 @@ int wrnc_cpu_load_application_raw(struct wrnc_dev *wrnc,
 	char path[WRNC_DEVICE_PATH_LEN];
 	int fd, i = 0;
 
-	snprintf(path, WRNC_DEVICE_PATH_LEN, "/dev/%s-cpu-%02d",
-		 wdesc->name, index);
+	snprintf(path, WRNC_DEVICE_PATH_LEN, "%s/%s-cpu-%02d",
+		 wdesc->path, wdesc->name, index);
 	fd = open(path, O_WRONLY);
 	if (!fd)
 		return -1;
@@ -445,8 +462,8 @@ int wrnc_cpu_dump_application_raw(struct wrnc_dev *wrnc,
 	char path[WRNC_DEVICE_PATH_LEN];
 	int fd, i = 0, c = 100;
 
-	snprintf(path, WRNC_DEVICE_PATH_LEN, "/dev/%s-cpu-%02d",
-		 wdesc->name, index);
+	snprintf(path, WRNC_DEVICE_PATH_LEN, "%s/%s-cpu-%02d",
+		 wdesc->path, wdesc->name, index);
 	fd = open(path, O_RDONLY);
 	if (!fd)
 		return -1;
@@ -562,8 +579,8 @@ struct wrnc_hmq *wrnc_hmq_open(struct wrnc_dev *wrnc, unsigned int index,
 		return NULL;
 	}
 
-	snprintf(path, 64, "/dev/%s-hmq-%c-%02d",
-		 wdesc->name, (dir ? 'i' : 'o'), index);
+	snprintf(path, 64, "%s/%s-hmq-%c-%02d",
+		 wdesc->path, wdesc->name, (dir ? 'i' : 'o'), index);
 	fd = open(path, (dir ? O_WRONLY : O_RDONLY));
 	if (fd < 0)
 		return NULL;
@@ -653,7 +670,7 @@ static int wrnc_dev_open(struct wrnc_desc *wdesc)
 
 
 	if (wdesc->fd_dev < 0) {
-		snprintf(path, 64, "/dev/%s", wdesc->name);
+		snprintf(path, 64, "%s/%s", wdesc->path, wdesc->name);
 	        wdesc->fd_dev = open(path, O_RDWR);
 		if (wdesc->fd_dev < 0)
 			return -1;

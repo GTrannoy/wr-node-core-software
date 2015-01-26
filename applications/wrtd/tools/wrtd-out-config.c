@@ -67,7 +67,7 @@ static void dump_output_state(struct wrtd_output_state *state)
 
 	decode_flags(tmp, state->flags);
 	printf("Output %d state:\n", state->output);
-    	printf(" - Flags:                         %s\n", tmp);
+    printf(" - Flags:                         %s\n", tmp);
 	decode_mode(tmp, state->mode);
 	printf(" - Mode:                          %s\n", tmp);
 	format_ts(tmp, state->pulse_width, 0);
@@ -110,6 +110,7 @@ static void dump_output_state(struct wrtd_output_state *state)
 	printf(" - Total loopback messages:       %-10d\n", state->received_loopback);
 
 }
+
 
 static int trig_enable(struct wrtd_node *wrtd, int output,
 			   int argc, char *argv[], int enable)
@@ -173,7 +174,7 @@ static int wrtd_cmd_state(struct wrtd_node *wrtd, int output,
 }
 
 static int wrtd_cmd_delay(struct wrtd_node *wrtd, int output,
-			  int argc, char *argv[])
+				  int argc, char *argv[])
 {
 	struct wrtd_output_trigger_state trig;
 	uint64_t dtime = 0;

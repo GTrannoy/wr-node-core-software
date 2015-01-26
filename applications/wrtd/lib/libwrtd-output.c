@@ -61,7 +61,7 @@ static int wrtd_out_trig_get(struct wrtd_node *dev, unsigned int output,
 	uint32_t seq = 0, id ;
 	uint32_t state, latency_worst, latency_avg_sum, latency_avg_nsamples, ptr = 0;
 
-  	if (output >= WRTD_OUT_MAX) {
+	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -171,7 +171,7 @@ int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 	uint32_t seq = 0, id;
 	uint32_t dead_time_ticks, pulse_width_ticks;
 
-	if (output >= WRTD_OUT_MAX) {
+	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -225,7 +225,7 @@ int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 	wrnc_msg_uint32(&msg, &state->received_messages);
 	wrnc_msg_uint32(&msg, &state->received_loopback);
 
-/* Check for deserialization errors (buffer underflow/overflow) */
+	/* Check for deserialization errors (buffer underflow/overflow) */
 	if ( wrnc_msg_check_error(&msg) ) {
 		errno = EWRTD_INVALID_ANSWER_STATE;
 		return -1;
@@ -234,11 +234,11 @@ int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 	state->pulse_width.seconds = 0;
 	state->pulse_width.frac = 0;
 	state->pulse_width.ticks = pulse_width_ticks;
-	
+
 	state->dead_time.seconds = 0;
 	state->dead_time.frac = 0;
 	state->dead_time.ticks = dead_time_ticks;
-	
+
 	return 0;
 }
 
@@ -257,7 +257,7 @@ int wrtd_out_enable(struct wrtd_node *dev, unsigned int output,
 	struct wrnc_msg msg;
 	int err;
 
-	if (output >= WRTD_OUT_MAX) {
+	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -298,7 +298,7 @@ int wrtd_out_trig_assign(struct wrtd_node *dev, unsigned int output,
 	uint32_t seq = 0, id;
 	struct wrtd_trigger_handle tmp_handle;
 
-	if (output >= WRTD_OUT_MAX) {
+	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -387,7 +387,7 @@ int wrtd_out_trig_get_all(struct wrtd_node *dev, unsigned int output,
 {
 	int status, bucket, count = 0, index;
 
-  	if (output >= WRTD_OUT_MAX) {
+	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -589,11 +589,11 @@ int wrtd_out_trig_enable(struct wrtd_node *dev,
 	struct wrnc_msg msg = wrnc_msg_init (16);
 	uint32_t id = WRTD_CMD_FD_CHAN_ENABLE_TRIGGER, seq = 0;
 	int err;
-	
+
 	wrnc_msg_header (&msg, &id, &seq);
 	wrnc_msg_int32 (&msg, &handle->channel);
 	wrnc_msg_int32 (&msg, &enable);
-	
+
 	if(handle->ptr_cond)
 		wrnc_msg_uint32 (&msg, (uint32_t *) &handle->ptr_cond);
 	else
@@ -609,22 +609,28 @@ int wrtd_out_trig_enable(struct wrtd_node *dev,
 
 
 /**
- * Log every trigger pulse sent out to the network. Each log message contains
- * the input number, sequence ID, trigger ID, trigger counter (since arm) and
- * origin timestamp.
+ * It opens the logging interface for the output device. You can provide a
+ * default logging level.
  * @param[in] dev device token
- * @param[out] log log message
- * @param[in] flags
- * @param[in] input_mask bit mask of channel where read
- * @param[in] count number of messages to read
- * @return 0 on success, -1 on error and errno is set appropriately
+ * @param[in] lvl default logging level
+ * @return a HMQ token on success, NULL on error and errno is set appropriately
  */
-int wrtd_out_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
-		      int flags, unsigned int output_mask, int count)
+struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev,
+				   enum wrtd_log_level lvl)
 {
-	errno = EWRTD_NO_IMPLEMENTATION;
-	return -1;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	int i, err;
+
+	/* Set the same logging level to all channels */
+	for (i = 0; i < FD_NUM_CHANNELS; ++i) {
+		err = wrtd_out_log_level_set(dev, i, lvl);
+		if (err)
+			return NULL;
+	}
+
+	return wrnc_hmq_open(wrtd->wrnc, WRTD_OUT_FD_LOGGING, 0);
 }
+
 
 /**
  * @param[in] dev device token
@@ -635,8 +641,28 @@ int wrtd_out_read_log(struct wrtd_node *dev, struct wrtd_log_entry *log,
 int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
 			   uint32_t log_level)
 {
-	errno = EWRTD_NO_IMPLEMENTATION;
-	return -1;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrnc_msg msg = wrnc_msg_init(4);
+	uint32_t seq = 0, id;
+	int err;
+
+	if (output >= FD_NUM_CHANNELS) {
+		errno = EWRTD_INVALID_CHANNEL;
+		return -1;
+	}
+
+	/* Build the message */
+	id = WRTD_CMD_FD_CHAN_SET_LOG_LEVEL;
+	wrnc_msg_header(&msg, &id, &seq);
+	wrnc_msg_uint32(&msg, &output);
+	wrnc_msg_uint32(&msg, &log_level);
+
+	/* Send the message and get answer */
+	err = wrtd_out_send_and_receive_sync(wrtd, &msg);
+        if (err)
+		return err;
+
+	return wrtd_validate_acknowledge(&msg);
 }
 
 /**
@@ -673,7 +699,7 @@ int wrtd_out_arm(struct wrtd_node *dev, unsigned int ouput, int armed)
  * @param[in] output index (0-based) of output channel
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrtd_out_reset_counters_reset(struct wrtd_node *dev, unsigned int output)
+int wrtd_out_counters_reset(struct wrtd_node *dev, unsigned int output)
 {
 	errno = EWRTD_NO_IMPLEMENTATION;
 	return -1;

@@ -24,12 +24,16 @@
 #include "wrnc.h"
 
 int hmq_max_msg = 32; /**< Maximum number of messages in driver queue */
-module_param_named(max_slot_msg, hmq_max_msg, int, 0444);
+module_param_named(max_slot_msg, hmq_max_msg, int, 0644);
 MODULE_PARM_DESC(max_slot_msg, "Maximum number of messages in driver queue.");
 
 int hmq_max_con = 8; /**< Maximum number connection for each slot */
-module_param_named(max_slot_con, hmq_max_con, int, 0444);
+module_param_named(max_slot_con, hmq_max_con, int, 0644);
 MODULE_PARM_DESC(max_slot_con, "Maximum number connection for each slot.");
+
+int hmq_sync_timeout = 1000; /**< Milli-seconds to wait for a synchronous answer */
+module_param_named(sync_timeout, hmq_sync_timeout, int, 0644);
+MODULE_PARM_DESC(sync_timeout, "Milli-seconds to wait for a synchronous answer.");
 
 
 /**
@@ -123,12 +127,16 @@ static int wrnc_hmq_simple_open(struct inode *inode, struct file *file)
 /**
  * It writes message in the drive message queue. The messages will be sent on
  * IRQ signal
- * @TODO to be done!
+ * @TODO to be tested! WRTD is using only sync messages
  */
 static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 			      size_t count, loff_t *offp)
 {
 	struct wrnc_hmq *hmq = f->private_data;
+	struct wrnc_msg_element *msgel;
+	unsigned int i, n, free_slot;
+	char *curbuf = buf;
+	int err = 0;
 
 	if (!(hmq->flags & WRNC_FLAG_HMQ_DIR)) {
 		dev_err(&hmq->dev, "cannot write on an output queue\n");
@@ -140,23 +148,80 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 		return -EINVAL;
 	}
 
-	/* TODO ... */
-	return count;
+	if (hmq->count >= hmq_max_msg) {
+		return -EBUSY;
+	}
+
+	/* Get number of free slots */
+	n = count / sizeof(struct wrnc_msg);
+	free_slot = hmq_max_msg - hmq->count;
+	n = free_slot < n ? free_slot : n;
+
+	/* Write all the messages */
+	count = 0;
+	mutex_lock(&hmq->mtx);
+	for (i = 0; i < n; i++, curbuf += sizeof(struct wrnc_msg)) {
+		/* Allocate and fill message structure */
+		msgel = kmalloc(sizeof(struct wrnc_msg_element), GFP_KERNEL);
+		if (msgel) {
+			err = -ENOMEM;
+			break;
+		}
+
+		msgel->msg = kmalloc(sizeof(struct wrnc_msg), GFP_KERNEL);
+		if (!msgel->msg) {
+			kfree(msgel);
+			err = -ENOMEM;
+			break;
+		}
+
+		if (copy_from_user(msgel->msg, curbuf, sizeof(struct wrnc_msg))) {
+			kfree(msgel->msg);
+			kfree(msgel);
+			err = -EFAULT;
+			break;
+		}
+
+		spin_lock(&hmq->lock);
+		list_add_tail(&msgel->list, &hmq->list_msg);
+		hmq->count++;
+		spin_unlock(&hmq->lock);
+	}
+	mutex_unlock(&hmq->mtx);
+
+	/* Update counter */
+	count = i * sizeof(struct wrnc_msg);
+	*offp += count;
+
+	/*
+	 * If `count` is not 0, it means that we saved at least one message, even
+	 * if we got an error on the second message. So, in this case notifiy the
+	 * user space about how many messages where stored and ignore errors.
+	 * Return the error only when we did not save any message.
+	 *
+	 * I choosed this solution because we do not have any dangerous error here,
+	 * and it simplify the code.
+	 */
+	return count ? count : err;
 }
 
 /**
  * It writes a message to a FPGA HMQ
  */
-static void wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
+static uint32_t wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
 {
 	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
 	unsigned long flags;
+	uint32_t seq;
 	int i;
 
 	spin_lock_irqsave(&hmq->lock, flags);
 	/* Get the slot in order to write into it */
 	fmc_writel(fmc, MQUEUE_CMD_CLAIM, hmq->base_sr + MQUEUE_SLOT_COMMAND);
+	seq = ++wrnc->message_sequence;
+	/* Assign a sequence number to the message */
+	msg->data[1] = seq;
 	/* Write data into the slot */
 	for (i = 0; i < msg->datalen; ++i) {
 		fmc_writel(fmc, msg->data[i],
@@ -165,6 +230,8 @@ static void wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
 	/* The slot is ready to be sent to the CPU */
 	fmc_writel(fmc, MQUEUE_CMD_READY, hmq->base_sr + MQUEUE_SLOT_COMMAND);
 	spin_unlock_irqrestore(&hmq->lock, flags);
+
+	return seq;
 }
 
 /**
@@ -201,15 +268,41 @@ static struct wrnc_msg *wrnc_message_pop(struct wrnc_hmq *hmq)
 	return msg;
 }
 
+
+/**
+ * Look for a particular message
+ */
+static struct wrnc_msg_element *wrnc_retr_message(struct wrnc_hmq *hmq,
+						  uint32_t sequence)
+{
+	struct wrnc_msg_element *tmp, *msg_out;
+	int found = 0;
+
+	spin_lock(&hmq->lock);
+	list_for_each_entry_safe(msg_out, tmp, &hmq->list_msg, list) {
+		if (msg_out->msg->data[1] == sequence) {
+			/* We found the message, return it */
+			list_del(&msg_out->list);
+			hmq->count--;
+			found = 1;  /* found */
+			break;
+		}
+	}
+	spin_unlock(&hmq->lock);
+
+	return found ? msg_out : 0;  /* not found */
+}
+
 /**
  * Send a message and wait for the answer
  */
 static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 {
-	struct wrnc_msg_element *msgel;
+	struct wrnc_msg_element *msgel = NULL;
 	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
 	struct wrnc_msg_sync msg;
 	struct wrnc_hmq *hmq_out;
+	uint32_t seq;
 	int err = 0, to;
 
 	/* Copy the message from user space*/
@@ -227,38 +320,17 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 		return -EINVAL;
 	}
 	hmq_out = &wrnc->hmq_out[msg.index_out];
-	/*
-	 * Wait until the message queue is empty so we can safely enqueue
-	 * the synchronous message. Get the mutex to avoid other process
-	 * to write while we are waiting to empty the list.
-	 * Sync messages does not have higher priority than the others, so
-	 * we'll wait here until is our turn
-	 */
-	mutex_lock(&hmq->mtx);
-	to = wait_event_interruptible(hmq->q_msg, list_empty(&hmq->list_msg));
-	if (unlikely(to < 0))
-		goto out;
-
-	/*
-	 * Wait for the CPU-out queue is empty. Then get the mutex to avoid
-	 * other processes to read our synchronous answer
-	 */
-	to = wait_event_interruptible(hmq_out->q_msg,
-				      list_empty(&hmq_out->list_msg));
-	if (unlikely(to < 0))
-		goto out;
-	mutex_lock(&hmq_out->mtx);
 
 	/* Send the message */
-	wrnc_message_push(hmq, &msg.msg);
+	seq = wrnc_message_push(hmq, &msg.msg);
 
 	/*
 	 * Wait our synchronous answer. If after 1000ms we don't receive
 	 * an answer, something is seriously broken
 	 */
 	to = wait_event_interruptible_timeout(hmq_out->q_msg,
-					      !list_empty(&hmq_out->list_msg),
-					      msecs_to_jiffies(1000));
+				 (msgel = wrnc_retr_message(hmq_out, seq)),
+				 msecs_to_jiffies(hmq_sync_timeout));
 	if (unlikely(to <= 0)) {
 		if (to == 0)
 			dev_err(&hmq->dev,
@@ -266,24 +338,15 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 		memset(&msg.msg, 0, sizeof(struct wrnc_msg));
 		goto out_sync;
 	}
-	/* We have at least one message in the buffer, return it */
-	spin_lock(&hmq_out->lock);
-	msgel = list_entry(hmq_out->list_msg.next,
-			   struct wrnc_msg_element, list);
-	list_del(&msgel->list);
-	hmq_out->count--;
-	spin_unlock(&hmq_out->lock);
 
+	if (!msgel)
+		return -EINVAL;
 	/* Copy the answer message back to user space */
 	memcpy(&msg.msg, msgel->msg, sizeof(struct wrnc_msg));
 	kfree(msgel->msg);
 	kfree(msgel);
 
 out_sync:
-	mutex_unlock(&hmq_out->mtx);
-out:
-	mutex_unlock(&hmq->mtx);
-
 	return copy_to_user(uarg, &msg, sizeof(struct wrnc_msg_sync));
 }
 
@@ -331,6 +394,7 @@ static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 	struct wrnc_hmq *hmq = f->private_data;
 	struct wrnc_msg_element *msgel;
 	unsigned int i, n;
+	int err = 0;
 
 	if (hmq->flags & WRNC_FLAG_HMQ_DIR) {
 		dev_err(&hmq->dev, "cannot read from an input queue\n");
@@ -347,7 +411,7 @@ static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 
 	count = 0;
 	/* read as much as we can */
-	for (i = 0; i < n; ++i) {
+	for (i = 0; i < n && !err; ++i) {
 		if (list_empty(&hmq->list_msg)) {
 			*offp = 0;
 			break;
@@ -363,7 +427,7 @@ static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 		/* Copy to user space buffer */
 		if (copy_to_user(buf + count, msgel->msg,
 				 sizeof(struct wrnc_msg)))
-			return -EFAULT;
+			err = -EFAULT;
 
 		count = (i + 1) * sizeof(struct wrnc_msg);
 		kfree(msgel->msg);
@@ -371,8 +435,7 @@ static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 	}
 
 	*offp += count;
-
-	return count;
+	return count ? count : err;
 }
 
 /**

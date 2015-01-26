@@ -481,6 +481,7 @@ int wrnc_cpu_load_application_file(struct wrnc_dev *wrnc,
 	f = fopen(path, "rb");
 	if (!f)
 		return -1;
+
 	fseek(f, 0, SEEK_END);
 	len = ftell(f);
 	rewind(f);
@@ -490,6 +491,7 @@ int wrnc_cpu_load_application_file(struct wrnc_dev *wrnc,
 	code = malloc(len);
 	if (!code)
 		return -1;
+
 	/* Get the code from file */
 	i = fread(code, 1, len, f);
 	fclose(f);
@@ -545,7 +547,7 @@ int wrnc_cpu_dump_application_file(struct wrnc_dev *wrnc,
  * @param[in] wdesc device token
  * @param[in] index HMQ index
  * @param[in] flags HMQ flags
- * @return 0 on success, -1 on error and errno is set appropriately
+ * @return a HMQ token on success, NULL on error and errno is set appropriately
  */
 struct wrnc_hmq *wrnc_hmq_open(struct wrnc_dev *wrnc, unsigned int index,
 			       unsigned long flags)

@@ -162,6 +162,8 @@ The driver support the following module parameters:
 \begin{description}
   \item[max\_slot\_msg] Maximum number of messages to keep in the
     driver internal queue for each slot.
+  \item[sync\_timeout] Maximum number of milli-seconds to wait for a
+    synchronous answer.
 \end{description}
 
 
@@ -193,7 +195,7 @@ three way to access the White-Rabbit Node-Core resources:
 
 From the figure \ref{fig:swgenstack} is clear that the only way to
 communicate with the White-Rabbit Node-Core is through its Linux
-driver; there are not other way to access it.
+driver; there are not other ways to access it.
 
 
 \subsection{Library Interface}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -220,7 +222,7 @@ Node-Core exports two communication channels: Host-Message-Queue and
 the Shared-Memory. These communication channels are used to communicate
 between a real-time application, running on the
 CPU\footnote{Internally, the White-Rabbit Node-Core has up to 8 CPUs.
-Each CPU run independently a real-time application.}, and the Linux
+Each CPU runs, independently, a real-time application.}, and the Linux
 driver.
 
 The device hierarchy of the driver is shown in figure 
@@ -234,8 +236,27 @@ according to the White-Rabbit Node-Core configuration.
         \label{fig:swdrvhier}
 \end{figure}
 
-The Linux device driver export two Interfaces: sysfs attributes and
-char-devices.
+The Linux device driver export three interfaces: sysfs attributes,
+char-devices and debugfs.
+
+\subsubsection{Debugfs Interface}
+The purpose of the \textit{debugfs} is to provide debuggin information.
+Usually, the debugfs file-system is not automatically mounted. If it
+is not, mount it by using the following command:
+
+\begin{verbatim}
+    mount -t debugfs none /sys/kernel/debug
+\end{verbatim}
+
+In this directory you will find a directory for each WRNC loaded. These
+directories have this format: \textbf{'wrnc-\%04x', device\_id}.
+
+Following the list of the available debug files:
+\begin{description}
+  \item['wrnc-\%04x-cpu-\%02d-dbg', device\_id, cpu\_index]. For each
+CPU we have a debugfs file. By reading the debugfs file you can
+read the debug messages coming from the real-time application.
+\end{description}
 
 \subsubsection{Char-Devices Interface}
 All char-devices are available under the directory \texttt{/dev/}.
@@ -466,7 +487,7 @@ providing information here in order to avoid inconsistencies.
   \item Reading a slot is an exclusive operation. More threads cannot
     read the same message from the same slot. (It will be implemented
     later)
-  \item filtering debug messages is not possible yet
+  \item filtering messages is not possible yet
 \end{itemize}
 
 \end{document}

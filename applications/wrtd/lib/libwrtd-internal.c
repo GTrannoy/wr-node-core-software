@@ -59,3 +59,4 @@ void unbag_ts(uint32_t *buf, int offset, struct wr_timestamp *ts)
     ts->ticks = buf[offset + 1];
     ts->frac = buf[offset + 2];
 }
+

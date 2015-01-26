@@ -35,5 +35,6 @@ struct wrtd_desc {
 void unbag_ts(uint32_t *buf, int offset, struct wr_timestamp *ts);
 struct wr_timestamp picos_to_ts(uint64_t p);
 int wrtd_validate_acknowledge(struct wrnc_msg *msg);
-
+int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
+		  int count);
 #endif

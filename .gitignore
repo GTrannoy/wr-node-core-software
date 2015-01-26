@@ -10,3 +10,6 @@
 Module.symvers
 modules.order
 Makefile.specific
+*.S
+*.bin
+*.elf

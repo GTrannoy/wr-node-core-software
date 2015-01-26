@@ -115,7 +115,7 @@ int print_debug(struct wrnc_dbg *dbg)
 	return 0;
 }
 
-void debug_thread(void *arg)
+void *debug_thread(void *arg)
 {
 	struct wrnc_thread_desc *th_data = arg;
 	struct pollfd p[MAX_SLOT];
@@ -124,7 +124,7 @@ void debug_thread(void *arg)
 	int ret, i;
 
 	if (!th_data->n_cpu)
-		return;
+		return NULL;
 
   	/* Open the device */
 	wrnc = wrnc_open_by_fmc(th_data->dev_id);
@@ -179,6 +179,7 @@ out:
 		wrnc_debug_close(wdbg[i]);
 
 	wrnc_close(wrnc);
+	return NULL;
 }
 
 /**
@@ -194,7 +195,7 @@ void *message_thread(void *arg)
 	int ret, err, i;
 
 	if (!th_data->n_slot)
-		return;
+		return NULL;
 
 	/* Open the device */
 	wrnc = wrnc_open_by_fmc(th_data->dev_id);

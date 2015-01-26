@@ -89,7 +89,13 @@ int main(int argc, char *argv[])
 	do_write = (optind != argc);
 	printf("write? %d - %d %d\n", do_write, optind, argc);
 
-	wrnc_init();
+	err = wrnc_init();
+	if (err) {
+		fprintf(stderr, "Cannot init White Rabbit Node Core lib: %s\n",
+			wrnc_strerror(errno));
+		exit(1);
+	}
+
 	wrnc = wrnc_open_by_fmc(dev_id);
 	if (!wrnc) {
 		fprintf(stderr, "Cannot open WRNC: %s\n", wrnc_strerror(errno));

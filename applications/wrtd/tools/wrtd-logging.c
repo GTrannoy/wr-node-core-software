@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
 {
 	struct wrnc_hmq *log[N_LOG];
 	struct pollfd p[N_LOG];  /* each node has 2 logging channels (in, out) */
-	int n = 0, i = 0, ret, k;
+	int n = 0, i = 0, ret, k, err;
 	struct wrtd_node *wrtd;
 	uint32_t dev_id = 0;
 	char c;
@@ -74,7 +74,12 @@ int main(int argc, char *argv[])
 		help();
 
 	atexit(wrtd_exit);
-	wrtd_init();
+	err = wrtd_init();
+	if (err) {
+		fprintf(stderr, "Cannot init White Rabbit Node Core lib: %s\n",
+			wrnc_strerror(errno));
+		exit(1);
+	}
 
 	wrtd = wrtd_open_by_fmc(dev_id);
 	if (!wrtd) {

@@ -294,7 +294,12 @@ int main(int argc, char *argv[])
 	}
 
 	atexit(wrtd_exit);
-	wrtd_init();
+	err = wrtd_init();
+	if (err) {
+		fprintf(stderr, "Cannot init White Rabbit Trigger Distribution lib: %s\n",
+			wrnc_strerror(errno));
+		exit(1);
+	}
 
 	wrtd = wrtd_open_by_fmc(dev_id);
 	if (!wrtd) {

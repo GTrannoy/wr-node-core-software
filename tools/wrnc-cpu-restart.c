@@ -66,7 +66,13 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	wrnc_init();
+	err = wrnc_init();
+	if (err) {
+		fprintf(stderr, "Cannot init White Rabbit Node Core lib: %s\n",
+			wrnc_strerror(errno));
+		exit(1);
+	}
+
 	/* Open all devices */
 	for (i = 0; i < di; i++) {
 		wrnc[i] = wrnc_open_by_fmc(dev_id[i]);

@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
 			break;
 		case -1:
 			/* error */
-			fprintf("Cannot poll the HMQ: %s\n",
+			fprintf(stderr, "Cannot poll the HMQ: %s\n",
 				wrtd_strerror(errno));
 		        goto out_dump;
 			break;

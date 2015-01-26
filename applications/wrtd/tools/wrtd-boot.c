@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
 			fd = optarg;
 			break;
 		case 'T':
-			sscanf(optarg, "%d", &timeout);
+			sscanf(optarg, "%lu", &timeout);
 			break;
 		}
 	}

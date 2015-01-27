@@ -14,7 +14,7 @@
 #define WRTD_CPU_TDC 0			/* Core 0 controls the TDC mezzanine */
 #define WRTD_CPU_FD 1			/* Core 1 controls the FD mezzanine */
 
-#define WRTD_IN_MAX		5
+#define WRTD_IN_MAX		2
 #define WRTD_IN_TDC_CONTROL	0
 #define WRTD_IN_FD_CONTROL	1
 

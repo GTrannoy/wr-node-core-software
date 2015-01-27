@@ -179,10 +179,10 @@ static int wrnc_cpu_firmware_load(struct wrnc_cpu *cpu, void *fw_buf,
 	uint32_t *fw = fw_buf, word, word_rb;
 	int size, offset, i;
 
-	if (off + count > 8192 * 4) {
+	if (off + count > WRNC_CPU_MEM_SIZE_BYTE) {
 		dev_err(&cpu->dev,
 			"Cannot load firmware: size limit %d byte\n",
-			8192);
+			WRNC_CPU_MEM_SIZE_BYTE);
 		return -ENOMEM;
 	}
 
@@ -197,7 +197,8 @@ static int wrnc_cpu_firmware_load(struct wrnc_cpu *cpu, void *fw_buf,
 	fmc_writel(fmc, cpu->index, wrnc->base_csr + WRN_CPU_CSR_REG_CORE_SEL);
 
 	/* Clean CPU memory */
-	for (i = offset; i < 8192; ++i) { /* FIXME get size dynamically*/
+	/* FIXME get size dynamically*/
+	for (i = offset; i < WRNC_CPU_MEM_SIZE_WORD; ++i) {
 		fmc_writel(fmc, i, wrnc->base_csr + WRN_CPU_CSR_REG_UADDR);
 		fmc_writel(fmc, 0, wrnc->base_csr + WRN_CPU_CSR_REG_UDATA);
 	}
@@ -227,9 +228,9 @@ static int wrnc_cpu_firmware_dump(struct wrnc_cpu *cpu, void *fw_buf,
 	uint32_t *fw = fw_buf, word;
 	int size, offset, i;
 
-	if (off + count > 8192 * 4) {
-		dev_err(&cpu->dev, "Cannot load firmware: size limit %d byte\n",
-			8192 * 4);
+	if (off + count > WRNC_CPU_MEM_SIZE_BYTE) {
+		dev_err(&cpu->dev, "Cannot dump firmware: size limit %d byte\n",
+			WRNC_CPU_MEM_SIZE_BYTE);
 		return -ENOMEM;
 	}
 

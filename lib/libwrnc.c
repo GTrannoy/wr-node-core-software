@@ -112,7 +112,7 @@ char (*wrnc_list())[WRNC_NAME_LEN]
 	char *list;
 	int n = wrnc_count();
 
-	list = malloc(n * WRNC_NAME_LEN);
+	list = malloc((n + 1) * WRNC_NAME_LEN);
 	if (!list)
 		return NULL;
 	memset(list, 0, (n + 1) * WRNC_NAME_LEN); /* To se the terminator */

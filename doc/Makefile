@@ -21,7 +21,19 @@ latex:
 	latex wrnc.tex
 	latex wrnc.tex
 
+	@which dvipdf > /dev/null;					\
+	if [ $$? -eq  0 ]; then						\
+		dvipdf wrnc.dvi;					\
+	else								\
+		@which dvipdf > /dev/null;				\
+		if [ $$? -eq 0 ]; then					\
+			dvipdfm wrnc.dvi;				\
+		else							\
+			echo "Cannot convert to pdf. dvipdf/dvipdfm missing"; \
+		fi 							\
+	fi 								\
+
 clean:
 	rm -rf $(O)
 # Latex stuff
-	rm -f *.dvi *.aux *.out *.log *.backup
+	rm -f *.dvi *.aux *.out *.log *.backup *.pdf

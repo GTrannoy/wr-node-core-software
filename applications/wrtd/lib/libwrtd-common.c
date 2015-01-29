@@ -10,8 +10,8 @@
 #include <errno.h>
 #include <libwrnc.h>
 #include <libwrtd-internal.h>
-//#include <fmctdc-lib.h>
-//#include <fdelay-lib.h>
+#include <fmctdc-lib.h>
+#include <fdelay-lib.h>
 
 static const uint32_t application_id[] = {
 	0x115790de,
@@ -165,10 +165,10 @@ struct wrnc_dev *wrtd_get_wrnc_dev(struct wrtd_node *dev)
 }
 
 
-#if 0
-
 /**
  * It synchronize the mezzanines with the white rabbit network
+ * TODO- remove this function as soon as the RT application can
+ * sync the hardware
  * @param[in] dev device token
  * @return 0 on success, -1 on error and errno is appropiately set
  */
@@ -252,7 +252,6 @@ out_fd:
 	return -1;
 }
 
-#endif
 
 /**
  * It loads a set of real-time applications for TDC and FD

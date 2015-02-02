@@ -3,6 +3,8 @@
  * Author: Federico Vaga <federico.vaga@cern.ch>
  * License: GPL v3
  */
+#ifndef __WRNC_USER_H__
+#define  __WRNC_USER_H__
 
 #define WRNC_MAX_CARRIER 20 /**< Maximum number of WRNC components on a
 			       single computer*/
@@ -77,3 +79,4 @@ enum ual_ioctl_commands {
 				    struct wrnc_msg_sync)
 #define WRNC_IOCTL_SMEM_IO _IOWR(WRNC_IOCTL_MAGIC, WRNC_SMEM_IO, \
 				    struct wrnc_smem_io)
+#endif

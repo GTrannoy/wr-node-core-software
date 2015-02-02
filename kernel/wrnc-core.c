@@ -488,7 +488,6 @@ static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
 	if (err)
 		return err;
 
-	INIT_LIST_HEAD(&hmq->list_filters);
 	INIT_LIST_HEAD(&hmq->list_msg_input);
 	INIT_LIST_HEAD(&hmq->list_usr);
 

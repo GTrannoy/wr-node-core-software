@@ -39,6 +39,47 @@ int hmq_shared = 0; /**< Maximum number connection for each slot */
 module_param_named(slot_share, hmq_shared, int, 0444);
 MODULE_PARM_DESC(slot_share, "Set if by default slot are shared or not.");
 
+
+/**
+ * It applies filters on a given message.
+ */
+static int wrnc_hmq_filter_check(struct wrnc_hmq_user *user,
+				 struct wrnc_msg *msg)
+{
+	struct wrnc_msg_filter_element *fltel, *tmp;
+	unsigned int passed = 1, off;
+	uint32_t word;
+
+	spin_lock(&user->lock_filter);
+	list_for_each_entry_safe (fltel, tmp, &user->list_filters, list) {
+		/* If one of the previous filter failed, then stop */
+		if (!passed)
+			break;
+
+		word = msg->data[fltel->filter.word_offset];
+		switch(fltel->filter.operation) {
+		case WRNC_MSG_FILTER_AND:
+			word &= fltel->filter.mask;
+			break;
+		case WRNC_MSG_FILTER_OR:
+			word |= fltel->filter.mask;
+			break;
+		case WRNC_MSG_FILTER_EQ:
+			break;
+#if 0 /* FIXME not clear from specification what NOT should do*/
+		case WRNC_MSG_FILTER_NOT:
+			word ~= word;
+			break;
+#endif
+		}
+		if (word != fltel->filter.value )
+			passed = 0;
+	}
+	spin_unlock(&user->lock_filter);
+
+	return passed;
+}
+
 /**
  * Dispatch messages to all listeners. This allow multiple readers to get the
  * messages
@@ -53,6 +94,10 @@ static void wrnc_hmq_dispatch_out(struct wrnc_hmq *hmq,
 
 	/* for each user list copy the message */
 	list_for_each_entry_safe(usr, tmp, &hmq->list_usr, list) {
+		/* Filter the message */
+		if (!wrnc_hmq_filter_check(usr, msgel->msg))
+			continue;
+
 		/* Create a copy */
 		new = kmalloc(sizeof(struct wrnc_msg_element), GFP_ATOMIC);
 		if (!new)
@@ -87,46 +132,6 @@ static void wrnc_hmq_dispatch_out(struct wrnc_hmq *hmq,
 	}
 }
 
-
-/**
- * It applies filters on a given message.
- */
-static int wrnc_hmq_filter_check(struct wrnc_hmq *hmq,
-				 struct wrnc_msg *msg)
-{
-	struct wrnc_msg_filter_element *fltel, *tmp;
-	unsigned int passed = 1, off;
-	uint32_t word;
-
-	spin_lock(&hmq->lock_filter);
-	list_for_each_entry_safe(fltel, tmp, &hmq->list_filters, list) {
-		/* If one of the previous filter failed, then stop */
-		if (!passed)
-			break;
-
-		word = msg->data[fltel->filter.word_offset];
-		switch(fltel->filter.operation) {
-		case WRNC_MSG_FILTER_AND:
-			word &= fltel->filter.mask;
-			break;
-		case WRNC_MSG_FILTER_OR:
-			word |= fltel->filter.mask;
-			break;
-		case WRNC_MSG_FILTER_EQ:
-			break;
-#if 0 /* FIXME not clear from specification what NOT should do*/
-		case WRNC_MSG_FILTER_NOT:
-			word ~= word;
-			break;
-#endif
-		}
-		if (word != fltel->filter.value )
-			passed = 0;
-	}
-	spin_unlock(&hmq->lock_filter);
-
-	return passed;
-}
 
 /**
  * It return 1 if the message quque slot is full
@@ -262,7 +267,9 @@ static int wrnc_hmq_open(struct inode *inode, struct file *file)
 
 		user->hmq = hmq;
 		spin_lock_init(&user->lock);
+		spin_lock_init(&user->lock_filter);
 		INIT_LIST_HEAD(&user->list_msg_output);
+		INIT_LIST_HEAD(&user->list_filters);
 
 		/* Add new user to the list */
 		spin_lock(&hmq->lock);
@@ -473,7 +480,7 @@ static struct wrnc_msg *wrnc_message_pop(struct wrnc_hmq *hmq)
 
 /**
  * Look for a particular message
- * FIXME: This is inefficient but probably it will be never used and
+ * FIXME: This is inefficient but rarely used: configuration, debug
  * we have time to think about better implemtations
  */
 static struct wrnc_msg_element *wrnc_retr_message(struct wrnc_hmq *hmq,
@@ -573,7 +580,7 @@ out_sync:
  * FIXME: to be tested
  * Add a filter rule to a given file-descriptor
  */
-static int wrnc_ioctl_msg_filter_add(struct wrnc_hmq *hmq,
+static int wrnc_ioctl_msg_filter_add(struct wrnc_hmq_user *user,
 				     void __user *uarg)
 {
 	struct wrnc_msg_filter_element *fltel;
@@ -593,10 +600,10 @@ static int wrnc_ioctl_msg_filter_add(struct wrnc_hmq *hmq,
 	memcpy(&fltel->filter, &u_filter, sizeof(struct wrnc_msg_filter));
 
 	/* Store filter */
-	spin_lock(&hmq->lock_filter);
-	list_add_tail(&fltel->list, &hmq->list_filters);
-	hmq->n_filters++;
-	spin_unlock(&hmq->lock_filter);
+	spin_lock(&user->lock_filter);
+	list_add_tail(&fltel->list, &user->list_filters);
+	user->n_filters++;
+	spin_unlock(&user->lock_filter);
 
 	return 0;
 }
@@ -606,20 +613,19 @@ static int wrnc_ioctl_msg_filter_add(struct wrnc_hmq *hmq,
  * FIXME: to be tested
  * Remove all filter rules form a given file-descriptor
  */
-static void wrnc_ioctl_msg_filter_clean(struct wrnc_hmq *hmq,
+static void wrnc_ioctl_msg_filter_clean(struct wrnc_hmq_user *user,
 				       void __user *uarg)
 {
 	struct wrnc_msg_filter_element *fltel, *tmp;
 
-	spin_lock(&hmq->lock_filter);
-	list_for_each_entry_safe(fltel, tmp, &hmq->list_filters, list) {
+	spin_lock(&user->lock_filter);
+	list_for_each_entry_safe (fltel, tmp, &user->list_filters, list) {
 		list_del(&fltel->list);
 		kfree(fltel);
-		hmq->n_filters--;
+		user->n_filters--;
 	}
-	spin_unlock(&hmq->lock_filter);
+	spin_unlock(&user->lock_filter);
 }
-
 
 
 /**
@@ -650,10 +656,10 @@ static long wrnc_hmq_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 		err = wrnc_ioctl_msg_sync(hmq, uarg);
 		break;
 	case WRNC_IOCTL_MSG_FILTER_ADD:
-		err = wrnc_ioctl_msg_filter_add(hmq, uarg);
+		err = wrnc_ioctl_msg_filter_add(user, uarg);
 		break;
 	case WRNC_MSG_FILTER_CLEAN:
-		wrnc_ioctl_msg_filter_clean(hmq, uarg);
+		wrnc_ioctl_msg_filter_clean(user, uarg);
 		break;
 	default:
 		pr_warn("ual: invalid ioctl command %d\n", cmd);
@@ -830,11 +836,6 @@ static void wrnc_irq_handler_output(struct wrnc_hmq *hmq)
 	/* get the message from the device */
 	msgel->msg = wrnc_message_pop(hmq);
 	if (IS_ERR_OR_NULL(msgel->msg)) {
-		kfree(msgel);
-		return;
-	}
-
-	if (!wrnc_hmq_filter_check(hmq, msgel->msg)) {
 		kfree(msgel);
 		return;
 	}

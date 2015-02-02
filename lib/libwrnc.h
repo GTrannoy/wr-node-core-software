@@ -71,22 +71,6 @@ enum wrnc_error_number {
 	__EWRNC_MAX,
 };
 
-enum wrnc_msg_filter_operation_type {
-	WRNC_MSG_FILTER_OR,
-	WRNC_MSG_FILTER_AND,
-	WRNC_MSG_FILTER_NOT,
-	WRNC_MSG_FILTER_EQ,
-};
-
-/**
- * It describe a filter to apply to messages
- */
-struct wrnc_msg_filter {
-	enum wrnc_msg_filter_operation_type operation; /**< kind of operation to perform */
-	unsigned int word_offset; /**< offset of the word to check */
-	uint32_t mask; /**< mask to apply before the operation */
-	uint32_t value; /**< second operand of the operation */
-};
 
 /**
  * @file libwrnc.c
@@ -139,6 +123,12 @@ extern int wrnc_hmq_send_and_receive_sync(struct wrnc_hmq *hmq,
 					   unsigned int index_out,
 					   struct wrnc_msg *msg,
 					   unsigned int timeout_ms);
+
+/* FIXME to be tested */
+extern int wrnc_hmq_filter_add(struct wrnc_hmq *hmq,
+			       struct wrnc_msg_filter *filter);
+/* FIXME to be tested */
+extern int wrnc_hmq_filter_clean(struct wrnc_hmq *hmq);
 extern int wrnc_smem_read(struct wrnc_dev *wrnc, uint32_t addr, uint32_t *data,
 			  size_t count, enum wrnc_smem_modifier mod);
 extern int wrnc_smem_write(struct wrnc_dev *wrnc, uint32_t addr, uint32_t *data,

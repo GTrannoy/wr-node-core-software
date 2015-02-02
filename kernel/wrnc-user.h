@@ -55,6 +55,28 @@ struct wrnc_msg_sync {
 };
 
 /**
+ * List of available filter's operations
+ */
+enum wrnc_msg_filter_operation_type {
+	WRNC_MSG_FILTER_AND,
+	WRNC_MSG_FILTER_OR,
+	WRNC_MSG_FILTER_NOT,
+	WRNC_MSG_FILTER_EQ,
+};
+
+/**
+ * It describe a filter to apply to messages
+ */
+struct wrnc_msg_filter {
+	uint32_t operation; /**< kind of operation
+							  to perform */
+	uint32_t word_offset; /**< offset of the word to check */
+	uint32_t mask; /**< mask to apply before the operation */
+	uint32_t value; /**< second operand of the operation */
+};
+
+
+/**
  * Descriptor of the IO operation on Shared Memory
  */
 struct wrnc_smem_io {
@@ -71,6 +93,8 @@ struct wrnc_smem_io {
 enum ual_ioctl_commands {
         WRNC_MSG_SYNC, /**< send a synchronous message */
 	WRNC_SMEM_IO, /**< access to shared memory */
+	WRNC_MSG_FILTER_ADD, /**< add a message filter */
+	WRNC_MSG_FILTER_CLEAN, /**< remove all filters */
 };
 
 
@@ -79,4 +103,11 @@ enum ual_ioctl_commands {
 				    struct wrnc_msg_sync)
 #define WRNC_IOCTL_SMEM_IO _IOWR(WRNC_IOCTL_MAGIC, WRNC_SMEM_IO, \
 				    struct wrnc_smem_io)
+
+#define WRNC_IOCTL_MSG_FILTER_ADD _IOW(WRNC_IOCTL_MAGIC,	\
+				       WRNC_MSG_FILTER_ADD,	\
+				       struct wrnc_msg_filter)
+#define WRNC_IOCTL_MSG_FILTER_CLEAN _IOW(WRNC_IOCTL_MAGIC,		\
+					 WRNC_MSG_FILTER_CLEAN,		\
+					 struct wrnc_msg_filter)
 #endif

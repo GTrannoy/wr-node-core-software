@@ -27,6 +27,12 @@
 #define WRNC_FLAG_HMQ_DIR (1 << 0) /**< 1 CPU input, 0 CPU output */
 #define WRNC_FLAG_HMQ_SHR (1 << 1) /**< 1 shared, means that more than
 				      1 CPU is using it */
+
+struct wrnc_msg_filter_element {
+	struct wrnc_msg_filter filter;
+	struct list_head list;
+};
+
 /**
  * Available type of devices
  */
@@ -61,6 +67,10 @@ struct wrnc_hmq {
 	struct spinlock lock; /**< to protect list read/write */
 	struct mutex mtx; /**< to protect operations on the HMQ */
 	wait_queue_head_t q_msg; /**< wait queue for synchronous messages */
+
+	struct list_head list_filters; /**< list of filters to apply */
+	unsigned int n_filters; /**< number of filters */
+	struct spinlock lock_filter; /**< to protect filter list read/write */
 };
 
 

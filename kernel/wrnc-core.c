@@ -486,6 +486,7 @@ static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
 	if (err)
 		return err;
 
+	INIT_LIST_HEAD(&hmq->list_filters);
 	INIT_LIST_HEAD(&hmq->list_msg);
 	if (is_input) { /* CPU input */
 		hmq->flags |= WRNC_FLAG_HMQ_DIR;

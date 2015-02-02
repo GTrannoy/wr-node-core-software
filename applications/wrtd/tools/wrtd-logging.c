@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* Open logging interfaces */
-	log[0] = wrtd_in_log_open(wrtd, WRTD_LOG_ALL);
+	log[0] = wrtd_in_log_open(wrtd, WRTD_LOG_ALL, -1);
 	if (!log[0]) {
 		fprintf(stderr, "Cannot open input logging HMQ: %s\n",
 				wrtd_strerror(errno));
@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
 	p[0].fd = log[0]->fd;
 	p[0].events = POLLIN;
 
-	log[1] = wrtd_out_log_open(wrtd, WRTD_LOG_ALL);
+	log[1] = wrtd_out_log_open(wrtd, WRTD_LOG_ALL, -1);
 	if (!log[1]) {
 		fprintf(stderr, "Cannot open output logging HMQ: %s\n",
 				wrtd_strerror(errno));

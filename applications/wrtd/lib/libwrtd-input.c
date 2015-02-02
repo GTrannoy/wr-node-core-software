@@ -534,24 +534,57 @@ int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
 /**
  * It opens the logging interface for the input device. You can provide a
  * default logging level.
+ * @todo reduce code duplication wrtd_out_log_open()
  * @param[in] dev device token
  * @param[in] lvl default logging level
+ * @param[in] input channel number [-1, 4]. [-1] for all channels, [0,4] for a
+ *                  specific one.
  * @return a HMQ token on success, NULL on error and errno is set appropriately
  */
 struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev,
-				  uint32_t lvl)
+				  uint32_t lvl,
+				  int input)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrnc_msg_filter filter = {
+		.operation = WRNC_MSG_FILTER_AND,
+		.word_offset = 2, /* channel field */
+		.mask = 0xFFFF, /* entire field */
+		.value = input, /* required channel */
+	};
+	struct wrnc_hmq *hmq = NULL;
 	int i, err;
 
-	/* Set the same logging level to all channels */
-	for (i = 0; i < TDC_NUM_CHANNELS; ++i) {
-		err = wrtd_in_log_level_set(dev, i, lvl);
-		if (err)
-			return NULL;
+	if (input < -1 || input >= TDC_NUM_CHANNELS) {
+		errno = EWRTD_INVALID_CHANNEL;
+		return NULL;
 	}
 
-	return wrnc_hmq_open(wrtd->wrnc, WRTD_OUT_TDC_LOGGING, 0);
+	if (input > -1) {
+		err = wrtd_in_log_level_set(dev, input, lvl);
+		if (err)
+			return NULL;
+
+		hmq = wrnc_hmq_open(wrtd->wrnc, WRTD_OUT_TDC_LOGGING, 0);
+		if (!hmq)
+			return NULL;
+
+		err = wrnc_hmq_filter_add(hmq, &filter);
+		if (err) {
+			wrnc_hmq_close(hmq);
+			return NULL;
+		}
+	} else {
+		/* Set the same logging level to all channels */
+		for (i = 0; i < TDC_NUM_CHANNELS; ++i) {
+			err = wrtd_in_log_level_set(dev, i, lvl);
+			if (err)
+				return NULL;
+		}
+		hmq = wrnc_hmq_open(wrtd->wrnc, WRTD_OUT_TDC_LOGGING, 0);
+	}
+
+	return hmq;
 }
 
 

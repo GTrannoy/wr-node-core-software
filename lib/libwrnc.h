@@ -71,22 +71,6 @@ enum wrnc_error_number {
 	__EWRNC_MAX,
 };
 
-enum wrnc_msg_filter_operation_type {
-	WRNC_MSG_FILTER_OR,
-	WRNC_MSG_FILTER_AND,
-	WRNC_MSG_FILTER_NOT,
-	WRNC_MSG_FILTER_EQ,
-};
-
-/**
- * It describe a filter to apply to messages
- */
-struct wrnc_msg_filter {
-	enum wrnc_msg_filter_operation_type operation; /**< kind of operation to perform */
-	unsigned int word_offset; /**< offset of the word to check */
-	uint32_t mask; /**< mask to apply before the operation */
-	uint32_t value; /**< second operand of the operation */
-};
 
 /**
  * @file libwrnc.c

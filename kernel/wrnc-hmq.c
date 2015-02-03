@@ -632,8 +632,11 @@ static void wrnc_irq_handler_output(struct wrnc_hmq *hmq)
 		return;
 	}
 
-	if (!wrnc_hmq_filter_check(hmq, msgel->msg))
+	if (!wrnc_hmq_filter_check(hmq, msgel->msg)) {
+		kfree(msgel);
 		return;
+	}
+
 	/* We have a valid message, store it */
 	spin_lock_irqsave(&hmq->lock, flags);
 	list_add_tail(&msgel->list, &hmq->list_msg);

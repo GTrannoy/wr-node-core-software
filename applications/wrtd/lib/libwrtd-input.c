@@ -534,7 +534,8 @@ int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
  * @param[in] lvl default logging level
  * @return a HMQ token on success, NULL on error and errno is set appropriately
  */
-struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev, enum wrtd_log_level lvl)
+struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev,
+				  uint32_t lvl)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	int i, err;

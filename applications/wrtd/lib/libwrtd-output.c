@@ -616,7 +616,7 @@ int wrtd_out_trig_enable(struct wrtd_node *dev,
  * @return a HMQ token on success, NULL on error and errno is set appropriately
  */
 struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev,
-				   enum wrtd_log_level lvl)
+				   uint32_t lvl)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	int i, err;

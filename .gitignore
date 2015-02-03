@@ -13,3 +13,5 @@ Makefile.specific
 *.S
 *.bin
 *.elf
+*.gdb
+GPATH

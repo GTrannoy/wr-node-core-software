@@ -34,7 +34,7 @@ static int print_message(struct wrnc_hmq *hmq)
 	if (count <= 0)
 		return -1;
 
-	fprintf(stdout, "Event Type  %d\n", log.type);
+	fprintf(stdout, "Event Type  %s\n", wrtd_strlogging(log.type));
 	fprintf(stdout, "Channel     %d\n", log.channel);
 	fprintf(stdout, "Sequence    %d\n", log.seq);
 	fprintf(stdout, "Identifier  %d:%d%d\n",

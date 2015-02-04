@@ -106,6 +106,7 @@ struct wrtd_output_state {
  * @file libwrtd-common.c
  */
 extern const char *wrtd_strerror(int err);
+extern const char *wrtd_strlogging(enum wrtd_log_level lvl);
 extern int wrtd_init();
 extern void wrtd_exit();
 extern struct wrtd_node *wrtd_open_by_fmc(uint32_t device_id);

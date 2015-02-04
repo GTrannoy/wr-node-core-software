@@ -49,6 +49,33 @@ const char *wrtd_strerror(int err)
 
 
 /**
+ * It returns a string that describe a given log level
+ * @param[in] lvl log level
+ * @return a string if the log level is mapped, otherwise an empty string
+ */
+const char *wrtd_strlogging(enum wrtd_log_level lvl)
+{
+	switch (lvl) {
+	case WRTD_LOG_NOTHING:
+		return "No logging";
+	case WRTD_LOG_RAW:
+		return "incoming pulse";
+	case WRTD_LOG_SENT:
+		return "trigger message sent";
+	case WRTD_LOG_PROMISC:
+		return "received trigger message";
+	case WRTD_LOG_FILTERED:
+		return "trigger message assigned";
+	case WRTD_LOG_EXECUTED:
+		return "pulse generated";
+	case WRTD_LOG_MISSED:
+		return "pulse missed";
+	}
+
+	return "n/a";
+}
+
+/**
  * It initializes the WRTD library. It must be called before doing
  * anything else. If you are going to load/unload WRTD devices, then
  * you have to un-load (wrtd_exit()) e reload (wrtd_init()) the library.

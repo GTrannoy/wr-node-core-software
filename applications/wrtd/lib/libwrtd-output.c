@@ -217,7 +217,7 @@ int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 
 	wrnc_msg_int32(&msg, &dummy);
 	wrnc_msg_int32(&msg, &dummy);
-	wrnc_msg_int32(&msg, &state->mode);
+	wrnc_msg_int32(&msg, (int *) &state->mode);
 	wrnc_msg_uint32(&msg, &state->flags);
 	wrnc_msg_uint32(&msg, &state->log_level);
 	wrnc_msg_uint32(&msg, &dead_time_ticks);

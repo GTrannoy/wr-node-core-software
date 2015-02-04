@@ -50,7 +50,7 @@ struct wrtd_input_state {
 
     uint32_t flags;           ///> enum list_io_flags
     uint32_t log_level;       ///> enum list_log_level
-    int mode;
+    enum wrtd_trigger_mode mode;
 
     uint32_t tagged_pulses;
     uint32_t sent_triggers;
@@ -94,7 +94,7 @@ struct wrtd_output_state {
 
     uint32_t flags;           ///> enum list_io_flags
     uint32_t log_level;       ///> enum list_log_level
-    int mode;
+    enum wrtd_trigger_mode mode;
     struct wr_timestamp dead_time;
     struct wr_timestamp pulse_width;
     

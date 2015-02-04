@@ -70,6 +70,8 @@ const char *wrtd_strlogging(enum wrtd_log_level lvl)
 		return "pulse generated";
 	case WRTD_LOG_MISSED:
 		return "pulse missed";
+	case WRTD_LOG_ALL:
+		return "all";
 	}
 
 	return "n/a";

@@ -99,7 +99,7 @@ enum wrtd_trigger_mode {
  * This enum is used in list_input_state / list_output_state
  * structures to pass state information
  */
-enum wrnc_io_flags {
+enum wrtd_io_flags {
     WRTD_ENABLED = (1 << 0),          /*!< I/O is physically enabled */
     WRTD_TRIGGER_ASSIGNED = (1 << 1), /*!< I/O is has a trigger assigned */
     WRTD_LAST_VALID = (1 << 2),       /*!< I/O processed at least one pulse.

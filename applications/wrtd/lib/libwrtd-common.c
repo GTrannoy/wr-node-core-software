@@ -346,3 +346,36 @@ void wrtd_log_close(struct wrnc_hmq *hmq)
 {
 	wrnc_hmq_close(hmq);
 }
+
+
+/**
+ * It converts the white rabbit time stamp to a pico seconds
+ * @param[in] ts time-stamp
+ * @param[out] pico pico-seconds
+ */
+void wrtd_ts_to_pico(struct wr_timestamp *ts, uint64_t *pico)
+{
+	uint64_t p;
+
+	p = ts->frac * 8000 / 4096;
+	p += (uint64_t) ts->ticks * 8000LL;
+	p += ts->seconds * (1000ULL * 1000ULL * 1000ULL * 1000ULL);
+	*pico = p;
+}
+
+
+/**
+ * It converts a pico seconds integer into a white rabbit time stamp
+ * @param[in] pico pico-seconds
+ * @param[out] ts time-stamp
+ */
+void wrtd_pico_to_ts(uint64_t *pico, struct wr_timestamp *ts)
+{
+	uint64_t p = *pico;
+
+	ts->seconds = p / (1000ULL * 1000ULL * 1000ULL * 1000ULL);
+	p %= (1000ULL * 1000ULL * 1000ULL * 1000ULL);
+	ts->ticks = p / 8000;
+	p %= 8000;
+	ts->frac = p * 4096 / 8000;
+}

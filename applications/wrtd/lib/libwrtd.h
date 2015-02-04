@@ -119,6 +119,8 @@ extern int wrtd_white_rabbit_sync(struct wrtd_node *dev,
 extern int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
 			 int count);
 extern void wrtd_log_close(struct wrnc_hmq *hmq);
+extern void wrtd_ts_to_pico(struct wr_timestamp *ts, uint64_t *pico);
+extern void wrtd_pico_to_ts(uint64_t *pico, struct wr_timestamp *ts);
 
 /**
  * @file libwrtd-input.c

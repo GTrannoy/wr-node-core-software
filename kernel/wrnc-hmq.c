@@ -47,7 +47,7 @@ static int wrnc_hmq_filter_check(struct wrnc_hmq_user *user,
 				 struct wrnc_msg *msg)
 {
 	struct wrnc_msg_filter_element *fltel, *tmp;
-	unsigned int passed = 1, off;
+	unsigned int passed = 1;
 	uint32_t word;
 
 	spin_lock(&user->lock_filter);
@@ -91,6 +91,19 @@ static void wrnc_hmq_dispatch_out(struct wrnc_hmq *hmq,
 	struct wrnc_msg *msg;
 	struct wrnc_hmq_user *usr, *tmp;
 	unsigned long flags;
+
+	/* If we are waiting a synchronous answer on this HMQ check */
+	if ((hmq->flags & WRNC_FLAG_HMQ_SYNC_WAIT) &&
+	    hmq->waiting_seq == wrnc_get_sequence(msgel->msg)) {
+		spin_lock_irqsave(&hmq->lock, flags);
+		hmq->sync_answer = *msgel->msg;
+		hmq->flags &= ~WRNC_FLAG_HMQ_SYNC_WAIT;
+		hmq->flags |= WRNC_FLAG_HMQ_SYNC_READY;
+		spin_unlock_irqrestore(&hmq->lock, flags);
+
+		/* Do not store synchronous answer */
+		return;
+	}
 
 	/* for each user list copy the message */
 	list_for_each_entry_safe(usr, tmp, &hmq->list_usr, list) {
@@ -217,10 +230,12 @@ static ssize_t wrnc_store_share(struct device *dev,
 	if (hmq->n_user > 0)
 		return -EBUSY;
 
+	spin_lock(&hmq->lock);
 	if (val)
 		hmq->flags |= WRNC_FLAG_HMQ_SHR_USR;
 	else
 		hmq->flags &= ~WRNC_FLAG_HMQ_SHR_USR;
+	spin_unlock(&hmq->lock);
 
 	return count;
 }
@@ -415,17 +430,16 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 }
 
 /**
- * It writes a message to a FPGA HMQ
+ * It writes a message to a FPGA HMQ. Note that you have to take
+ * the HMQ spinlock before call this function
  */
 static uint32_t wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
 {
 	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
-	unsigned long flags;
 	uint32_t seq;
 	int i;
 
-	spin_lock_irqsave(&hmq->lock, flags);
 	/* Get the slot in order to write into it */
 	fmc_writel(fmc, MQUEUE_CMD_CLAIM, hmq->base_sr + MQUEUE_SLOT_COMMAND);
 	seq = ++wrnc->message_sequence;
@@ -438,7 +452,6 @@ static uint32_t wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
 	}
 	/* The slot is ready to be sent to the CPU */
 	fmc_writel(fmc, MQUEUE_CMD_READY, hmq->base_sr + MQUEUE_SLOT_COMMAND);
-	spin_unlock_irqrestore(&hmq->lock, flags);
 
 	return seq;
 }
@@ -451,7 +464,6 @@ static struct wrnc_msg *wrnc_message_pop(struct wrnc_hmq *hmq)
 	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
 	struct wrnc_msg *msg;
-	unsigned long flags;
 	uint32_t status;
 	int i;
 
@@ -459,7 +471,6 @@ static struct wrnc_msg *wrnc_message_pop(struct wrnc_hmq *hmq)
 	if (!msg)
 		return ERR_PTR(-ENOMEM);
 
-	spin_lock_irqsave(&hmq->lock, flags);
 	/* Get information about the incoming slot */
 	status = fmc_readl(fmc, hmq->base_sr + MQUEUE_SLOT_STATUS);
 	msg->datalen = (status & MQUEUE_SLOT_STATUS_MSG_SIZE_MASK);
@@ -472,51 +483,8 @@ static struct wrnc_msg *wrnc_message_pop(struct wrnc_hmq *hmq)
 
 	/* Discard the slot content */
 	fmc_writel(fmc, MQUEUE_CMD_DISCARD, hmq->base_sr + MQUEUE_SLOT_COMMAND);
-	spin_unlock_irqrestore(&hmq->lock, flags);
 
 	return msg;
-}
-
-
-/**
- * Look for a particular message
- * FIXME: This is inefficient but rarely used: configuration, debug
- * we have time to think about better implemtations
- */
-static struct wrnc_msg_element *wrnc_retr_message(struct wrnc_hmq *hmq,
-						  uint32_t sequence)
-{
-	struct wrnc_msg_element *msg, *tmp, *msg_out;
-  	struct wrnc_hmq_user *usr;
-	int found = 0;
-
-	spin_lock(&hmq->lock);
-	/* Look insto all users instances */
-	list_for_each_entry(usr, &hmq->list_usr, list) {
-		spin_lock(&usr->lock);
-		/*
-		 * Look into all messages in reverse order.
-		 * Reverse because the main purpose of this function is to
-		 * retrieve a sync. answer which is probably at the end of
-		 * the list
-		 */
-		list_for_each_entry_safe_reverse(msg, tmp, &usr->list_msg_output, list) {
-			if (msg->msg->data[1] == sequence) {
-				/* We found the message, return it */
-				list_del(&msg->list);
-				usr->n_output--;
-				if (!found) {
-					msg_out = msg;
-					found = 1;  /* found */
-					break;
-				}
-			}
-		}
-		spin_unlock(&usr->lock);
-	}
-	spin_unlock(&hmq->lock);
-
-	return found ? msg_out : 0;  /* not found */
 }
 
 
@@ -526,7 +494,7 @@ static struct wrnc_msg_element *wrnc_retr_message(struct wrnc_hmq *hmq,
 static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 {
 	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
-	struct wrnc_msg_element *msgel = NULL;
+	struct wrnc_msg msg_ans;
 	struct wrnc_msg_sync msg;
 	struct wrnc_hmq *hmq_out;
 	uint32_t seq;
@@ -549,15 +517,24 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	hmq_out = &wrnc->hmq_out[msg.index_out];
 
 	/* Send the message */
-	seq = wrnc_message_push(hmq, &msg.msg);
+	spin_lock(&hmq_out->lock);
+	hmq_out->flags |= WRNC_FLAG_HMQ_SYNC_WAIT;
+	hmq_out->waiting_seq = wrnc_message_push(hmq, &msg.msg);
+	spin_unlock(&hmq_out->lock);
 
 	/*
 	 * Wait our synchronous answer. If after 1000ms we don't receive
 	 * an answer, something is seriously broken
 	 */
 	to = wait_event_interruptible_timeout(hmq_out->q_msg,
-				 (msgel = wrnc_retr_message(hmq_out, seq)),
-				 msecs_to_jiffies(hmq_sync_timeout));
+					      hmq_out->flags & WRNC_FLAG_HMQ_SYNC_READY,
+					      msecs_to_jiffies(hmq_sync_timeout));
+
+	spin_lock(&hmq_out->lock);
+	hmq_out->flags &= ~WRNC_FLAG_HMQ_SYNC_READY;
+	msg_ans = hmq_out->sync_answer;
+	spin_unlock(&hmq_out->lock);
+
 	if (unlikely(to <= 0)) {
 		if (to == 0)
 			dev_err(&hmq->dev,
@@ -566,10 +543,8 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 		goto out_sync;
 	}
 
-	if (!msgel)
-		return -EINVAL;
 	/* Copy the answer message back to user space */
-	memcpy(&msg.msg, msgel->msg, sizeof(struct wrnc_msg));
+	memcpy(&msg.msg, &msg_ans, sizeof(struct wrnc_msg));
 
 out_sync:
 	return copy_to_user(uarg, &msg, sizeof(struct wrnc_msg_sync));
@@ -827,6 +802,7 @@ static void wrnc_irq_handler_input(struct wrnc_hmq *hmq)
 static void wrnc_irq_handler_output(struct wrnc_hmq *hmq)
 {
 	struct wrnc_msg_element *msgel;
+	unsigned long flags;
 
 	/* Allocate space for the incoming message */
 	msgel = kmalloc(sizeof(struct wrnc_msg_element), GFP_ATOMIC);
@@ -834,7 +810,9 @@ static void wrnc_irq_handler_output(struct wrnc_hmq *hmq)
 		return;
 
 	/* get the message from the device */
+	spin_lock_irqsave(&hmq->lock, flags);
 	msgel->msg = wrnc_message_pop(hmq);
+	spin_unlock_irqrestore(&hmq->lock, flags);
 	if (IS_ERR_OR_NULL(msgel->msg)) {
 		kfree(msgel);
 		return;

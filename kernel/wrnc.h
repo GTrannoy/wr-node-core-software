@@ -29,8 +29,14 @@
 				      1 CPU is using it */
 
 #define WRNC_FLAG_HMQ_SHR_USR (1 << 2) /**< Shared by users */
-#define WRNC_FLAG_HMQ_SYNC (1 << 3) /**< Next message is sync answer */
+#define WRNC_FLAG_HMQ_SYNC_WAIT (1 << 3) /**< wait sync answer */
+#define WRNC_FLAG_HMQ_SYNC_READY (1 << 4) /**< sync answer is ready */
 
+
+static inline uint32_t wrnc_get_sequence(struct wrnc_msg *msg)
+{
+	return msg->data[1];
+}
 
 struct wrnc_msg_filter_element {
 	struct wrnc_msg_filter filter;
@@ -76,6 +82,10 @@ struct wrnc_hmq {
 
 	struct list_head list_usr; /**< list of consumer of the output slot  */
 	unsigned int n_user; /**< number of users in the list */
+
+
+	unsigned int waiting_seq; /**< sequence number to wait */
+	struct wrnc_msg sync_answer; /**< synchronous answer message */
 };
 
 /**

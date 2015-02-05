@@ -19,6 +19,8 @@ extern "C" {
 
 struct wrnc_dev;
 
+#define WRNC_SYSFS_PATH_LEN 128
+
 /**
  * Debug descriptor. It is not obfuscated because it is meant for debugging
  * purpose. This way, it leaves the user all the freedom to read/poll the
@@ -36,6 +38,7 @@ struct wrnc_dbg {
  */
 struct wrnc_hmq {
 	struct wrnc_dev *wrnc; /**< where this slot belong to */
+	char syspath[WRNC_SYSFS_PATH_LEN];
 	unsigned int index; /* index of the slot. Note that we have
 			       different kind of slot and each kind start
 			       counting from 0*/
@@ -49,7 +52,6 @@ struct wrnc_hmq {
 #define WRNC_NAME_LEN 16
 #define WRNC_PATH_LEN 32
 
-#define WRNC_SYSFS_PATH_LEN 128
 #define WRNC_SYSFS_READ_LEN 32
 #define WRNC_DEVICE_PATH_LEN 64
 
@@ -117,6 +119,8 @@ extern struct wrnc_hmq *wrnc_hmq_open(struct wrnc_dev *wrnc,
 				      unsigned int index,
 				      unsigned long flags);
 extern void wrnc_hmq_close(struct wrnc_hmq *hmq);
+extern int wrnc_hmq_share_set(struct wrnc_hmq *hmq, unsigned int status);
+extern int wrnc_hmq_share_get(struct wrnc_hmq *hmq, unsigned int *status);
 extern struct wrnc_msg *wrnc_hmq_receive(struct wrnc_hmq *hmq);
 extern int wrnc_hmq_send(struct wrnc_hmq *hmq, struct wrnc_msg *msg);
 extern int wrnc_hmq_send_and_receive_sync(struct wrnc_hmq *hmq,

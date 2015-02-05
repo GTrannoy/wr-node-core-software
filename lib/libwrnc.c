@@ -595,6 +595,8 @@ struct wrnc_hmq *wrnc_hmq_open(struct wrnc_dev *wrnc, unsigned int index,
 	hmq->index = index;
 	hmq->flags = flags;
 	hmq->fd = fd;
+	snprintf(hmq->syspath, 64, "/sys/class/wr-node-core/%s/%s-hmq-%c-%02d",
+		 wdesc->name, wdesc->name, (dir ? 'i' : 'o'), index);
 
 	return (struct wrnc_hmq *)hmq;
 }
@@ -613,6 +615,38 @@ void wrnc_hmq_close(struct wrnc_hmq *hmq)
 	}
 }
 
+
+/**
+ * It enables/disables the message share mode. Multiple clients can read the same message
+ * when they read from the same file descriptor
+ * @param[in] hmq HMQ device descriptor
+ * @param[in] status status to set: 1 enable, 0 disable
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrnc_hmq_share_set(struct wrnc_hmq *hmq, unsigned int status)
+{
+	char path[WRNC_SYSFS_PATH_LEN];
+
+	snprintf(path, WRNC_SYSFS_PATH_LEN, "%s/shared_by_users", hmq->syspath);
+
+	return wrnc_sysfs_printf(path, "%d", status);
+}
+
+
+/**
+ * It gets the current status of the message share mode
+ * @param[in] hmq HMQ device descriptor
+ * @param[out] status current value
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrnc_hmq_share_get(struct wrnc_hmq *hmq, unsigned int *status)
+{
+	char path[WRNC_SYSFS_PATH_LEN];
+
+	snprintf(path, WRNC_SYSFS_PATH_LEN, "%s/shared_by_users", hmq->syspath);
+
+	return wrnc_sysfs_scanf(path, "%d", status);
+}
 
 /**
  * It sends a synchronous message. The slots are uni-directional, so you must

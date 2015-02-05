@@ -555,13 +555,64 @@ struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev,
  * Check the enable status on a trigger input.
  * @param[in] dev device token
  * @param[in] input index (0-based) of input channel
- * @param[in] enable 1 enables the input, 0 disables it.
+ * @param[out] enable 1 if it is enabled, 0 otherwise
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrtd_in_is_enabled(struct wrtd_node *dev, unsigned int input)
+int wrtd_in_is_enabled(struct wrtd_node *dev, unsigned int input,
+		       unsigned int *enable)
 {
-	errno = EWRTD_NO_IMPLEMENTATION;
-	return -1;
+	struct wrtd_input_state state;
+	int err;
+
+	err = wrtd_in_state_get(dev, input, &state);
+	if (err)
+		return -1;
+	*enable = !!(state.flags & WRTD_ENABLED);
+
+	return 0;
+}
+
+
+/**
+ * Check the armed status on a trigger input.
+ * @param[in] dev device token
+ * @param[in] input index (0-based) of input channel
+ * @param[out] armed 1 if it is enabled, 0 otherwise
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_in_is_armed(struct wrtd_node *dev, unsigned int input,
+		     unsigned int *armed)
+{
+	struct wrtd_input_state state;
+	int err;
+
+	err = wrtd_in_state_get(dev, input, &state);
+	if (err)
+		return -1;
+	*armed = !!(state.flags & WRTD_ARMED);
+
+	return 0;
+}
+
+/**
+ * Check the trigger assigned status on a trigger input.
+ * @param[in] dev device token
+ * @param[in] input index (0-based) of input channel
+ * @param[out] armed 1 if it is enabled, 0 otherwise
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_in_has_trigger(struct wrtd_node *dev, unsigned int input,
+			unsigned int *assigned)
+{
+	struct wrtd_input_state state;
+	int err;
+
+	err = wrtd_in_state_get(dev, input, &state);
+	if (err)
+		return -1;
+	*assigned = !!(state.flags & WRTD_TRIGGER_ASSIGNED);
+
+	return 0;
 }
 
 

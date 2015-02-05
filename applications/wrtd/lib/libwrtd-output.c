@@ -717,3 +717,67 @@ int wrtd_out_check_triggered(struct wrtd_node *dev, unsigned int output)
 	return -1;
 }
 //int wrtd_out_wait_trigger(struct wrtd_node*, int output_mask, struct wrtd_trig_id *id);
+
+/**
+ * Check the enable status on a trigger output.
+ * @param[in] dev device token
+ * @param[in] output index (0-based) of output channel
+ * @param[out] enable 1 if it is enabled, 0 otherwise
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_out_is_enabled(struct wrtd_node *dev, unsigned int output,
+			unsigned int *enable)
+{
+	struct wrtd_input_state state;
+	int err;
+
+	err = wrtd_in_state_get(dev, output, &state);
+	if (err)
+		return -1;
+	*enable = !!(state.flags & WRTD_ENABLED);
+
+	return 0;
+}
+
+
+/**
+ * Check the armed status on a trigger output.
+ * @param[in] dev device token
+ * @param[in] output index (0-based) of output channel
+ * @param[out] armed 1 if it is enabled, 0 otherwise
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_out_is_armed(struct wrtd_node *dev, unsigned int output,
+		      unsigned int *armed)
+{
+	struct wrtd_output_state state;
+	int err;
+
+	err = wrtd_out_state_get(dev, output, &state);
+	if (err)
+		return -1;
+	*armed = !!(state.flags & WRTD_ARMED);
+
+	return 0;
+}
+
+/**
+ * Check the trigger assigned status on a trigger output.
+ * @param[in] dev device token
+ * @param[in] output index (0-based) of output channel
+ * @param[out] armed 1 if it is enabled, 0 otherwise
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_out_has_trigger(struct wrtd_node *dev, unsigned int output,
+			 unsigned int *assigned)
+{
+	struct wrtd_output_state state;
+	int err;
+
+	err = wrtd_out_state_get(dev, output, &state);
+	if (err)
+		return -1;
+	*assigned = !!(state.flags & WRTD_TRIGGER_ASSIGNED);
+
+	return 0;
+}

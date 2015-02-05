@@ -14,7 +14,7 @@ extern "C" {
 
 #include <stdint.h>
 #include <stdio.h>
-#include <wrtd-common.h>
+#include "wrtd-common.h"
 
 struct wrtd_node;
 

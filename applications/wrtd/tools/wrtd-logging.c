@@ -95,6 +95,7 @@ int main(int argc, char *argv[])
 		goto out_in;
 	}
 	p[0].fd = log[0]->fd;
+	p[0].events = POLLIN;
 
 	log[1] = wrtd_out_log_open(wrtd, WRTD_LOG_ALL);
 	if (!log[1]) {
@@ -103,6 +104,7 @@ int main(int argc, char *argv[])
 		goto out_out;
 	}
 	p[1].fd = log[1]->fd;
+	p[1].events = POLLIN;
 
 	/* Print messages till the end */
 	while (i < n || n == 0) {

@@ -61,7 +61,7 @@ static int wrtd_out_trig_get(struct wrtd_node *dev, unsigned int output,
 	uint32_t seq = 0, id ;
 	uint32_t state, latency_worst, latency_avg_sum, latency_avg_nsamples, ptr = 0;
 
-	if (output >= FD_NUM_CHANNELS) {
+	if (output > FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -171,7 +171,7 @@ int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 	uint32_t seq = 0, id;
 	uint32_t dead_time_ticks, pulse_width_ticks;
 
-	if (output >= FD_NUM_CHANNELS) {
+	if (output > FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -257,7 +257,7 @@ int wrtd_out_enable(struct wrtd_node *dev, unsigned int output,
 	struct wrnc_msg msg;
 	int err;
 
-	if (output >= FD_NUM_CHANNELS) {
+	if (output > FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -298,7 +298,7 @@ int wrtd_out_trig_assign(struct wrtd_node *dev, unsigned int output,
 	uint32_t seq = 0, id;
 	struct wrtd_trigger_handle tmp_handle;
 
-	if (output >= FD_NUM_CHANNELS) {
+	if (output > FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -379,7 +379,8 @@ int wrtd_out_trig_unassign(struct wrtd_node *dev,
  * @param[in] output index (0-based) of output channel
  * @param[out] triggers list of assigned trigger
  * @param[in] max_count maximum triggers to retreive
- * @return 0 on success, -1 on error and errno is set appropriately
+ * @return number of triggers on success, -1 on error and
+ *         errno is set appropriately
  */
 int wrtd_out_trig_get_all(struct wrtd_node *dev, unsigned int output,
 			  struct wrtd_output_trigger_state *triggers,
@@ -387,7 +388,7 @@ int wrtd_out_trig_get_all(struct wrtd_node *dev, unsigned int output,
 {
 	int status, bucket, count = 0, index;
 
-	if (output >= FD_NUM_CHANNELS) {
+	if (output > FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -408,7 +409,6 @@ int wrtd_out_trig_get_all(struct wrtd_node *dev, unsigned int output,
 				break;
 			else if (status < 0)
 				return -1;
-				
 			index++;
 		}
 	}
@@ -498,7 +498,7 @@ int wrtd_out_pulse_width_set(struct wrtd_node *dev, unsigned int output,
 	int err, tmp = 0;
 	uint32_t seq = 0, id;
 	
-	if (output >= WRTD_OUT_MAX) {
+	if (output > FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -646,7 +646,7 @@ int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
 	uint32_t seq = 0, id;
 	int err;
 
-	if (output >= FD_NUM_CHANNELS) {
+	if (output > FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}

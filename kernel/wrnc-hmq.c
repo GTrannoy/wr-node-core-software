@@ -516,10 +516,19 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	}
 	hmq_out = &wrnc->hmq_out[msg.index_out];
 
-	/* Send the message */
+	/* Rise wait flag */
 	spin_lock(&hmq_out->lock);
 	hmq_out->flags |= WRNC_FLAG_HMQ_SYNC_WAIT;
-	hmq_out->waiting_seq = wrnc_message_push(hmq, &msg.msg);
+	spin_unlock(&hmq_out->lock);
+
+	/* Send the message */
+	spin_lock(&hmq->lock);
+	seq = wrnc_message_push(hmq, &msg.msg);
+	spin_unlock(&hmq->lock);
+
+	/* Set message sequance to wait */
+	spin_lock(&hmq_out->lock);
+	hmq_out->waiting_seq = seq;
 	spin_unlock(&hmq_out->lock);
 
 	/*

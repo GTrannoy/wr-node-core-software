@@ -21,7 +21,8 @@ static void help()
 	fprintf(stderr, "It shows logging information coming from Real-Time applications\n");
 	fprintf(stderr, "-D device id\n");
 	fprintf(stderr, "-n number of messages to read (0 means infinite)\n");
-fprintf(stderr, "-l");
+	fprintf(stderr, "-s share the logging device with other processes\n");
+	fprintf(stderr, "-l");
 	exit(1);
 }
 
@@ -51,12 +52,12 @@ int main(int argc, char *argv[])
 {
 	struct wrnc_hmq *log[N_LOG];
 	struct pollfd p[N_LOG];  /* each node has 2 logging channels (in, out) */
-	int n = 0, i = 0, ret, k, err;
+	int n = 0, i = 0, ret, k, err, share = 0;
 	struct wrtd_node *wrtd;
 	uint32_t dev_id = 0;
 	char c;
 
-	while ((c = getopt (argc, argv, "hD:n:")) != -1) {
+	while ((c = getopt (argc, argv, "hD:n:s")) != -1) {
 		switch (c) {
 		default:
 			help();
@@ -66,6 +67,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'n':
 			sscanf(optarg, "0x%x", &n);
+			break;
+		case 's':
+			share = 1;
 			break;
 		}
 	}
@@ -94,6 +98,11 @@ int main(int argc, char *argv[])
 				wrtd_strerror(errno));
 		goto out_in;
 	}
+	if (share) {
+		err = wrnc_hmq_share_set(log[0], share);
+		if (err)
+			fprintf(stderr, "Cannot set share mode: %s\n", wrtd_strerror(errno));
+	}
 	p[0].fd = log[0]->fd;
 	p[0].events = POLLIN;
 
@@ -102,6 +111,11 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Cannot open output logging HMQ: %s\n",
 				wrtd_strerror(errno));
 		goto out_out;
+	}
+	if (share) {
+		err = wrnc_hmq_share_set(log[1], share);
+		if (err)
+			fprintf(stderr, "Cannot set share mode: %s\n", wrtd_strerror(errno));
 	}
 	p[1].fd = log[1]->fd;
 	p[1].events = POLLIN;

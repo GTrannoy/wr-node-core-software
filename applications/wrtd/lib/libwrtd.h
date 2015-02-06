@@ -122,6 +122,10 @@ extern int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
 extern void wrtd_log_close(struct wrnc_hmq *hmq);
 extern void wrtd_ts_to_pico(struct wr_timestamp *ts, uint64_t *pico);
 extern void wrtd_pico_to_ts(uint64_t *pico, struct wr_timestamp *ts);
+extern void wrtd_ts_to_sec_pico(struct wr_timestamp *ts,
+				uint64_t *sec, uint64_t *pico);
+extern void wrtd_sec_pico_to_ts(uint64_t sec, uint64_t pico,
+				struct wr_timestamp *ts);
 
 /**
  * @file libwrtd-input.c

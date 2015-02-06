@@ -408,3 +408,31 @@ void wrtd_pico_to_ts(uint64_t *pico, struct wr_timestamp *ts)
 	p %= 8000;
 	ts->frac = p * 4096 / 8000;
 }
+
+
+/**
+ * It converts a white rabbit time stamp to seconds and pico-seconds
+ * @param[in] ts time-stamp
+ * @param[out] sec seconds
+ * @param[out] pico pico-seconds
+ */
+void wrtd_ts_to_sec_pico(struct wr_timestamp *ts, uint64_t *sec, uint64_t *pico)
+{
+	*sec = ts->seconds;
+	*pico = ts->frac * 8000 / 4096;
+	*pico += (uint64_t) ts->ticks * 8000LL;
+}
+
+
+/**
+ * It converts a white rabbit time stamp to seconds and pico-seconds
+ * @param[in] sec seconds
+ * @param[in] pico pico-seconds
+ * @param[out] ts time-stamp
+ */
+void wrtd_sec_pico_to_ts(uint64_t sec, uint64_t pico, struct wr_timestamp *ts)
+{
+	ts->seconds = sec;
+	ts->ticks = pico / 8000;
+	ts->frac = (pico % 8000) * 4096 / 8000;
+}

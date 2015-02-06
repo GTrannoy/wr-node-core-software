@@ -722,19 +722,12 @@ static unsigned int wrnc_hmq_poll(struct file *f, struct poll_table_struct *w)
 
 	poll_wait(f, &hmq->q_msg, w);
 
-	/* check if there are interrupts to notify */
-	if (!list_empty(&user->list_msg_output)) {
-		/* Check just to be really sure */
-		if (!(hmq->flags & WRNC_FLAG_HMQ_DIR))  /* CPU input */
-			ret |= POLLIN | POLLRDNORM;
-		else
-			ret |= POLLERR;
-	} else {
-		/* Check just to be really sure */
-		if (hmq->flags & WRNC_FLAG_HMQ_DIR)  /* CPU input */
+	if (hmq->flags & WRNC_FLAG_HMQ_DIR) { /* CPU input */
+		if (hmq->n_input < hmq_max_msg)
 			ret |= POLLOUT | POLLWRNORM;
-		else
-			ret |= POLLERR;
+	} else { /* CPU output */
+		if (user->n_output)
+			ret |= POLLIN | POLLRDNORM;
 	}
 
 	return ret;

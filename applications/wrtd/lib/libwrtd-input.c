@@ -681,3 +681,29 @@ int wrtd_in_seq_counter_set(struct wrtd_node *dev, unsigned int input,
 
 	return wrtd_validate_acknowledge(&msg);
 }
+
+
+/**
+ * It check if the input real-time application is alive
+ * @param[in] dev device token
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_in_ping(struct wrtd_node *dev)
+{
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrnc_msg msg = wrnc_msg_init(2);
+	uint32_t id, seq = 0;
+	int err;
+
+	id = WRTD_CMD_TDC_PING;
+	wrnc_msg_header(&msg, &id, &seq);
+
+	/* Send the message and get answer */
+	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
+        if (err) {
+		errno = EWRTD_INVALID_ANSWER_STATE;
+		return -1;
+	}
+
+	return wrtd_validate_acknowledge(&msg);
+}

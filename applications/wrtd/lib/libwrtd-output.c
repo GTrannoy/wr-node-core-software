@@ -781,3 +781,37 @@ int wrtd_out_has_trigger(struct wrtd_node *dev, unsigned int output,
 
 	return 0;
 }
+
+
+/**
+ * It check if the input real-time application is alive
+ * @param[in] dev device token
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+#if 0
+int wrtd_out_ping(struct wrtd_node *dev)
+{
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrnc_msg msg = wrnc_msg_init(2);
+	uint32_t id, seq = 0;
+	int err;
+
+	id = WRTD_CMD_FD_PING;
+	wrnc_msg_header(&msg, &id, &seq);
+
+	/* Send the message and get answer */
+	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
+        if (err) {
+		errno = EWRTD_INVALID_ANSWER_STATE;
+		return -1;
+	}
+
+	return wrtd_validate_acknowledge(&msg);
+}
+#else
+int wrtd_out_ping(struct wrtd_node *dev)
+{
+	errno = EWRTD_NO_IMPLEMENTATION;
+	return -1;
+}
+#endif

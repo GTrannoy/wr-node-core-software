@@ -161,6 +161,7 @@ extern int wrtd_in_is_armed(struct wrtd_node *dev, unsigned int input,
 			    unsigned int *armed);
 extern int wrtd_in_has_trigger(struct wrtd_node *dev, unsigned int input,
 			       unsigned int *assigned);
+extern int wrtd_in_ping(struct wrtd_node *dev);
 
 /* TODO implements the following prototypes */
 extern int wrtd_in_dead_time_get(struct wrtd_node *dev, unsigned int input,
@@ -200,6 +201,7 @@ extern struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev,
 					  uint32_t lvl);
 extern int wrtd_out_trig_enable(struct wrtd_node *dev,
 				struct wrtd_trigger_handle *handle, int enable);
+extern int wrtd_out_ping(struct wrtd_node *dev);
 
 /* TODO implements the following prototypes */
 extern int wrtd_out_trig_condition_delay_set(struct wrtd_node *dev,

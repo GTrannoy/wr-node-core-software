@@ -119,8 +119,10 @@ extern struct wrnc_hmq *wrnc_hmq_open(struct wrnc_dev *wrnc,
 				      unsigned int index,
 				      unsigned long flags);
 extern void wrnc_hmq_close(struct wrnc_hmq *hmq);
-extern int wrnc_hmq_share_set(struct wrnc_hmq *hmq, unsigned int status);
-extern int wrnc_hmq_share_get(struct wrnc_hmq *hmq, unsigned int *status);
+extern int wrnc_hmq_share_set(struct wrnc_dev *wrnc, unsigned int dir,
+			      unsigned int index, unsigned int status);
+extern int wrnc_hmq_share_get(struct wrnc_dev *wrnc, unsigned int dir,
+			      unsigned int index, unsigned int *status);
 extern struct wrnc_msg *wrnc_hmq_receive(struct wrnc_hmq *hmq);
 extern int wrnc_hmq_send(struct wrnc_hmq *hmq, struct wrnc_msg *msg);
 extern int wrnc_hmq_send_and_receive_sync(struct wrnc_hmq *hmq,

@@ -91,17 +91,21 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
+	if (share) {
+		err = wrtd_in_log_share_set(wrtd, 1);
+		if (err)
+			fprintf(stderr, "Cannot set share mode: %s\n", wrtd_strerror(errno));
+		err = wrtd_out_log_share_set(wrtd, 1);
+		if (err)
+			fprintf(stderr, "Cannot set share mode: %s\n", wrtd_strerror(errno));
+	}
+
 	/* Open logging interfaces */
 	log[0] = wrtd_in_log_open(wrtd, WRTD_LOG_ALL, -1);
 	if (!log[0]) {
 		fprintf(stderr, "Cannot open input logging HMQ: %s\n",
 				wrtd_strerror(errno));
 		goto out_in;
-	}
-	if (share) {
-		err = wrnc_hmq_share_set(log[0], share);
-		if (err)
-			fprintf(stderr, "Cannot set share mode: %s\n", wrtd_strerror(errno));
 	}
 	p[0].fd = log[0]->fd;
 	p[0].events = POLLIN;
@@ -111,11 +115,6 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Cannot open output logging HMQ: %s\n",
 				wrtd_strerror(errno));
 		goto out_out;
-	}
-	if (share) {
-		err = wrnc_hmq_share_set(log[1], share);
-		if (err)
-			fprintf(stderr, "Cannot set share mode: %s\n", wrtd_strerror(errno));
 	}
 	p[1].fd = log[1]->fd;
 	p[1].events = POLLIN;

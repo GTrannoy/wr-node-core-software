@@ -226,6 +226,14 @@ static ssize_t wrnc_store_share(struct device *dev,
 	if (kstrtol(buf, 0, &val))
 		return -EINVAL;
 
+	/*
+	 * If the status is the same, than there is nothing to do. This
+	 * control sounds useless but it save code in user-space and it
+	 * allows a proper error management
+	 */
+	if (val == (!!(hmq->flags & WRNC_FLAG_HMQ_SHR_USR)))
+		return count;
+
 	/* You cannot configure while the HMQ is in use */
 	if (hmq->n_user > 0)
 		return -EBUSY;

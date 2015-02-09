@@ -617,17 +617,23 @@ void wrnc_hmq_close(struct wrnc_hmq *hmq)
 
 
 /**
- * It enables/disables the message share mode. Multiple clients can read the same message
- * when they read from the same file descriptor
- * @param[in] hmq HMQ device descriptor
+ * It enables/disables the message share mode. When enable, all users will read
+ * the same messages.
+ * @param[in] wrnc device token
+ * @param[in] dir slot direction, 1 CPU input, 0 CPU output
+ * @param[in] index slot index
  * @param[in] status status to set: 1 enable, 0 disable
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrnc_hmq_share_set(struct wrnc_hmq *hmq, unsigned int status)
+int wrnc_hmq_share_set(struct wrnc_dev *wrnc, unsigned int dir,
+		       unsigned int index, unsigned int status)
 {
+	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	char path[WRNC_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN, "%s/shared_by_users", hmq->syspath);
+	snprintf(path, WRNC_SYSFS_PATH_LEN,
+		 "/sys/class/wr-node-core/%s/%s-hmq-%c-%02d/shared_by_users",
+		 wdesc->name, wdesc->name, (dir ? 'i' : 'o'), index);
 
 	return wrnc_sysfs_printf(path, "%d", status);
 }
@@ -635,15 +641,21 @@ int wrnc_hmq_share_set(struct wrnc_hmq *hmq, unsigned int status)
 
 /**
  * It gets the current status of the message share mode
- * @param[in] hmq HMQ device descriptor
+ * @param[in] wrnc device token
+ * @param[in] dir slot direction, 1 CPU input, 0 CPU output
+ * @param[in] index slot index
  * @param[out] status current value
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrnc_hmq_share_get(struct wrnc_hmq *hmq, unsigned int *status)
+int wrnc_hmq_share_get(struct wrnc_dev *wrnc, unsigned int dir,
+		       unsigned int index, unsigned int *status)
 {
+	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	char path[WRNC_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN, "%s/shared_by_users", hmq->syspath);
+	snprintf(path, WRNC_SYSFS_PATH_LEN,
+		 "/sys/class/wr-node-core/%s/%s-hmq-%c-%02d/shared_by_users",
+		 wdesc->name, wdesc->name, (dir ? 'i' : 'o'), index);
 
 	return wrnc_sysfs_scanf(path, "%d", status);
 }

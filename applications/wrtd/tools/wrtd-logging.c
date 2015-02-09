@@ -22,6 +22,7 @@ static void help()
 	fprintf(stderr, "-D device id\n");
 	fprintf(stderr, "-n number of messages to read (0 means infinite)\n");
 	fprintf(stderr, "-s share the logging device with other processes\n");
+	fprintf(stderr, "-c <ch> channel to listen\n");
 	fprintf(stderr, "-l");
 	exit(1);
 }
@@ -52,12 +53,12 @@ int main(int argc, char *argv[])
 {
 	struct wrnc_hmq *log[N_LOG];
 	struct pollfd p[N_LOG];  /* each node has 2 logging channels (in, out) */
-	int n = 0, i = 0, ret, k, err, share = 0;
+	int n = 0, i = 0, ret, k, err, share = 0, chan = -1;
 	struct wrtd_node *wrtd;
 	uint32_t dev_id = 0;
 	char c;
 
-	while ((c = getopt (argc, argv, "hD:n:s")) != -1) {
+	while ((c = getopt (argc, argv, "hD:n:sc:")) != -1) {
 		switch (c) {
 		default:
 			help();
@@ -70,6 +71,9 @@ int main(int argc, char *argv[])
 			break;
 		case 's':
 			share = 1;
+			break;
+		case 'c':
+			sscanf(optarg, "%d", &chan);
 			break;
 		}
 	}
@@ -101,7 +105,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* Open logging interfaces */
-	log[0] = wrtd_in_log_open(wrtd, WRTD_LOG_ALL, -1);
+	log[0] = wrtd_in_log_open(wrtd, WRTD_LOG_ALL, chan);
 	if (!log[0]) {
 		fprintf(stderr, "Cannot open input logging HMQ: %s\n",
 				wrtd_strerror(errno));
@@ -110,7 +114,7 @@ int main(int argc, char *argv[])
 	p[0].fd = log[0]->fd;
 	p[0].events = POLLIN;
 
-	log[1] = wrtd_out_log_open(wrtd, WRTD_LOG_ALL, -1);
+	log[1] = wrtd_out_log_open(wrtd, WRTD_LOG_ALL, chan);
 	if (!log[1]) {
 		fprintf(stderr, "Cannot open output logging HMQ: %s\n",
 				wrtd_strerror(errno));

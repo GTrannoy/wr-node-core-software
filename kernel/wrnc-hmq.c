@@ -52,28 +52,24 @@ static int wrnc_hmq_filter_check(struct wrnc_hmq *hmq,
 		if (!passed)
 			break;
 
-		word = msg->data[fltel->filter.word_offset] & fltel->filter.mask;
-
+		word = msg->data[fltel->filter.word_offset];
 		switch(fltel->filter.operation) {
 		case WRNC_MSG_FILTER_AND:
-			if (!(word & fltel->filter.value))
-				passed = 0;
+			word &= fltel->filter.mask;
 			break;
 		case WRNC_MSG_FILTER_OR:
-			if (!(word | fltel->filter.value))
-				passed = 0;
+			word |= fltel->filter.mask;
 			break;
 		case WRNC_MSG_FILTER_EQ:
-			if (!(word == fltel->filter.value))
-				passed = 0;
 			break;
 #if 0 /* FIXME not clear from specification what NOT should do*/
 		case WRNC_MSG_FILTER_NOT:
-			if (!(word != fltel->filter.value))
-				passed = 0;
+			word ~= word;
 			break;
 #endif
 		}
+		if (word != fltel->filter.value )
+			passed = 0;
 	}
 	spin_unlock(&hmq->lock_filter);
 
@@ -415,6 +411,10 @@ static int wrnc_ioctl_msg_filter_add(struct wrnc_hmq *hmq,
 	if (!fltel)
 		return -ENOMEM;
 
+	/* Copy the filter */
+	memcpy(&fltel->filter, &u_filter, sizeof(struct wrnc_msg_filter));
+
+	/* Store filter */
 	spin_lock(&hmq->lock_filter);
 	list_add_tail(&fltel->list, &hmq->list_filters);
 	hmq->n_filters++;

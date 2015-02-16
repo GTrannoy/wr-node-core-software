@@ -202,6 +202,9 @@ extern struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev,
 extern int wrtd_out_trig_enable(struct wrtd_node *dev,
 				struct wrtd_trigger_handle *handle, int enable);
 extern int wrtd_out_ping(struct wrtd_node *dev);
+extern int wrtd_out_set_trigger_mode(struct wrtd_node *dev,
+				     unsigned int output,
+				     enum wrtd_trigger_mode mode);
 
 /* TODO implements the following prototypes */
 extern int wrtd_out_trig_condition_delay_set(struct wrtd_node *dev,
@@ -210,8 +213,6 @@ extern int wrtd_out_trig_condition_delay_set(struct wrtd_node *dev,
 extern int wrtd_out_trig_get_state(struct wrtd_node *dev,
 				   struct wrtd_trigger_handle *handle,
 				   struct wrtd_output_trigger_state *state);
-extern int wrtd_out_set_trigger_mode(struct wrtd_node *dev,
-				     unsigned int output, int mode);
 extern int wrtd_out_arm(struct wrtd_node *dev, unsigned int input, int armed);
 extern int wrtd_out_counters_reset(struct wrtd_node *dev, unsigned int output);
 extern int wrtd_out_check_triggered(struct wrtd_node *dev, unsigned int output);

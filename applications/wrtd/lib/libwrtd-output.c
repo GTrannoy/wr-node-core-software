@@ -673,10 +673,31 @@ int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
-			      unsigned int output, int mode)
+			      unsigned int output,
+			      enum wrtd_trigger_mode mode)
 {
-	errno = EWRTD_NO_IMPLEMENTATION;
-	return -1;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrnc_msg msg  = wrnc_msg_init(4);;
+	uint32_t seq = 0, id;
+	int err;
+
+	if (output > FD_NUM_CHANNELS) {
+		errno = EWRTD_INVALID_CHANNEL;
+		return -1;
+	}
+
+	/* Build the message */
+	id = WRTD_CMD_FD_CHAN_SET_MODE;
+	wrnc_msg_header(&msg, &id, &seq);
+	wrnc_msg_uint32(&msg, &output);
+	wrnc_msg_uint32(&msg, &mode);
+
+	/* Send the message and get answer */
+	err = wrtd_out_send_and_receive_sync(wrtd, &msg);
+	if (err)
+		return err;
+
+	return wrtd_validate_acknowledge(&msg);
 }
 
 

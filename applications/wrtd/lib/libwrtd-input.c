@@ -226,7 +226,7 @@ int wrtd_in_trigger_unassign(struct wrtd_node *dev,
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_in_trigger_mode_set(struct wrtd_node *dev, unsigned int input,
-				    enum wrtd_trigger_mode mode)
+			     enum wrtd_trigger_mode mode)
 {
     	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrnc_msg msg;

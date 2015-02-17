@@ -6,6 +6,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <libwrnc.h>
 #include <libwrtd-internal.h>
@@ -418,15 +419,77 @@ int wrtd_out_trig_get_all(struct wrtd_node *dev, unsigned int output,
 
 
 /**
- * It returns a trigget from a given index
+ * It returns a trigger state from a given handle.
+ * @param[in] dev pointer to open node device.
+ * @param[in] handle trigger where act on
+ * @param[out] state trigger status
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_out_trig_state_get_by_handle(struct wrtd_node *dev,
+				      struct wrtd_trigger_handle *handle,
+				      struct wrtd_output_trigger_state *state)
+{
+	int err;
+
+	err = wrtd_out_trig_get(dev, handle->channel, 0, 0, handle, state);
+	if (err)
+		return -1;
+
+	return 0;
+}
+
+
+/**
+ * It returns a trigget from a given index. The index may change due to trigger
+ * assing and un-assing. So, before use this function you have to check the
+ * current trigger's indexes. Note that this is not thread safe.
+ * Whenever is possible you should prefer wrtd_out_trig_state_get_by_handle()
+ * @param[in] dev device token
+ * @param[in] id identifier of the trigger to retrieve
+ * @param[out] trigger trigger status
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_out_trig_state_get_by_id(struct wrtd_node *dev,
+				  struct wrtd_trig_id *id,
+				  struct wrtd_output_trigger_state *trigger)
+{
+	struct wrtd_output_trigger_state triggers[256];
+	int ret, i, k;
+
+	for (k = 0; k < FD_NUM_CHANNELS; ++k) {
+		/* Get triggers for a given channel */
+		ret = wrtd_out_trig_get_all(dev, k, triggers, 256);
+		if (ret < 0) {
+			return -1;
+		}
+
+		/* Look for trigger ID */
+		for (i = 0; i < 256; ++i) {
+			if (memcmp(id, &triggers[i].trigger,
+				   sizeof(struct wrtd_trig_id)) == 0) {
+				*trigger = triggers[i];
+				return 0;
+			}
+		}
+	}
+	errno = EWRTD_NOFOUND_TRIGGER;
+	return -1;
+}
+
+
+/**
+ * It returns a trigget from a given index. The index may change due to trigger
+ * assing and un-assing. So, before use this function you have to check the
+ * current trigger's indexes. Note that this is not thread safe.
+ * Whenever is possible you should prefer wrtd_out_trig_state_get_by_handle()
  * @param[in] dev device token
  * @param[in] output index (0-based) of output channel
  * @param[out] trigger trigger status
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrtd_out_trig_get_by_index(struct wrtd_node *dev, unsigned int index,
-			       unsigned int output,
-			       struct wrtd_output_trigger_state *trigger)
+int wrtd_out_trig_state_get_by_index(struct wrtd_node *dev, unsigned int index,
+				     unsigned int output,
+				     struct wrtd_output_trigger_state *trigger)
 {
 	struct wrtd_output_trigger_state triggers[256];
 	int ret;
@@ -554,21 +617,6 @@ int wrtd_out_dead_time_set(struct wrtd_node *dev, unsigned int output,
 int wrtd_out_trig_condition_delay_set(struct wrtd_node *dev,
 				      struct wrtd_trigger_handle *handle,
 				      uint64_t delay_ps)
-{
-	errno = EWRTD_NO_IMPLEMENTATION;
-	return -1;
-}
-
-
-/**
- * @param[in] dev pointer to open node device.
- * @param[in] handle trigger where act on
- * @param[out] state trigger status
- * @return 0 on success, -1 on error and errno is set appropriately
- */
-int wrtd_out_trig_state_get(struct wrtd_node *dev,
-			    struct wrtd_trigger_handle *handle,
-			    struct wrtd_output_trigger_state *state)
 {
 	errno = EWRTD_NO_IMPLEMENTATION;
 	return -1;

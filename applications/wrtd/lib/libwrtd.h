@@ -36,6 +36,7 @@ enum wrtd_error_list {
 	EWRTD_INVALID_ANSWER_HASH,
 	EWRTD_INVALID_ANSWER_HASH_CONT,
 	EWRTD_INVALID_ANSWER_HANDLE,
+	EWRTD_NOFOUND_TRIGGER,
 	__EWRTD_MAX_ERROR_NUMBER,
 };
 
@@ -185,9 +186,16 @@ extern int wrtd_out_trig_unassign(struct wrtd_node *dev,
 extern int wrtd_out_trig_get_all (struct wrtd_node *dev, unsigned int output,
 				  struct wrtd_output_trigger_state *triggers,
 				  int max_count);
-extern int wrtd_out_trig_get_by_index(struct wrtd_node *dev, unsigned int index,
-			       unsigned int output,
-			       struct wrtd_output_trigger_state *trigger);
+extern int wrtd_out_trig_state_get_by_index(struct wrtd_node *dev,
+					    unsigned int index,
+					    unsigned int output,
+					    struct wrtd_output_trigger_state *trigger);
+extern int wrtd_out_trig_state_get_by_id(struct wrtd_node *dev,
+					 struct wrtd_trig_id *id,
+					 struct wrtd_output_trigger_state *trigger);
+extern int wrtd_out_trig_state_get_by_handle(struct wrtd_node *dev,
+					     struct wrtd_trigger_handle *handle,
+					     struct wrtd_output_trigger_state *state);
 extern int wrtd_out_trig_delay_set(struct wrtd_node *dev,
 				   struct wrtd_trigger_handle *handle,
 				   uint64_t delay_ps);
@@ -210,9 +218,6 @@ extern int wrtd_out_set_trigger_mode(struct wrtd_node *dev,
 extern int wrtd_out_trig_condition_delay_set(struct wrtd_node *dev,
 					     struct wrtd_trigger_handle *handle,
 					     uint64_t delay_ps);
-extern int wrtd_out_trig_get_state(struct wrtd_node *dev,
-				   struct wrtd_trigger_handle *handle,
-				   struct wrtd_output_trigger_state *state);
 extern int wrtd_out_arm(struct wrtd_node *dev, unsigned int input, int armed);
 extern int wrtd_out_counters_reset(struct wrtd_node *dev, unsigned int output);
 extern int wrtd_out_check_triggered(struct wrtd_node *dev, unsigned int output);

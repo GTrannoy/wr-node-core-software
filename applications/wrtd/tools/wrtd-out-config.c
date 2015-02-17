@@ -126,7 +126,7 @@ static int trig_enable(struct wrtd_node *wrtd, int output,
 	index = atoi(argv[0]);
 
 	/* Get a trigger */
-	err = wrtd_out_trig_get_by_index(wrtd, index, output, &trig);
+	err = wrtd_out_trig_state_get_by_index(wrtd, index, output, &trig);
 	if (err)
 		return err;
 
@@ -188,7 +188,7 @@ static int wrtd_cmd_delay(struct wrtd_node *wrtd, int output,
 	index = atoi(argv[0]);
 
 	/* Get a trigger */
-	err = wrtd_out_trig_get_by_index(wrtd, index, output, &trig);
+	err = wrtd_out_trig_state_get_by_index(wrtd, index, output, &trig);
 	if (err)
 		return err;
 
@@ -253,7 +253,7 @@ static int wrtd_cmd_unassign(struct wrtd_node *wrtd, int output,
 	index = atoi(argv[0]);
 
 	/* Get a trigger */
-	err = wrtd_out_trig_get_by_index(wrtd, index, output, &trig);
+	err = wrtd_out_trig_state_get_by_index(wrtd, index, output, &trig);
 	if (err)
 		return err;
 

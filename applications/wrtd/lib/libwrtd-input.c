@@ -422,7 +422,11 @@ int wrtd_in_delay_set(struct wrtd_node *dev, unsigned int input,
 
 
 /**
- * Set the time offset on a given input channel
+ * Set the time offset on a given input channel. The time offset is between
+ * the White-Rabbit timescale and the ACAM TDC timescale. This information
+ * is only known by the TDC driver which has access the calibration data
+ * on the TDC eeprom. So, it is necessary to inform the RealTime application
+ * about this offset as soon as the RealTime application start to run.
  * @param[in] dev device token
  * @param[in] input index (0-based) of input channel
  * @param[in] offset time offset in pico seconds

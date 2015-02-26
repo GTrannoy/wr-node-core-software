@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <getopt.h>
+#include <inttypes.h>
 #include <libwrnc.h>
 #include <libwrtd.h>
 
@@ -24,14 +25,46 @@ static void help()
 	exit(1);
 }
 
+
+/**
+ * Get the white-rabbit timeoffset form the TDC driver
+ */
+uint64_t wb_offset_get(unsigned int dev_id, unsigned int channel, uint64_t *offset)
+{
+	char path[255];
+	FILE *f;
+	int ret;
+
+	sprintf(path, "/sys/bus/zio/devices/tdc-1n5c-%04x/ft-ch%d/wr-offset",
+		dev_id, channel + 1);
+
+	f = fopen(path, "r");
+	if (!f)
+		return -1;
+
+	ret = fscanf(f, "%"SCNx64, offset);
+	if (ret != 1) {
+		fclose(f);
+		if (!errno)
+		errno = EINVAL;
+		return -1;
+	}
+
+	fclose(f);
+
+	return 0;
+}
+
+
 int main(int argc, char *argv[])
 {
-	int err;
+	int err, i;
 	uint32_t dev_id = 0;
 	char *tdc = NULL, *fd =NULL, c;
 	struct wrtd_node *wrtd;
 	struct wrnc_dev *wrnc;
 	unsigned long timeout = 180;
+	uint64_t offset;
 
 	atexit(wrtd_exit);
 
@@ -117,6 +150,14 @@ int main(int argc, char *argv[])
 	err = wrnc_cpu_start(wrnc, 1);
 	if (err)
 		exit(1);
+
+	/* Inform the input real-time channels about the offset */
+	for (i = 0; i < TDC_NUM_CHANNELS; ++i) {
+		offset = wb_offset_get(dev_id, i, &offset);
+		err = wrtd_in_timebase_offset_set(wrtd, i, offset);
+		if (err)
+			exit(1);
+	}
 
 	wrtd_close(wrtd);
 

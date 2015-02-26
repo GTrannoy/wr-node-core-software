@@ -210,7 +210,7 @@ extern struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev,
 extern int wrtd_out_trig_enable(struct wrtd_node *dev,
 				struct wrtd_trigger_handle *handle, int enable);
 extern int wrtd_out_ping(struct wrtd_node *dev);
-extern int wrtd_out_set_trigger_mode(struct wrtd_node *dev,
+extern int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
 				     unsigned int output,
 				     enum wrtd_trigger_mode mode);
 

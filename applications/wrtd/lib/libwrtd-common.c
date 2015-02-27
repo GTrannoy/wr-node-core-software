@@ -344,22 +344,35 @@ int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
 	struct wrnc_msg *msg;
 	int remaining = count;
 	int n_read = 0;
+	uint32_t id = 0, seq = 0;
 
 	while (remaining) {
+		struct wrtd_trigger_entry ent;
 		msg = wrnc_hmq_receive(hmq_log);
 		if (!msg)
 			break;
-		/*FIXME optimize with serialization */
-		cur->type = msg->data[0];
-		cur->channel = msg->data[2];
 
-		cur->seq = msg->data[1];
-		cur->id.system = msg->data[3];
-		cur->id.source_port = msg->data[4];
-		cur->id.trigger = msg->data[5];
-		cur->ts.seconds = msg->data[6];
-		cur->ts.ticks = msg->data[7];
-		cur->ts.frac = msg->data[8];
+		wrnc_msg_header (msg, &id, &seq);
+
+		if (id != WRTD_REP_LOG_MESSAGE)
+		{
+			errno = EWRTD_INVALID_ANSWER_STATE;
+			return -1;
+		}
+
+		wrnc_msg_uint32 (msg, &cur->type);
+		wrnc_msg_int32 (msg, &cur->channel);
+		wrnc_msg_uint32 (msg, &cur->miss_reason);
+		wrtd_msg_trigger_entry(msg, &ent);
+
+		cur->ts = ent.ts;
+		cur->seq = ent.seq;
+		cur->id = ent.id;
+
+		if ( wrnc_msg_check_error(msg) ) {
+			errno = EWRTD_INVALID_ANSWER_STATE;
+			return -1;
+		}
 
 		remaining--;
 		n_read++;

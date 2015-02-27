@@ -121,8 +121,8 @@ static inline void ts_adjust_delay(struct wr_timestamp *ts, uint32_t cycles, uin
 	}
 }
 
-/* Puts a successfully transmitted trigger message in the log buffer */
-static void log_trigger(int type, int miss_reason, struct lrt_output *out, struct wrtd_trigger_entry *ent)
+/* Puts a trigger message in the log buffer */
+static inline void log_trigger(int type, int miss_reason, struct lrt_output *out, struct wrtd_trigger_entry *ent)
 {
     	uint32_t id = WRTD_REP_LOG_MESSAGE;
     	uint32_t seq = 0;
@@ -633,7 +633,7 @@ static inline void ctl_trig_remove (uint32_t seq, struct wrnc_msg *ibuf)
 
 		/* check if this wasn't a pending conditional trigger and re-arm the output
 		   if so */
-		if(out->state == OUT_ST_CONDITION_HIT && out->pending_trig == handle.trig)
+		if(out->state == OUT_ST_CONDITION_HIT && out->pending_trig == (struct lrt_output_rule *)handle.trig)
 		{
 			out->state = OUT_ST_ARMED;
 		}

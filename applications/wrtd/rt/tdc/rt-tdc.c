@@ -70,28 +70,53 @@ static int coalesce_count = 0;
 /* Puts raw TDC timestamp (ts) for channel (ch) in the log buffer */
 static inline void log_raw_timestamp (struct tdc_channel_state *ch, struct wr_timestamp *ts)
 {
-    volatile struct wrtd_log_entry *msg = mq_map_out_buffer(0, WRTD_OUT_TDC_LOGGING);
+    uint32_t id = WRTD_REP_LOG_MESSAGE;
+    uint32_t seq = 0;
+    int dummy = 0;
+    int type = WRTD_LOG_RAW;
+    struct wrtd_trigger_entry ent;
+
+    if ( !(ch->log_level & WRTD_LOG_RAW))
+        return;
+
+    struct wrnc_msg buf = hmq_msg_claim_out (WRTD_OUT_TDC_LOGGING, 16);
     
-    mq_claim(0, WRTD_OUT_TDC_LOGGING);
-    msg->type = WRTD_LOG_RAW;
-    msg->channel = ch->n;
-    msg->seq = ch->total_pulses;
-    msg->ts = *ts;
-    mq_send(0, WRTD_OUT_TDC_LOGGING, sizeof(struct wrtd_log_entry) / 4);
+    wrnc_msg_header (&buf, &id, &seq);
+    wrnc_msg_int32 (&buf, &type);
+    wrnc_msg_int32 (&buf, &ch->n);
+    wrnc_msg_int32 (&buf, &dummy);
+    ent.seq = ch->total_pulses;
+    ent.ts = *ts;
+    wrtd_msg_trigger_entry (&buf, &ent);
+    
+    hmq_msg_send (&buf);
 }
 
 /* Puts a successfully transmitted trigger message in the log buffer */
 static inline void log_sent_trigger(struct tdc_channel_state *ch, struct wr_timestamp *ts)
 {
-    volatile struct wrtd_log_entry *msg =  mq_map_out_buffer(0, WRTD_OUT_TDC_LOGGING);
+    uint32_t id = WRTD_REP_LOG_MESSAGE;
+    uint32_t seq = 0;
+    int dummy = 0;
+    int type = WRTD_LOG_SENT;
+
+    struct wrtd_trigger_entry ent;
+
+    if ( !(ch->log_level & WRTD_LOG_SENT))
+        return;
+
+    struct wrnc_msg buf = hmq_msg_claim_out (WRTD_OUT_TDC_LOGGING, 16);
     
-    mq_claim(0, WRTD_OUT_TDC_LOGGING);
-    msg->type = WRTD_LOG_SENT_TRIGGER;
-    msg->seq = ch->seq;
-    msg->id = ch->id;
-    msg->ts = *ts;
+    wrnc_msg_header (&buf, &id, &seq);
+    wrnc_msg_int32 (&buf, &type);
+    wrnc_msg_int32 (&buf, &ch->n);
+    wrnc_msg_int32 (&buf, &dummy);
+    ent.seq = ch->seq;
+    ent.id = ch->id;
+    ent.ts = *ts;
+    wrtd_msg_trigger_entry (&buf, &ent);
     
-    mq_send(0, WRTD_OUT_TDC_LOGGING, sizeof(struct wrtd_log_entry) / 4);
+    hmq_msg_send (&buf);  
 }
 
 /* Creates a trigger message with timestamp (ts) for the channel (ch) and pushes it

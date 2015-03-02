@@ -995,7 +995,7 @@ static inline void do_control()
 	_CMD(WRTD_CMD_FD_CHAN_SET_WIDTH,		ctl_chan_set_width)
 
 	_CMD(WRTD_CMD_FD_READ_HASH,			ctl_read_hash)
-
+	_CMD(WRTD_CMD_FD_PING,                          ctl_ping)
 	default:
 	break;
 	}

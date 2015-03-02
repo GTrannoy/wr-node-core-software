@@ -69,6 +69,8 @@
 #define WRTD_CMD_FD_CHAN_SET_LOG_LEVEL        0x8
 #define WRTD_CMD_FD_CHAN_RESET_COUNTERS       0x9
 
+#define WRTD_CMD_FD_PING                     0xa
+
 
 #define WRTD_REP_ACK_ID			0x100
 #define WRTD_REP_STATE			0x101

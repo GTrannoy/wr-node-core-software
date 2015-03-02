@@ -399,7 +399,7 @@ void enqueue_trigger(int output, struct lrt_output_rule *rule,
 				return;
 			} else if (out->mode == WRTD_TRIGGER_MODE_SINGLE)
 				out->state = OUT_ST_IDLE;
-
+			break;
 		case OUT_ST_TEST_PENDING:
 			return;
 

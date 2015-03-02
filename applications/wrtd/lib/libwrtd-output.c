@@ -35,6 +35,19 @@ static inline int wrtd_out_send_and_receive_sync(struct wrtd_desc *wrtd,
 	return err;
 }
 
+static int wrtd_out_trivial_request (struct wrtd_node *dev, struct wrnc_msg *request_msg)
+{
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	int err;
+
+	/* Send the message and get answer */
+	err = wrtd_out_send_and_receive_sync(wrtd, request_msg);
+        if (err)
+		return err;
+
+	return wrtd_validate_acknowledge(request_msg);
+}
+
 
 #define WRTD_HASH_ENTRY_OK 0
 #define WRTD_HASH_ENTRY_CONDITIONAL 1
@@ -305,7 +318,7 @@ int wrtd_out_trig_assign(struct wrtd_node *dev, unsigned int output,
 	}
 
 	/* Build the message */
-	id = WRTD_CMD_FD_CHAN_ASSIGN_TRIGGER;
+	id = WRTD_CMD_FD_TRIG_ASSIGN;
 	wrnc_msg_header (&msg, &id, &seq);
    	wrnc_msg_uint32 (&msg, &output);
    	wrtd_msg_trig_id (&msg, trig);
@@ -359,7 +372,7 @@ int wrtd_out_trig_unassign(struct wrtd_node *dev,
 
 	/* Build the message */
 	msg.datalen = 5;
-	msg.data[0] = WRTD_CMD_FD_CHAN_REMOVE_TRIGGER;
+	msg.data[0] = WRTD_CMD_FD_TRIG_REMOVE;
 	msg.data[1] = 0;
 	msg.data[2] = handle->channel;
 	msg.data[3] = handle->ptr_cond;
@@ -504,6 +517,39 @@ int wrtd_out_trig_state_get_by_index(struct wrtd_node *dev, unsigned int index,
 	return 0;
 }
 
+static int wrtd_out_rule_delay_set(struct wrtd_node *dev,
+			    	   int output,
+			    	   uint32_t rule_ptr,
+			    	   uint64_t delay_ps)
+{
+	struct wr_timestamp t;
+	struct wrnc_msg msg = wrnc_msg_init (16);
+	uint32_t id, seq = 0;
+
+	if (output > FD_NUM_CHANNELS) {
+		errno = EWRTD_INVALID_CHANNEL;
+		return -1;
+	}
+
+	if (delay_ps > (1000 * 1000 * 1000 * 1000ULL - 1000ULL))
+	{
+		errno = -EWRTD_INVALID_DELAY;
+		return -1;
+
+	}
+
+	t = picos_to_ts(delay_ps);
+
+	id = WRTD_CMD_FD_TRIG_SET_DELAY;
+	wrnc_msg_header (&msg, &id, &seq);
+   	wrnc_msg_int32 (&msg, &output);
+	wrnc_msg_uint32 (&msg, &rule_ptr);
+	wrnc_msg_uint32 (&msg, &t.ticks);
+	wrnc_msg_uint32 (&msg, &t.frac);
+
+	return wrtd_out_trivial_request (dev, &msg);
+}
+
 
 /**
  * It sets the delay to apply for a given trigger
@@ -516,38 +562,11 @@ int wrtd_out_trig_delay_set(struct wrtd_node *dev,
 			    struct wrtd_trigger_handle *handle,
 			    uint64_t delay_ps)
 {
-	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wr_timestamp t;
-	struct wrnc_msg msg = wrnc_msg_init (16);
-	int err;
-	uint32_t id, seq = 0;
-
-	if (delay_ps > (1000 * 1000 * 1000 * 1000ULL - 1000ULL))
-	{
-		errno = -EWRTD_INVALID_DELAY;
-		return -1;
-
-	}
-
-	t = picos_to_ts(delay_ps);
-
-	id = WRTD_CMD_FD_CHAN_SET_DELAY;
-	wrnc_msg_header (&msg, &id, &seq);
-   	wrnc_msg_int32 (&msg, &handle->channel);
-	wrnc_msg_uint32 (&msg, &handle->ptr_trig);
-	wrnc_msg_uint32 (&msg, &t.ticks);
-	wrnc_msg_uint32 (&msg, &t.frac);
-
-	/* Send the message and get answer */
-	err = wrtd_out_send_and_receive_sync(wrtd, &msg);
-        if (err)
-		return err;
-
-	return wrtd_validate_acknowledge(&msg);
+	return wrtd_out_rule_delay_set (dev, handle->channel, handle->ptr_trig, delay_ps);
 }
 
 /**
- * Sets the pulse width for a given output channel. 
+ * Sets the pulse width for a given output channel.
  * @param[in] dev device token
  * @param[in] output index (0-based) of output channel
  * @param[in] width_ps pulse width in pico-seconds (from 1us to 1s)
@@ -560,7 +579,7 @@ int wrtd_out_pulse_width_set(struct wrtd_node *dev, unsigned int output,
 	struct wrnc_msg msg = wrnc_msg_init (16);
 	int err, tmp = 0;
 	uint32_t seq = 0, id;
-	
+
 	if (output > FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
@@ -618,8 +637,13 @@ int wrtd_out_trig_condition_delay_set(struct wrtd_node *dev,
 				      struct wrtd_trigger_handle *handle,
 				      uint64_t delay_ps)
 {
-	errno = EWRTD_NO_IMPLEMENTATION;
-	return -1;
+	if (handle->ptr_cond == 0)
+	{
+		errno = EWRTD_NO_TRIGGER_CONDITION;
+		return -1;
+	}
+
+	return wrtd_out_rule_delay_set (dev, handle->channel, handle->ptr_cond, delay_ps);
 }
 
 
@@ -635,7 +659,7 @@ int wrtd_out_trig_enable(struct wrtd_node *dev,
 
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrnc_msg msg = wrnc_msg_init (16);
-	uint32_t id = WRTD_CMD_FD_CHAN_ENABLE_TRIGGER, seq = 0;
+	uint32_t id = WRTD_CMD_FD_TRIG_ENABLE, seq = 0;
 	int err;
 
 	wrnc_msg_header (&msg, &id, &seq);
@@ -757,10 +781,8 @@ struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev,
 int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
 			   uint32_t log_level)
 {
-	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrnc_msg msg = wrnc_msg_init(4);
-	uint32_t seq = 0, id;
-	int err;
+	uint32_t seq = 0, id = WRTD_CMD_FD_CHAN_SET_LOG_LEVEL;
 
 	if (output > FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
@@ -768,17 +790,11 @@ int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
 	}
 
 	/* Build the message */
-	id = WRTD_CMD_FD_CHAN_SET_LOG_LEVEL;
 	wrnc_msg_header(&msg, &id, &seq);
 	wrnc_msg_uint32(&msg, &output);
 	wrnc_msg_uint32(&msg, &log_level);
 
-	/* Send the message and get answer */
-	err = wrtd_out_send_and_receive_sync(wrtd, &msg);
-        if (err)
-		return err;
-
-	return wrtd_validate_acknowledge(&msg);
+	return wrtd_out_trivial_request (dev, &msg);
 }
 
 /**
@@ -792,10 +808,8 @@ int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
 			      unsigned int output,
 			      enum wrtd_trigger_mode mode)
 {
-	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrnc_msg msg  = wrnc_msg_init(4);;
 	uint32_t seq = 0, id;
-	int err;
 
 	if (output > FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
@@ -808,12 +822,7 @@ int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
 	wrnc_msg_uint32(&msg, &output);
 	wrnc_msg_uint32(&msg, &mode);
 
-	/* Send the message and get answer */
-	err = wrtd_out_send_and_receive_sync(wrtd, &msg);
-	if (err)
-		return err;
-
-	return wrtd_validate_acknowledge(&msg);
+	return wrtd_out_trivial_request (dev, &msg);
 }
 
 
@@ -824,10 +833,22 @@ int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
  * @param[in] armed 1 to arm, 0 to un-arm
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrtd_out_arm(struct wrtd_node *dev, unsigned int ouput, int armed)
+int wrtd_out_arm(struct wrtd_node *dev, unsigned int output, int armed)
 {
-	errno = EWRTD_NO_IMPLEMENTATION;
-	return -1;
+	struct wrnc_msg msg = wrnc_msg_init(4);
+	uint32_t seq = 0, id = WRTD_CMD_FD_CHAN_ARM;
+	
+	if (output >= FD_NUM_CHANNELS) {
+		errno = EWRTD_INVALID_CHANNEL;
+		return -1;
+	}
+
+	/* Build the message */
+	wrnc_msg_header(&msg, &id, &seq);
+	wrnc_msg_uint32(&msg, &output);
+	wrnc_msg_int32(&msg, &armed);
+
+	return wrtd_out_trivial_request (dev, &msg);
 }
 
 
@@ -838,8 +859,19 @@ int wrtd_out_arm(struct wrtd_node *dev, unsigned int ouput, int armed)
  */
 int wrtd_out_counters_reset(struct wrtd_node *dev, unsigned int output)
 {
-	errno = EWRTD_NO_IMPLEMENTATION;
-	return -1;
+	struct wrnc_msg msg = wrnc_msg_init(3);
+	uint32_t seq = 0, id = WRTD_CMD_FD_CHAN_RESET_COUNTERS;
+
+	if (output > FD_NUM_CHANNELS) {
+		errno = EWRTD_INVALID_CHANNEL;
+		return -1;
+	}
+
+	/* Build the message */
+	wrnc_msg_header(&msg, &id, &seq);
+	wrnc_msg_uint32(&msg, &output);
+
+	return wrtd_out_trivial_request (dev, &msg);
 }
 
 
@@ -850,10 +882,16 @@ int wrtd_out_counters_reset(struct wrtd_node *dev, unsigned int output)
  */
 int wrtd_out_check_triggered(struct wrtd_node *dev, unsigned int output)
 {
-	errno = EWRTD_NO_IMPLEMENTATION;
-	return -1;
+	struct wrtd_output_state st;
+	int err;
+
+	err = wrtd_out_state_get(dev, output, &st);
+	if(err)
+		return err;
+
+	return st.flags & WRTD_TRIGGERED ? 1 : 0;
 }
-//int wrtd_out_wait_trigger(struct wrtd_node*, int output_mask, struct wrtd_trig_id *id);
+
 
 /**
  * Check the enable status on a trigger output.

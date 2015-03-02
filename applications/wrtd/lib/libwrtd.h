@@ -38,6 +38,8 @@ enum wrtd_error_list {
 	EWRTD_INVALID_ANSWER_HASH_CONT,
 	EWRTD_INVALID_ANSWER_HANDLE,
 	EWRTD_NOFOUND_TRIGGER,
+	EWRTD_NO_TRIGGER_CONDITION,
+	EWRTD_INVALID_PULSE_WIDTH,
 	__EWRTD_MAX_ERROR_NUMBER,
 };
 
@@ -228,7 +230,6 @@ extern int wrtd_out_trig_condition_delay_set(struct wrtd_node *dev,
 extern int wrtd_out_arm(struct wrtd_node *dev, unsigned int input, int armed);
 extern int wrtd_out_counters_reset(struct wrtd_node *dev, unsigned int output);
 extern int wrtd_out_check_triggered(struct wrtd_node *dev, unsigned int output);
-//int wrtd_out_wait_trigger(struct wrtd_node*, int output_mask, struct wrtd_trig_id *id);
 extern int wrtd_out_is_enabled(struct wrtd_node *dev, unsigned int output,
 			       unsigned int *enable);
 extern int wrtd_out_is_armed(struct wrtd_node *dev, unsigned int output,

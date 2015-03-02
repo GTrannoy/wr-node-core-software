@@ -38,8 +38,9 @@ static int print_message(struct wrnc_hmq *hmq)
 
 	fprintf(stdout, "Event Type  %s\n", wrtd_strlogging(log.type));
 	fprintf(stdout, "Channel     %d\n", log.channel);
-	fprintf(stdout, "Sequence    %d\n", log.seq);
-	fprintf(stdout, "Identifier  %d:%d%d\n",
+	fprintf(stdout, "Miss reason %x\n", log.miss_reason);
+	fprintf(stdout, "Seq         %d\n", log.seq);
+	fprintf(stdout, "Identifier  %04x:%04x:%04x\n",
 		log.id.system, log.id.source_port, log.id.trigger);
 	fprintf(stdout, "Timestamp   %"PRIu64"s  %"PRIu32"tick %"PRIu32"frac\n",
 		log.ts.seconds, log.ts.ticks, log.ts.frac);

@@ -33,8 +33,6 @@
 
 
 /* Command and log message IDs */
-#define WRTD_LOG_RAW_INPUT	  	 0x1
-#define WRTD_LOG_SENT_TRIGGER 	 0x2
 
 #define WRTD_CMD_TDC_CHAN_ENABLE		0x1
 #define WRTD_CMD_TDC_CHAN_SET_DEAD_TIME		0x2
@@ -78,6 +76,8 @@
 #define WRTD_REP_TRIGGER_HANDLE	0x103
 #define WRTD_REP_HASH_ENTRY		0x104
 #define WRTD_REP_TIMESTAMP		0x105
+#define WRTD_REP_LOG_MESSAGE    0x106
+
 
 
 
@@ -135,6 +135,13 @@ enum wrtd_log_level {
     WRTD_LOG_ALL = 0xff,
 };
 
+enum wrtd_log_miss_reason {
+    WRTD_MISS_DEAD_TIME = 0,
+    WRTD_MISS_OVERFLOW = 1,
+    WRTD_MISS_NO_WR = 2,
+    WRTD_MISS_TIMEOUT = 3
+};
+
 
 #define HASH_ENT_EMPTY          (0 << 0)
 #define HASH_ENT_DIRECT         (1 << 0)
@@ -167,6 +174,7 @@ struct wrtd_log_entry {
     int channel;
     struct wrtd_trig_id id;
     struct wr_timestamp ts;
+    enum wrtd_log_miss_reason miss_reason;
 };
 
 #ifdef WRNODE_RT

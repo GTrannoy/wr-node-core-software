@@ -67,14 +67,14 @@ static void dump_output_state(struct wrtd_output_state *state)
 
 	decode_flags(tmp, state->flags);
 	printf("Output %d state:\n", state->output);
-    printf(" - Flags:                         %s\n", tmp);
+	printf(" - Flags:                         %s\n", tmp);
 	decode_mode(tmp, state->mode);
 	printf(" - Mode:                          %s\n", tmp);
 	format_ts(tmp, state->pulse_width, 0);
 	printf(" - Pulse width:                   %s\n", tmp);
 	format_ts(tmp, state->dead_time, 1);
 	printf(" - Dead time:                     %s\n", tmp);
-	
+
 	printf(" - Executed pulses:               %-10d\n",
 		       state->executed_pulses);
 	printf(" - Missed pulses (latency):       %-10d\n",
@@ -182,7 +182,7 @@ static int wrtd_cmd_delay(struct wrtd_node *wrtd, int output,
 
 	if (argc != 2 || argv[0] == NULL || argv[1] == NULL) {
 		fprintf(stderr,
-			"Missing arguments: delay <trig-index> <delay>\n");
+			"Missing arguments: trig_delay <trig-index> <delay>\n");
 		return -1;
 	}
 	index = atoi(argv[0]);
@@ -222,7 +222,7 @@ static int wrtd_cmd_assign(struct wrtd_node *wrtd, int output,
 	int err, cond = 0;
 
 	if ((argc != 1 && argc != 2) || argv[0] == NULL) {
-		fprintf(stderr, "Missing arguments\n");
+		fprintf(stderr, "Missing arguments: assign <trigger ID> [condition ID]\n");
 		return -1;
 	}
 
@@ -247,7 +247,7 @@ static int wrtd_cmd_unassign(struct wrtd_node *wrtd, int output,
 	int index, err;
 
 	if (argc != 1 || argv[0] == NULL) {
-		fprintf(stderr, "Missing deadtime value\n");
+		fprintf(stderr, "Missing arguments: unassign <trigger index>\n");
 		return -1;
 	}
 	index = atoi(argv[0]);
@@ -305,12 +305,19 @@ static int wrtd_cmd_trig_stats(struct wrtd_node *wrtd, int output,
 	return wrtd_show_triggers (wrtd, output, argc, argv, 1);
 }
 
+static int wrtd_cmd_trig_find(struct wrtd_node *wrtd, int output,
+				  int argc, char *argv[])
+{
+	return -1;
+	//return wrtd_show_triggers (wrtd, output, argc, argv, 1);
+}
+
 static void help()
 {
 	int i;
 
-	fprintf(stderr, "wrtd-tdc-config -D 0x<hex-number> -C <string> -c <number> [cmd-options]\n");
-	fprintf(stderr, "It configures a channel of a TDC on a white-rabbit trigger distribution node\n");
+	fprintf(stderr, "wrtd-out-config -D 0x<hex-number> -C <string> -c <number> [cmd-options]\n");
+	fprintf(stderr, "Test program for the outputs of a White Rabbit Trigger Distribution node\n");
 	fprintf(stderr, "-D device id\n");
 	fprintf(stderr, "-C command name\n");
 	fprintf(stderr, "-c channel to configure\n");

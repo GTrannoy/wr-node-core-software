@@ -16,6 +16,7 @@ PROGS := wrtd-boot
 PROGS += wrtd-in-config
 PROGS += wrtd-out-config
 PROGS += wrtd-logging
+PROGS += wrtd-ping
 
 all: $(PROGS)
 

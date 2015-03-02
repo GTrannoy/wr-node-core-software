@@ -32,6 +32,8 @@ const char *wrtd_errors[] = {
 	"Received an invalid hash chain",
 	"Received an invalid trigger handle",
 	"Trigger not found",
+	"No trigger condition",
+	"Invalid pulse width",
 };
 
 

@@ -533,7 +533,7 @@ static int wrtd_out_rule_delay_set(struct wrtd_node *dev,
 
 	if (delay_ps > (1000 * 1000 * 1000 * 1000ULL - 1000ULL))
 	{
-		errno = -EWRTD_INVALID_DELAY;
+		errno = EWRTD_INVALID_DELAY;
 		return -1;
 
 	}
@@ -587,7 +587,7 @@ int wrtd_out_pulse_width_set(struct wrtd_node *dev, unsigned int output,
 
 	if (width_ps < 1000ULL * 250 || width_ps >= 1000ULL * 1000 * 1000 * 1000 )
 	{
-		//fixme : add errno
+		errno = EWRTD_INVALID_PULSE_WIDTH;
 		return -1;
 	}
 

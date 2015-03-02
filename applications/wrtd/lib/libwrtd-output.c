@@ -808,7 +808,7 @@ int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
 			      unsigned int output,
 			      enum wrtd_trigger_mode mode)
 {
-	struct wrnc_msg msg  = wrnc_msg_init(4);;
+	struct wrnc_msg msg  = wrnc_msg_init(4);
 	uint32_t seq = 0, id;
 
 	if (output > FD_NUM_CHANNELS) {

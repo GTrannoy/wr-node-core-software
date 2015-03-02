@@ -29,14 +29,16 @@ static inline int _wrnc_msg_check_buffer( struct wrnc_msg *buf, int n_words )
     if(buf->error) 
 	return -1;
 
-    if(buf->direction == WRNC_MSG_DIR_SEND && buf->datalen + n_words >= buf->max_size)
+    if(buf->direction == WRNC_MSG_DIR_SEND &&
+       buf->datalen + n_words > buf->max_size)
     {
 #ifdef DEBUG
 	pp_printf("Error: HMQ buffer send overflow: %d vs %d\n", buf->datalen + n_words, buf->max_size );
 #endif
 	buf->error = 1;
 	return -1;
-    } else if (buf->direction == WRNC_MSG_DIR_RECEIVE && buf->offset + n_words > buf->datalen ) {
+    } else if (buf->direction == WRNC_MSG_DIR_RECEIVE &&
+	       buf->offset + n_words > buf->datalen ) {
 
 #ifdef DEBUG
 	pp_printf("Error: HMQ buffer recv overflow: %d vs %d\n", buf->offset + n_words, buf->datalen );

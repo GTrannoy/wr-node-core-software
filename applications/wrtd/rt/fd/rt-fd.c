@@ -306,7 +306,8 @@ void do_output (struct lrt_output *out)
 				if(out->state == OUT_ST_TEST_PENDING)
 					out->state = OUT_ST_IDLE;
 
-				log_trigger (WRTD_LOG_EXECUTED, 0, out, &pq_ent->trig);
+				log_trigger (WRTD_LOG_MISSED, WRTD_MISS_TIMEOUT,
+					     out, &pq_ent->trig);
 			}
 		} else {
 			out->last_executed = pq_ent->trig;
@@ -319,7 +320,7 @@ void do_output (struct lrt_output *out)
 			if(out->state == OUT_ST_TEST_PENDING)
 				out->state = OUT_ST_IDLE;
 
-			log_trigger (WRTD_LOG_MISSED, WRTD_MISS_TIMEOUT, out, &pq_ent->trig);
+			log_trigger (WRTD_LOG_EXECUTED, 0, out, &pq_ent->trig);
 		}
 		return;
 	}

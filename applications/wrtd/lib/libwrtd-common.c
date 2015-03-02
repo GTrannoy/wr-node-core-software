@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <libwrnc.h>
 #include <libwrtd-internal.h>
+#include <wrtd-serializers.h>
 #include <fmctdc-lib.h>
 #include <fdelay-lib.h>
 

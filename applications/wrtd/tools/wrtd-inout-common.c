@@ -69,6 +69,8 @@ void decode_log_level(char *buf, uint32_t flags)
         strcat(buf, "Filtered ");
     if (flags & WRTD_LOG_EXECUTED)
         strcat(buf, "Exceuted ");
+    if (flags & WRTD_LOG_MISSED)
+        strcat(buf, "Missed ");
 }
 
 

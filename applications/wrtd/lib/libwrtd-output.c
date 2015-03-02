@@ -657,26 +657,94 @@ int wrtd_out_trig_enable(struct wrtd_node *dev,
 
 
 /**
+ * It sets the logging interface shared mode. When the logging interface
+ * is shared all users will receive the same messages.
+ * Rembember that the logging interface is not "per-channel" but "per-core".
+ * Even if it is possible to fake a per-channel behaviour
+ * for wrtd_in_log_open(); there is no way to set the shared mode for
+ * single channel
+ * @param[in] dev device token
+ * @param[in] shared 1 share, 0 not share
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_out_log_share_set(struct wrtd_node *dev, unsigned int shared)
+{
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+
+	return wrnc_hmq_share_set(wrtd->wrnc, WRNC_HMQ_OUTCOMING,
+				  WRTD_OUT_FD_LOGGING, shared);
+}
+
+
+/**
+ * It gets the current shared mode status for the logging interface
+ * @param[in] dev device token
+ * @param[out] shared 1 share, 0 not share
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_out_log_share_get(struct wrtd_node *dev, unsigned int *shared)
+{
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+
+	return wrnc_hmq_share_get(wrtd->wrnc, WRNC_HMQ_OUTCOMING,
+				  WRTD_OUT_FD_LOGGING, shared);
+}
+
+
+/**
  * It opens the logging interface for the output device. You can provide a
  * default logging level.
+ * @todo reduce code duplication wrtd_in_log_open()
  * @param[in] dev device token
  * @param[in] lvl default logging level
+ * @param[in] output channel number [-1, 3]. [-1] for all channels, [0,3] for a
+ *                   specific one.
  * @return a HMQ token on success, NULL on error and errno is set appropriately
  */
 struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev,
-				   uint32_t lvl)
+				   uint32_t lvl,
+				   int output)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrnc_msg_filter filter = {
+		.operation = WRNC_MSG_FILTER_AND,
+		.word_offset = 2, /* channel field */
+		.mask = 0xFFFF, /* entire field */
+		.value = output, /* required channel */
+	};
+	struct wrnc_hmq *hmq = NULL;
 	int i, err;
 
-	/* Set the same logging level to all channels */
-	for (i = 0; i < FD_NUM_CHANNELS; ++i) {
-		err = wrtd_out_log_level_set(dev, i, lvl);
-		if (err)
-			return NULL;
+	if (output < -1 || output >= FD_NUM_CHANNELS) {
+		errno = EWRTD_INVALID_CHANNEL;
+		return NULL;
 	}
 
-	return wrnc_hmq_open(wrtd->wrnc, WRTD_OUT_FD_LOGGING, 0);
+	if (output > -1) {
+		err = wrtd_out_log_level_set(dev, output, lvl);
+		if (err)
+			return NULL;
+
+		hmq = wrnc_hmq_open(wrtd->wrnc, WRTD_OUT_FD_LOGGING, 0);
+		if (!hmq)
+			return NULL;
+
+		err = wrnc_hmq_filter_add(hmq, &filter);
+		if (err) {
+			wrnc_hmq_close(hmq);
+			return NULL;
+		}
+	} else {
+		/* Set the same logging level to all channels */
+		for (i = 0; i < TDC_NUM_CHANNELS; ++i) {
+			err = wrtd_out_log_level_set(dev, i, lvl);
+			if (err)
+				return NULL;
+		}
+		hmq = wrnc_hmq_open(wrtd->wrnc, WRTD_OUT_FD_LOGGING, 0);
+	}
+
+	return hmq;
 }
 
 

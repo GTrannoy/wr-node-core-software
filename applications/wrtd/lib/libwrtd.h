@@ -152,8 +152,11 @@ extern int wrtd_in_timebase_offset_set(struct wrtd_node *dev,
 extern int wrtd_in_counters_reset(struct wrtd_node *dev, unsigned int input);
 extern int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
 				 uint32_t log_level);
+extern int wrtd_in_log_share_set(struct wrtd_node *dev, unsigned int shared);
+extern int wrtd_in_log_share_get(struct wrtd_node *dev, unsigned int *shared);
 extern struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev,
-					 uint32_t lvl);
+					 uint32_t lvl,
+					 int input);
 extern int wrtd_in_seq_counter_set (struct wrtd_node *dev, unsigned int input,
 				    unsigned int value);
 extern int wrtd_in_is_enabled(struct wrtd_node *dev, unsigned int input,
@@ -205,8 +208,11 @@ extern int wrtd_out_pulse_width_set(struct wrtd_node *dev, unsigned int output,
 				  uint64_t pulse_width_ps);
 extern int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
 				  uint32_t log_level);
+extern int wrtd_out_log_share_set(struct wrtd_node *dev, unsigned int shared);
+extern int wrtd_out_log_share_get(struct wrtd_node *dev, unsigned int *shared);
 extern struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev,
-					  uint32_t lvl);
+					  uint32_t lvl,
+					  int output);
 extern int wrtd_out_trig_enable(struct wrtd_node *dev,
 				struct wrtd_trigger_handle *handle, int enable);
 extern int wrtd_out_ping(struct wrtd_node *dev);

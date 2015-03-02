@@ -764,7 +764,7 @@ int wrtd_in_seq_counter_set(struct wrtd_node *dev, unsigned int input,
 int wrtd_in_ping(struct wrtd_node *dev)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg = wrnc_msg_init(2);
+	struct wrnc_msg msg = wrnc_msg_init(3); /* FIXME cannot use 2 */
 	uint32_t id, seq = 0;
 	int err;
 

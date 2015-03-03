@@ -14,6 +14,18 @@
 #include <libwrnc.h>
 #include <libwrtd.h>
 
+enum wrtb_boot_tdc_offset_type {
+	OFFSET_ZERO,
+	OFFSET_USER,
+	OFFSET_WR,
+};
+
+char *strtype[] = {
+	"zero-offset",
+	"user-offset",
+	"wr-offset",
+};
+
 static void help()
 {
 	fprintf(stderr, "wrtd-boot [options] -D 0x<hex-number> -t <path> -f <path> [-T <number>]\n");
@@ -25,18 +37,24 @@ static void help()
 	exit(1);
 }
 
+static inline char *stroffset(enum wrtb_boot_tdc_offset_type type) {
+	return strtype[type];
+}
 
 /**
- * Get the white-rabbit timeoffset form the TDC driver
+ * Get a timeoffset form the TDC driver
  */
-uint64_t wb_offset_get(unsigned int dev_id, unsigned int channel, uint64_t *offset)
+static int partial_offset_get(unsigned int dev_id,
+			      unsigned int channel,
+			      uint64_t *offset,
+			      enum wrtb_boot_tdc_offset_type type)
 {
 	char path[255];
 	FILE *f;
 	int ret;
 
-	sprintf(path, "/sys/bus/zio/devices/tdc-1n5c-%04x/ft-ch%d/wr-offset",
-		dev_id, channel + 1);
+	sprintf(path, "/sys/bus/zio/devices/tdc-1n5c-%04x/ft-ch%d/%s",
+		dev_id, channel + 1, stroffset(type));
 
 	f = fopen(path, "r");
 	if (!f)
@@ -55,6 +73,38 @@ uint64_t wb_offset_get(unsigned int dev_id, unsigned int channel, uint64_t *offs
 	return 0;
 }
 
+
+/**
+ * It compute the final time stamp (as it is done on the fmc-tdc driver)
+ */
+static int offset_get(unsigned int dev_id, unsigned int channel, uint64_t *offset)
+{
+	uint64_t tmp;
+	int err;
+
+	fprintf(stdout, "Building timestamp offset\n");
+
+	err = partial_offset_get(dev_id, channel, &tmp, OFFSET_ZERO);
+	if (err)
+		return -1;
+	*offset = tmp;
+	fprintf(stdout, " zero offset : %"PRIu64"\n", tmp);
+
+	err = partial_offset_get(dev_id, channel, &tmp, OFFSET_WR);
+	if (err)
+		return -1;
+	*offset -= tmp;
+	fprintf(stdout, " user offset : %"PRIu64"\n", tmp);
+
+	err = partial_offset_get(dev_id, channel, offset, OFFSET_USER);
+	if (err)
+		return -1;
+	*offset += tmp;
+	fprintf(stdout, "   wr offset : %"PRIu64"\n", tmp);
+	fprintf(stdout, "final offset : %"PRIu64"\n", *offset);
+
+	return 0;
+}
 
 int main(int argc, char *argv[])
 {
@@ -153,10 +203,18 @@ int main(int argc, char *argv[])
 
 	/* Inform the input real-time channels about the offset */
 	for (i = 0; i < TDC_NUM_CHANNELS; ++i) {
-		offset = wb_offset_get(dev_id, i, &offset);
-		err = wrtd_in_timebase_offset_set(wrtd, i, offset);
-		if (err)
+		err = offset_get(dev_id, i, &offset);
+		if (err) {
+			fprintf(stderr, "Cannot calculate offset: %s\n",
+				wrtd_strerror(errno));
 			exit(1);
+		}
+		err = wrtd_in_timebase_offset_set(wrtd, i, offset);
+		if (err) {
+			fprintf(stderr, "Cannot set offset: %s\n",
+				wrtd_strerror(errno));
+			exit(1);
+		}
 	}
 
 	wrtd_close(wrtd);

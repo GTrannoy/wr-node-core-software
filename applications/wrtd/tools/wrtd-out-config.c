@@ -448,7 +448,7 @@ static void help()
 	fprintf(stderr, "\n");
 	fprintf(stderr, "Available commands:\n");
 	for(i = 0; cmds[i].handler; i++) {
-		fprintf(stderr, "  %-10s %s\n", cmds[i].name, cmds[i].desc);
+		fprintf(stderr, "  %-16s %s\n", cmds[i].name, cmds[i].desc);
 	}
 	exit(1);
 }

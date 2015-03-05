@@ -15,7 +15,7 @@ extern "C" {
 #include <stdint.h>
 #include <stdio.h>
 #include <poll.h>
-#include <wrnc-user.h>
+#include "wrnc-user.h"
 
 struct wrnc_dev;
 

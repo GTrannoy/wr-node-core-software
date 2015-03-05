@@ -389,42 +389,41 @@ static int wrtd_cmd_trig_unassign(struct wrtd_node *wrtd, int output,
  * It prints trigger statistics
  */
 static void wrtd_trigger_stats_print(struct wrtd_output_trigger_state *state,
-				     int index)
+				     int index, int latency_stats)
 {
 	char ts[1024], id[1024];
 
-	format_ts(ts, state->.delay_trig, 0);
-	format_id(id, state->.trigger);
+	format_ts(ts, state->delay_trig, 0);
+	format_id(id, state->trigger);
 	if (index > 0)
 		printf(" %-3d: ID: %s, delay: %s, enabled: %d\n",
-		       index, id, ts, state->.enabled );
+		       index, id, ts, state->enabled );
 	else
 		printf(" ---: ID: %s, delay: %s, enabled: %d\n",
-		       index, id, ts, state->.enabled );
+		       id, ts, state->enabled );
 
-	if(state->.is_conditional) {
-		format_ts(ts, state->.delay_cond, 0);
-		format_id(id, state->.condition);
+	if(state->is_conditional) {
+		format_ts(ts, state->delay_cond, 0);
+		format_id(id, state->condition);
 		printf("     (condition ID: %s, delay: %s)\n", id, ts);
 	}
 	if(latency_stats)
 	{
 		printf("  - executed pulses:      %d\n",
-		       state->.executed_pulses);
+		       state->executed_pulses);
 		printf("  - missed pulses:        %d\n",
-		       state->.missed_pulses);
+		       state->missed_pulses);
 		printf("  - latency (worst case): %d us\n",
-		       state->.latency_worst_us);
+		       state->latency_worst_us);
 		printf("  - latency (average):    %d us\n",
-		       state->.latency_average_us);
+		       state->latency_average_us);
 	}
 }
 static int wrtd_show_triggers(struct wrtd_node *wrtd, int output,
 			    int argc, char *argv[], int latency_stats)
 {
-	int ret, i;
-	char ts[1024], id[1024];
 	struct wrtd_output_trigger_state trigs[256];
+	int ret, i;
 
 	ret = wrtd_out_trig_get_all(wrtd, output, trigs, 256);
 	if (ret < 0)
@@ -432,7 +431,7 @@ static int wrtd_show_triggers(struct wrtd_node *wrtd, int output,
 
 	printf("Output %d: %d trigger(s) assigned\n", output, ret);
 	for (i = 0; i < ret; i++)
-		wrtd_trigger_stats_print(i, &trigs[i]);
+		wrtd_trigger_stats_print(&trigs[i], i, latency_stats);
 
 	return 0;
 }
@@ -453,8 +452,26 @@ static int wrtd_cmd_trig_stats(struct wrtd_node *wrtd, int output,
 static int wrtd_cmd_trig_find(struct wrtd_node *wrtd, int output,
 				  int argc, char *argv[])
 {
-	return -1;
-	//return wrtd_show_triggers (wrtd, output, argc, argv, 1);
+	struct wrtd_output_trigger_state state;
+	struct wrtd_trig_id id;
+	int ret;
+
+	if (argc != 1 || argv[0] == NULL) {
+		fprintf(stderr, "Missing arguments: trig_find <trigger id>\n");
+		return -1;
+	}
+
+	ret = parse_trigger_id(argv[0], &id);
+	if (ret != 3)
+		return -1;
+
+	ret = wrtd_out_trig_state_get_by_id(wrtd, &id, &state);
+	if (ret)
+		return -1;
+
+	wrtd_trigger_stats_print(&state, -1, 1);
+
+	return 0;
 }
 
 static void help()

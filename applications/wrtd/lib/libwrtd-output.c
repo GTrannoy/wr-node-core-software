@@ -53,6 +53,89 @@ static int wrtd_out_trivial_request (struct wrtd_node *dev, struct wrnc_msg *req
 #define WRTD_HASH_ENTRY_CONDITIONAL 1
 #define WRTD_HASH_ENTRY_EMPTY 2
 
+
+static int __wrtd_out_trig_get(struct wrtd_desc *wrtd, uint32_t output,
+			       struct wrnc_msg *msg,
+			       struct wrtd_output_trigger_state *trigger)
+{
+	uint32_t id = 0, seq = 0, is_conditional, entry_ok, state;
+	uint32_t latency_worst, latency_avg_nsamples, latency_avg_sum;
+	int err;
+
+	/* Send the message and get answer */
+	err = wrtd_out_send_and_receive_sync(wrtd, msg);
+	if (err) {
+		errno = EWRTD_INVALID_ANSWER_STATE;
+		return -1;
+	}
+
+	/* Deserialize and check the answer */
+	wrnc_msg_header(msg, &id, &seq);
+	if (id != WRTD_REP_HASH_ENTRY)
+	{
+		errno = EWRTD_INVALID_ANSWER_STATE;
+		return -1;
+	}
+
+	wrnc_msg_uint32(msg, &entry_ok);
+	wrnc_msg_uint32(msg, &is_conditional);
+
+	if(!entry_ok)
+		return WRTD_HASH_ENTRY_EMPTY;
+
+	trigger->is_conditional = 0;
+
+	trigger->handle.channel = output;
+	wrnc_msg_uint32(msg, (uint32_t *) &trigger->handle.ptr_trig);
+	wrnc_msg_uint32(msg, (uint32_t *) &trigger->handle.ptr_cond);
+
+	if(is_conditional)
+	{
+		trigger->is_conditional = 1;
+
+		wrnc_msg_uint32(msg, &state);
+		wrtd_msg_trig_id(msg, &trigger->condition);
+		trigger->delay_cond.ticks = 0;
+		wrnc_msg_uint32(msg, &trigger->delay_cond.ticks);
+		wrnc_msg_uint32(msg, &trigger->delay_cond.frac);
+		/* skip the condition latency stats for the time being */
+		wrnc_msg_skip(msg, 5);
+	}
+
+	wrnc_msg_uint32(msg, &state);
+
+	if (state & HASH_ENT_CONDITIONAL)
+		return WRTD_HASH_ENTRY_CONDITIONAL;
+
+	wrtd_msg_trig_id(msg, &trigger->trigger);
+	trigger->delay_trig.ticks = 0;
+	wrnc_msg_uint32(msg, &trigger->delay_trig.ticks);
+	wrnc_msg_uint32(msg, &trigger->delay_trig.frac);
+	wrnc_msg_uint32(msg, &latency_worst);
+	wrnc_msg_uint32(msg, &latency_avg_sum);
+	wrnc_msg_uint32(msg, &latency_avg_nsamples);
+	wrnc_msg_uint32(msg, &trigger->executed_pulses);
+	wrnc_msg_uint32(msg, &trigger->missed_pulses);
+
+	if(latency_avg_nsamples == 0)
+		trigger->latency_average_us = 0;
+	else
+		trigger->latency_average_us = (latency_avg_sum /
+					       latency_avg_nsamples + 124) / 125;
+
+	trigger->latency_worst_us = (latency_worst + 124) / 125;
+
+	trigger->enabled = (state & HASH_ENT_DISABLED) ? 0 : 1;
+
+	if ( wrnc_msg_check_error(msg) ) {
+		errno = EWRTD_INVALID_ANSWER_STATE;
+		return -1;
+	}
+
+	return WRTD_HASH_ENTRY_OK;
+}
+
+
 /**
  * Retreives a trigger entry specified by a position in the hash table 
  * (bucket/index number) or by its handle (if handle parameter is not null)
@@ -71,9 +154,8 @@ static int wrtd_out_trig_get(struct wrtd_node *dev, unsigned int output,
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrnc_msg msg = wrnc_msg_init (16);
-	int err, is_conditional = 0, entry_ok = 0;
 	uint32_t seq = 0, id ;
-	uint32_t state, latency_worst, latency_avg_sum, latency_avg_nsamples, ptr = 0;
+	uint32_t ptr = 0;
 
 	if (output > FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
@@ -93,75 +175,7 @@ static int wrtd_out_trig_get(struct wrtd_node *dev, unsigned int output,
 	wrnc_msg_uint32 (&msg, &ptr);
 
 	/* Send the message and get answer */
-	err = wrtd_out_send_and_receive_sync (wrtd, &msg);
-	if (err) {
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
-
-	/* Deserialize and check the answer */
-	wrnc_msg_header (&msg, &id, &seq);
-	if (id != WRTD_REP_HASH_ENTRY)
-	{
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
-
-	wrnc_msg_int32 (&msg, &entry_ok);
-	wrnc_msg_int32 (&msg, &is_conditional);
-
-	if(!entry_ok)
-		return WRTD_HASH_ENTRY_EMPTY;
-
-	trigger->is_conditional = 0;
-
-	trigger->handle.channel = output;
-	wrnc_msg_uint32 (&msg, (uint32_t *) &trigger->handle.ptr_trig);
-	wrnc_msg_uint32 (&msg, (uint32_t *) &trigger->handle.ptr_cond);
-
-	if(is_conditional)
-	{
-		trigger->is_conditional = 1;
-
-		wrnc_msg_uint32 (&msg, &state);
-		wrtd_msg_trig_id (&msg, &trigger->condition);
-		trigger->delay_cond.ticks = 0;
-		wrnc_msg_uint32 (&msg, &trigger->delay_cond.ticks);
-		wrnc_msg_uint32 (&msg, &trigger->delay_cond.frac);
-		/* skip the condition latency stats for the time being */
-		wrnc_msg_skip(&msg, 5);
-	}
-
-	wrnc_msg_uint32 (&msg, &state);
-
-	if (state & HASH_ENT_CONDITIONAL)
-		return WRTD_HASH_ENTRY_CONDITIONAL;
-
-	wrtd_msg_trig_id (&msg, &trigger->trigger);
-	trigger->delay_trig.ticks = 0;
-	wrnc_msg_uint32 (&msg, &trigger->delay_trig.ticks);
-	wrnc_msg_uint32 (&msg, &trigger->delay_trig.frac);
-	wrnc_msg_uint32 (&msg, &latency_worst);
-	wrnc_msg_uint32 (&msg, &latency_avg_sum);
-	wrnc_msg_uint32 (&msg, &latency_avg_nsamples);
-	wrnc_msg_uint32 (&msg, &trigger->executed_pulses);
-	wrnc_msg_uint32 (&msg, &trigger->missed_pulses);
-
-	if(latency_avg_nsamples == 0)
-		trigger->latency_average_us = 0;
-	else
-		trigger->latency_average_us = (latency_avg_sum / latency_avg_nsamples + 124) / 125;
-
-	trigger->latency_worst_us = (latency_worst + 124) / 125;
-
-	trigger->enabled = (state & HASH_ENT_DISABLED) ? 0 : 1;
-
-	if ( wrnc_msg_check_error(&msg) ) {
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
-
-	return WRTD_HASH_ENTRY_OK;
+	return  __wrtd_out_trig_get(wrtd, output, &msg, trigger);
 }
 
 
@@ -453,9 +467,7 @@ int wrtd_out_trig_state_get_by_handle(struct wrtd_node *dev,
 
 
 /**
- * It returns a trigget from a given index. The index may change due to trigger
- * assing and un-assing. So, before use this function you have to check the
- * current trigger's indexes. Note that this is not thread safe.
+ * It returns a trigget from a given identifier.
  * Whenever is possible you should prefer wrtd_out_trig_state_get_by_handle()
  * @param[in] dev device token
  * @param[in] id identifier of the trigger to retrieve
@@ -463,28 +475,26 @@ int wrtd_out_trig_state_get_by_handle(struct wrtd_node *dev,
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_out_trig_state_get_by_id(struct wrtd_node *dev,
-				  struct wrtd_trig_id *id,
+				  struct wrtd_trig_id *tid,
 				  struct wrtd_output_trigger_state *trigger)
 {
-	struct wrtd_output_trigger_state triggers[256];
-	int ret, i, k;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	uint32_t seq = 0, id;
+	int ret, i;
 
-	for (k = 0; k < FD_NUM_CHANNELS; ++k) {
-		/* Get triggers for a given channel */
-		ret = wrtd_out_trig_get_all(dev, k, triggers, 256);
-		if (ret < 0) {
-			return -1;
-		}
+	for (i = 0; i < FD_NUM_CHANNELS; ++i) {
+		struct wrnc_msg msg = wrnc_msg_init(6);
+		id = WRTD_CMD_FD_TRIG_GET_BY_ID;
+		wrnc_msg_header(&msg, &id, &seq);
+		wrnc_msg_int32(&msg, &i);
+		wrtd_msg_trig_id(&msg, tid);
 
-		/* Look for trigger ID */
-		for (i = 0; i < 256; ++i) {
-			if (memcmp(id, &triggers[i].trigger,
-				   sizeof(struct wrtd_trig_id)) == 0) {
-				*trigger = triggers[i];
-				return 0;
-			}
-		}
+		ret = __wrtd_out_trig_get(wrtd, i, &msg, trigger);
+		if (ret == WRTD_HASH_ENTRY_OK)
+			return 0;
 	}
+
+
 	errno = EWRTD_NOFOUND_TRIGGER;
 	return -1;
 }

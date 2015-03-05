@@ -204,6 +204,24 @@ struct lrt_hash_entry *hash_get_entry (int bucket, int pos)
     return l;
 }
 
+
+/* It counts the number of triggers assigned to a given channel */
+int hash_count_rules(int ch)
+{
+	struct lrt_hash_entry *l, *ln;
+	int count, i, k;
+
+	for (i = 0; i < FD_HASH_ENTRIES; i++) {
+		l = htab[i];
+		for (k = 0; ln; ln = ln->next) {
+			if (ln->ocfg[ch])
+				count++;
+		}
+	}
+
+	return count;
+}
+
 /* Returns the number of free hash entries */
 int hash_free_count()
 {

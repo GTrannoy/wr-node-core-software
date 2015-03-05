@@ -61,6 +61,7 @@ void hash_init ();
 struct lrt_hash_entry *hash_add (struct wrtd_trig_id *id, int output, struct lrt_output_rule *rule);
 int hash_remove (struct lrt_hash_entry *ent, int output);
 int hash_free_count ();
+int hash_count_rules(int ch);
 struct lrt_hash_entry *hash_get_entry (int bucket, int pos);
 
 /* Hash function, returing the hash table index corresponding to a given trigger ID */

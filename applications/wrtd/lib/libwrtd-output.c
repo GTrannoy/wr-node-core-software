@@ -937,24 +937,48 @@ int wrtd_out_is_armed(struct wrtd_node *dev, unsigned int output,
 }
 
 /**
- * Check the trigger assigned status on a trigger output.
+ * Check the trigger assigned status on a trigger output. If you provide
+ * a trigger identifier then the function checks that the given trigger
+ * is assigned to the given channel. Otherwise it will tell you if there
+ * is any trigger assigned to the channel.
  * @param[in] dev device token
  * @param[in] output index (0-based) of output channel
+ * @param[in] id trigger identifier (optional)
  * @param[out] armed 1 if it is enabled, 0 otherwise
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_out_has_trigger(struct wrtd_node *dev, unsigned int output,
-			 unsigned int *assigned)
+			 struct wrtd_trig_id *id, unsigned int *assigned)
 {
+	struct wrtd_output_trigger_state triggers[256];
 	struct wrtd_output_state state;
-	int err;
+	int ret, i;
 
-	err = wrtd_out_state_get(dev, output, &state);
-	if (err)
+	/* Set default output */
+	*assigned = 0;
+
+	ret = wrtd_out_state_get(dev, output, &state);
+	if (ret)
 		return -1;
-	*assigned = !!(state.flags & WRTD_TRIGGER_ASSIGNED);
 
-	return 0;
+	if (!id) {
+		/* Check only if there is at least one trigger */
+		*assigned = !!(state.flags & WRTD_TRIGGER_ASSIGNED);
+		return 0;
+	}
+
+	/* Look for the id among all assigned trigger */
+	ret = wrtd_out_trig_get_all(dev, output, triggers, 256);
+	if (ret < 0)
+		return -1;
+	for (i = 0; i < ret; i++) {
+		if (wrtd_trig_id_cmp(id, &triggers[i].trigger) == 0) {
+			*assigned = 1;
+			return 0;
+		}
+	}
+
+	return -1;
 }
 
 

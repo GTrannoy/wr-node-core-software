@@ -53,8 +53,12 @@ static int partial_offset_get(unsigned int dev_id,
 	FILE *f;
 	int ret;
 
-	sprintf(path, "/sys/bus/zio/devices/tdc-1n5c-%04x/ft-ch%d/%s",
-		dev_id, channel + 1, stroffset(type));
+	if (type == OFFSET_WR)
+		sprintf(path, "/sys/bus/zio/devices/tdc-1n5c-%04x/%s",
+			dev_id, stroffset(type));
+	else
+		sprintf(path, "/sys/bus/zio/devices/tdc-1n5c-%04x/ft-ch%d/%s",
+			dev_id, channel + 1, stroffset(type));
 
 	f = fopen(path, "r");
 	if (!f)

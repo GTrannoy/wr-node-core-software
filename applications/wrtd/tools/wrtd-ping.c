@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
 				wrtd_strerror(errno));
 		else
 			fprintf(stdout, "output : it is running!\n");
-
+		fprintf(stdout, "\n");
 		usleep(period);
 	}
 

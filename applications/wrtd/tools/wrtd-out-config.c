@@ -493,7 +493,7 @@ static int wrtd_cmd_trig_find(struct wrtd_node *wrtd, int output,
 	}
 
 	ret = parse_trigger_id(argv[0], &id);
-	if (ret != 3)
+	if (ret)
 		return -1;
 
 	ret = wrtd_out_trig_state_get_by_id(wrtd, &id, &state);

@@ -14,6 +14,8 @@
 #include <libwrnc.h>
 #include <libwrtd.h>
 
+#define WRTD_BOOT_WR_FMC_OFFSET 0x2
+
 enum wrtb_boot_tdc_offset_type {
 	OFFSET_ZERO,
 	OFFSET_USER,
@@ -46,25 +48,27 @@ static inline char *stroffset(enum wrtb_boot_tdc_offset_type type) {
  */
 static int partial_offset_get(unsigned int dev_id,
 			      unsigned int channel,
-			      uint64_t *offset,
+			      int32_t *offset,
 			      enum wrtb_boot_tdc_offset_type type)
 {
 	char path[255];
 	FILE *f;
 	int ret;
+	uint32_t val;
 
 	if (type == OFFSET_WR)
 		sprintf(path, "/sys/bus/zio/devices/tdc-1n5c-%04x/%s",
-			dev_id, stroffset(type));
+			dev_id - WRTD_BOOT_WR_FMC_OFFSET, stroffset(type));
 	else
 		sprintf(path, "/sys/bus/zio/devices/tdc-1n5c-%04x/ft-ch%d/%s",
-			dev_id, channel + 1, stroffset(type));
+			dev_id - WRTD_BOOT_WR_FMC_OFFSET, channel + 1,
+			stroffset(type));
 
 	f = fopen(path, "r");
 	if (!f)
 		return -1;
 
-	ret = fscanf(f, "%"SCNx64, offset);
+	ret = fscanf(f, "%"SCNu32, &val);
 	if (ret != 1) {
 		fclose(f);
 		if (!errno)
@@ -74,6 +78,7 @@ static int partial_offset_get(unsigned int dev_id,
 
 	fclose(f);
 
+	*offset = (int32_t) val;
 	return 0;
 }
 
@@ -81,31 +86,35 @@ static int partial_offset_get(unsigned int dev_id,
 /**
  * It compute the final time stamp (as it is done on the fmc-tdc driver)
  */
-static int offset_get(unsigned int dev_id, unsigned int channel, uint64_t *offset)
+static int offset_get(unsigned int dev_id, unsigned int channel, int32_t *offset)
 {
-	uint64_t tmp;
+	int32_t tmp;
 	int err;
 
 	fprintf(stdout, "Building timestamp offset\n");
 
+	/* Get zero offset */
 	err = partial_offset_get(dev_id, channel, &tmp, OFFSET_ZERO);
 	if (err)
 		return -1;
 	*offset = tmp;
-	fprintf(stdout, " zero offset : %"PRIu64"\n", tmp);
+	fprintf(stdout, " zero offset : %"PRIi32"\n", tmp);
 
+	/* Get White Rabbit offset */
 	err = partial_offset_get(dev_id, channel, &tmp, OFFSET_WR);
 	if (err)
 		return -1;
 	*offset -= tmp;
-	fprintf(stdout, " user offset : %"PRIu64"\n", tmp);
+	fprintf(stdout, "   wr offset : %"PRIi32"\n", tmp);
 
-	err = partial_offset_get(dev_id, channel, offset, OFFSET_USER);
+	/* Get user offset */
+	err = partial_offset_get(dev_id, channel, &tmp, OFFSET_USER);
 	if (err)
 		return -1;
 	*offset += tmp;
-	fprintf(stdout, "   wr offset : %"PRIu64"\n", tmp);
-	fprintf(stdout, "final offset : %"PRIu64"\n", *offset);
+	fprintf(stdout, " user offset : %"PRIi32"\n", tmp);
+
+	fprintf(stdout, "final offset : %"PRIi32"\n", *offset);
 
 	return 0;
 }
@@ -118,7 +127,7 @@ int main(int argc, char *argv[])
 	struct wrtd_node *wrtd;
 	struct wrnc_dev *wrnc;
 	unsigned long timeout = 180;
-	uint64_t offset;
+	int32_t offset;
 
 	atexit(wrtd_exit);
 

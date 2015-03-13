@@ -56,6 +56,8 @@ static int wrtd_cmd_log_level(struct wrtd_node *wrtd, int output,
 				  int argc, char *argv[]);
 static int wrtd_cmd_software_trigger(struct wrtd_node *wrtd, int output,
 				     int argc, char *argv[]);
+static int wrtd_cmq_has_trig(struct wrtd_node *wrtd, int output,
+			     int argc, char *argv[]);
 static struct wrtd_commands cmds[] = {
 	{ "state", "shows output state", wrtd_cmd_state },
 	{ "assign", "assigns a trigger", wrtd_cmd_trig_assign },
@@ -71,6 +73,7 @@ static struct wrtd_commands cmds[] = {
 	{ "log_level", "set log level", wrtd_cmd_log_level },
 	{ "pulse_width", "sets the output pulse width", wrtd_cmd_pulse_width },
 	{ "sw_trig", "forces a software trigger", wrtd_cmd_software_trigger },
+	{ "has_trig", "return true it as a trigger assigned", wrtd_cmq_has_trig},
 	{ "trig_enable", "enables a particular trigger", wrtd_cmd_trig_enable },
 	{ "trig_disable", "disables a particular trigger", wrtd_cmd_trig_disable },
 	{ "trig_stats", "shows per-trigger statistics", wrtd_cmd_trig_stats },
@@ -134,6 +137,34 @@ static void dump_output_state(struct wrtd_output_state *state)
 	printf(" - Total RX messages:             %-10d\n", state->received_messages);
 	printf(" - Total loopback messages:       %-10d\n", state->received_loopback);
 
+}
+
+static int wrtd_cmq_has_trig(struct wrtd_node *wrtd, int output,
+			     int argc, char *argv[])
+{
+	struct wrtd_trig_id id_t;
+	unsigned int ass;
+	int err;
+
+	if (argc == 1) {
+		err = parse_trigger_id(argv[0], &id_t);
+		if(err)
+			return err;
+		err = wrtd_out_has_trigger(wrtd, output, &id_t, &ass);
+	} else {
+		err = wrtd_out_has_trigger(wrtd, output, NULL, &ass);
+	}
+
+	if(err)
+		return err;
+
+	if (ass)
+		printf("Channel %d has %s trigger assigned\n", output,
+		       argc == 1 ? argv[0] : "a");
+	else
+		printf("Channel %d has no trigger assigned\n", output);
+
+	return 0;
 }
 
 

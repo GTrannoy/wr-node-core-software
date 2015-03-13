@@ -5,6 +5,8 @@
  */
 #include <stdint.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
@@ -17,16 +19,18 @@ void help()
 	fprintf(stderr, "  -h             print this help\n");
 	fprintf(stderr, "  -D 0x<dev_id>  device id to ping\n");
 	fprintf(stderr, "  -n <num>       number of ping to perform\n");
+	fprintf(stderr, "  -p <num>       ping period in micro-seconds\n");
 }
 
 int main(int argc, char *argv[])
 {
 	struct wrtd_node *wrtd;
 	uint32_t dev_id = 0, n = 1;
+	uint64_t period = 0;
 	int err;
 	char c;
 
-	while ((c = getopt (argc, argv, "hD:n:")) != -1) {
+	while ((c = getopt (argc, argv, "hD:n:p:")) != -1) {
 		switch (c) {
 		case 'h':
 		case '?':
@@ -38,6 +42,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'n':
 			sscanf(optarg, "%d", &n);
+			break;
+		case 'p':
+			sscanf(optarg, "%"SCNu64, &period);
 			break;
 		}
 	}
@@ -78,6 +85,8 @@ int main(int argc, char *argv[])
 				wrtd_strerror(errno));
 		else
 			fprintf(stdout, "output : it is running!\n");
+
+		usleep(period);
 	}
 
 	wrtd_close(wrtd);

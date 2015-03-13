@@ -978,7 +978,7 @@ int wrtd_out_has_trigger(struct wrtd_node *dev, unsigned int output,
 		}
 	}
 
-	return -1;
+	return 0;
 }
 
 

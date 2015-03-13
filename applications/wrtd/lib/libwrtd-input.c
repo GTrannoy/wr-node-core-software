@@ -440,7 +440,7 @@ int wrtd_in_timebase_offset_set(struct wrtd_node *dev, unsigned int input,
 	struct wrnc_msg msg;
 	int err;
 
-  	if (input >= WRTD_OUT_MAX) {
+	if (input >= TDC_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}

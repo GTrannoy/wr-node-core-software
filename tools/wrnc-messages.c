@@ -139,6 +139,7 @@ void *debug_thread(void *arg)
 		if (!wdbg[i]) {
 			fprintf(stderr, "Cannot open WRNC debug channel: %s\n",
 				wrnc_strerror(errno));
+			fprintf(stderr, "NOTE: the debug interface is on debugfs, be sure that is mounted\n");
 			goto out;
 		}
 		p[i].fd = wdbg[i]->fd;

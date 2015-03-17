@@ -225,7 +225,7 @@ static int wrnc_sysfs_read(char *path, void *buf, size_t len)
 	int fd, i;
 
 	fd = open(path, O_RDONLY);
-	if (!fd)
+	if (fd < 0)
 		return -1;
 	i = read(fd, buf, len);
 	close(fd);
@@ -242,7 +242,7 @@ static int wrnc_sysfs_write(char *path, void *buf, size_t len)
 	int fd, i;
 
 	fd = open(path, O_WRONLY);
-	if (!fd)
+	if (fd < 0)
 		return -1;
 	i = write(fd, buf, len);
 	close(fd);
@@ -431,7 +431,7 @@ int wrnc_cpu_load_application_raw(struct wrnc_dev *wrnc,
 	snprintf(path, WRNC_DEVICE_PATH_LEN, "%s/%s-cpu-%02d",
 		 wdesc->path, wdesc->name, index);
 	fd = open(path, O_WRONLY);
-	if (!fd)
+	if (fd < 0)
 		return -1;
 	lseek(fd, offset, SEEK_SET);
 
@@ -465,7 +465,7 @@ int wrnc_cpu_dump_application_raw(struct wrnc_dev *wrnc,
 	snprintf(path, WRNC_DEVICE_PATH_LEN, "%s/%s-cpu-%02d",
 		 wdesc->path, wdesc->name, index);
 	fd = open(path, O_RDONLY);
-	if (!fd)
+	if (fd < 0)
 		return -1;
 
 	lseek(fd, offset, SEEK_SET);
@@ -990,7 +990,7 @@ struct wrnc_dbg *wrnc_debug_open(struct wrnc_dev *wrnc, unsigned int index)
 		 wdesc->name, wdesc->name, index);
 
 	dbg->fd = open(path, O_RDONLY);
-	if (!dbg->fd) {
+	if (dbg->fd < 0) {
 	        free(dbg);
 		return NULL;
 	}

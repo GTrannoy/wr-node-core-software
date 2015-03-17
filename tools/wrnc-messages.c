@@ -176,10 +176,10 @@ void *debug_thread(void *arg)
 
 out:
 	/* Close all debug channels */
-	for (i = 0; i < th_data->n_cpu; i++)
-		wrnc_debug_close(wdbg[i]);
-
+	while (--i >= 0)
+	  wrnc_debug_close(wdbg[i]);
 	wrnc_close(wrnc);
+
 	return NULL;
 }
 
@@ -248,7 +248,7 @@ void *message_thread(void *arg)
 
 out:
 	/* Close all message slots */
-	for (i = 0; i < th_data->n_slot; ++i)
+	while (--i >= 0)
 		wrnc_hmq_close(hmq[i]);
 	wrnc_close(wrnc);
 	return NULL;

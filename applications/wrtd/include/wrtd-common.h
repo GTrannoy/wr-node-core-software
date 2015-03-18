@@ -115,6 +115,8 @@ enum wrtd_io_flags {
 					field. */
     WRTD_ARMED = (1 << 3),            /*!< I/O is armed */
     WRTD_TRIGGERED = (1 << 4),        /*!< I/O has triggered */
+    WRTD_NO_WR = (1 << 5),            /*!< I/O has no WR timing */
+
 };
 
 

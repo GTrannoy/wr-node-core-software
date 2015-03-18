@@ -281,6 +281,11 @@ void update_latency_stats (struct pulse_queue_entry *pq_ent)
 
 void drop_trigger( struct lrt_output *out, struct pulse_queue_entry *pq_ent, struct lrt_pulse_queue *q, int reason)
 {
+	out->idle = 1;
+
+	if(pulse_queue_empty(q))
+	    return;
+
 	/* Drop the pulse */
 	pulse_queue_pop(q);
 	pq_ent->rule->misses ++;
@@ -291,7 +296,6 @@ void drop_trigger( struct lrt_output *out, struct pulse_queue_entry *pq_ent, str
 		out->miss_no_timing ++;
 
 	out->last_lost = pq_ent->trig;
-	out->idle = 1;
 
 	/* Disarm the FD output */
 	fd_ch_writel(out, FD_DCR_MODE, FD_REG_DCR);
@@ -309,9 +313,10 @@ void do_output (struct lrt_output *out)
 {
 	struct lrt_pulse_queue *q = &out->queue;
 	struct pulse_queue_entry *pq_ent = pulse_queue_front(q);
-	uint32_t dcr = fd_ch_readl(out, FD_REG_DCR);
 	struct lrt_output_rule dummy_rule;
 	struct lrt_output_rule *rule = (pq_ent->rule ? pq_ent->rule : &dummy_rule);
+
+	uint32_t dcr = fd_ch_readl(out, FD_REG_DCR);
 
 	/* Check if the output has triggered */
 	if(!out->idle) {
@@ -409,7 +414,7 @@ void enqueue_trigger(int output, struct lrt_output_rule *rule,
 	switch(out->state)
 	{
 		case OUT_ST_IDLE:
-			break;
+			return; // output not armed
 
 		case OUT_ST_ARMED:
 			if (rule->state & HASH_ENT_CONDITION)
@@ -843,6 +848,9 @@ static inline void ctl_chan_get_state (uint32_t seq, struct wrnc_msg *ibuf)
 	if(st->state != OUT_ST_IDLE)
 		st->flags |= WRTD_ARMED;
 
+
+	st->flags &= ~WRTD_NO_WR;		
+
 	if( !wr_is_timing_ok() )
 		st->flags |= WRTD_NO_WR;		
 
@@ -1115,18 +1123,11 @@ void wr_update_link()
 			break;
 	}
 
-	if( !wr_link_up() )
+	if( wr_state != WR_LINK_OFFLINE && !wr_link_up() )
 	{
 		wr_state = WR_LINK_OFFLINE;
 		wr_enable_lock(0);
-
-
-	} else if (!wr_time_ready())
-	{
-		wr_state = WR_LINK_ONLINE;
-		wr_enable_lock(0);
 	}
-
 }
 
 int wr_is_timing_ok()

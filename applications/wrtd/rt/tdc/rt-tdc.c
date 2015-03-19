@@ -8,8 +8,8 @@
  */
 
 
-/* 
- * LHC Instability Trigger Distribution (LIST) Firmware 
+/*
+ * LHC Instability Trigger Distribution (LIST) Firmware
  *
  * rt-tdc.c: real-time CPU application for the FMC TDC mezzanine (Trigger Input)
  */
@@ -28,7 +28,7 @@
 struct tdc_channel_state {
 /* Currently assigned trigger ID */
     struct wrtd_trig_id id;
-/* Trigger delay, added to each timestamp */    
+/* Trigger delay, added to each timestamp */
     struct wr_timestamp delay;
 /* Internal time base offset. Used to compensate the TDC-to-WR timebase lag.
    Not exposed to the public, set from the internal calibration data of the TDC driver. */
@@ -39,7 +39,7 @@ struct tdc_channel_state {
     struct wrtd_trigger_entry last_sent;
 /* Channel flags (enum wrnc_io_flags) */
     uint32_t flags;
-/* Log level (enum wrnc_log_level) */   
+/* Log level (enum wrnc_log_level) */
     uint32_t log_level;
 /* Triggering mode (enum wrtd_triger_mode) */
     enum wrtd_trigger_mode mode;
@@ -49,11 +49,10 @@ struct tdc_channel_state {
     uint32_t total_pulses;
 /* Total sent pulses */
     uint32_t sent_pulses;
-/* Trigger message sequence counter */    
+/* Trigger message sequence counter */
     uint32_t seq;
 /* TDC dead time, in 8ns ticks */
     uint32_t dead_time;
-    
 };
 
 /* States of all TDC channels */
@@ -70,28 +69,53 @@ static int coalesce_count = 0;
 /* Puts raw TDC timestamp (ts) for channel (ch) in the log buffer */
 static inline void log_raw_timestamp (struct tdc_channel_state *ch, struct wr_timestamp *ts)
 {
-    volatile struct wrtd_log_entry *msg = mq_map_out_buffer(0, WRTD_OUT_TDC_LOGGING);
-    
-    mq_claim(0, WRTD_OUT_TDC_LOGGING);
-    msg->type = WRTD_LOG_RAW;
-    msg->channel = ch->n;
-    msg->seq = ch->total_pulses;
-    msg->ts = *ts;
-    mq_send(0, WRTD_OUT_TDC_LOGGING, sizeof(struct wrtd_log_entry) / 4);
+    uint32_t id = WRTD_REP_LOG_MESSAGE;
+    uint32_t seq = 0;
+    int dummy = 0;
+    int type = WRTD_LOG_RAW;
+    struct wrtd_trigger_entry ent;
+
+    if ( !(ch->log_level & WRTD_LOG_RAW))
+        return;
+
+    struct wrnc_msg buf = hmq_msg_claim_out (WRTD_OUT_TDC_LOGGING, 16);
+
+    wrnc_msg_header (&buf, &id, &seq);
+    wrnc_msg_int32 (&buf, &type);
+    wrnc_msg_int32 (&buf, &ch->n);
+    wrnc_msg_int32 (&buf, &dummy);
+    ent.seq = ch->total_pulses;
+    ent.ts = *ts;
+    wrtd_msg_trigger_entry (&buf, &ent);
+
+    hmq_msg_send (&buf);
 }
 
 /* Puts a successfully transmitted trigger message in the log buffer */
 static inline void log_sent_trigger(struct tdc_channel_state *ch, struct wr_timestamp *ts)
 {
-    volatile struct wrtd_log_entry *msg =  mq_map_out_buffer(0, WRTD_OUT_TDC_LOGGING);
-    
-    mq_claim(0, WRTD_OUT_TDC_LOGGING);
-    msg->type = WRTD_LOG_SENT_TRIGGER;
-    msg->seq = ch->seq;
-    msg->id = ch->id;
-    msg->ts = *ts;
-    
-    mq_send(0, WRTD_OUT_TDC_LOGGING, sizeof(struct wrtd_log_entry) / 4);
+    uint32_t id = WRTD_REP_LOG_MESSAGE;
+    uint32_t seq = 0;
+    int dummy = 0;
+    int type = WRTD_LOG_SENT;
+
+    struct wrtd_trigger_entry ent;
+
+    if ( !(ch->log_level & WRTD_LOG_SENT))
+        return;
+
+    struct wrnc_msg buf = hmq_msg_claim_out (WRTD_OUT_TDC_LOGGING, 16);
+
+    wrnc_msg_header (&buf, &id, &seq);
+    wrnc_msg_int32 (&buf, &type);
+    wrnc_msg_int32 (&buf, &ch->n);
+    wrnc_msg_int32 (&buf, &dummy);
+    ent.seq = ch->seq;
+    ent.id = ch->id;
+    ent.ts = *ts;
+    wrtd_msg_trigger_entry (&buf, &ent);
+
+    hmq_msg_send (&buf);
 }
 
 /* Creates a trigger message with timestamp (ts) for the channel (ch) and pushes it
@@ -102,10 +126,10 @@ static inline void send_trigger (struct tdc_channel_state *ch, struct wr_timesta
 
     msg->triggers[coalesce_count].id = ch->id;
     msg->triggers[coalesce_count].seq = ch->seq;
-    msg->triggers[coalesce_count].ts = *ts; 
-    
+    msg->triggers[coalesce_count].ts = *ts;
+
     loop_queue_push(&ch->id, ch->seq, ts);
-    
+
     coalesce_count++;
 }
 
@@ -124,7 +148,7 @@ static inline void flush_tx ()
     msg->hdr.target_ip = 0xffffffff;    /* broadcast */
     msg->hdr.target_port = 0xebd0;      /* port */
     msg->hdr.target_offset = 0x4000;    /* target EB slot */
-    
+
     /* Embed transmission time for latency measyurement */
     msg->transmit_seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
     msg->transmit_cycles = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
@@ -141,7 +165,7 @@ static inline void do_channel (int channel, struct wr_timestamp *ts)
     struct tdc_channel_state *ch = &channels[channel];
 
 /* Apply timebase offset to align TDC time with WR timebase */
-    ts_sub(ts, &ch->timebase_offset);    
+    ts_sub(ts, &ch->timebase_offset);
     ch->last_tagged = *ts;
 
 /* Log raw value if needed */
@@ -160,7 +184,7 @@ static inline void do_channel (int channel, struct wr_timestamp *ts)
     	ch->flags |= WRTD_TRIGGERED;
     	if(ch->mode == WRTD_TRIGGER_MODE_SINGLE )
     	    ch->flags &= ~WRTD_ARMED;
-    	
+
         ch->sent_pulses++;
         send_trigger(ch, ts);
         ch->last_sent.ts  = *ts;
@@ -171,7 +195,7 @@ static inline void do_channel (int channel, struct wr_timestamp *ts)
 /* Log sent trigger if needed */
 	    if(ch->log_level & WRTD_LOG_SENT)
             log_sent_trigger(ch, ts);
-    }     
+    }
 }
 
 /* Handles input timestamps from all TDC channels, calling do_output() on incoming pulses */
@@ -194,7 +218,7 @@ static inline void do_input ()
         /* Poll the FIFO and read the timestamp */
         if(fifo_sr & DR_FIFO_CSR_EMPTY)
             break;
-        
+
         ts.seconds = dp_readl(DR_REG_FIFO_R0);
         ts.ticks  = dp_readl(DR_REG_FIFO_R1);
         meta   = dp_readl(DR_REG_FIFO_R2);
@@ -205,7 +229,7 @@ static inline void do_input ()
     	ts.ticks += ts.frac >> 12;
     	ts.frac &= 0xfff;
 
-        /* Make sure there's no overflow after conversion */        
+        /* Make sure there's no overflow after conversion */
     	if (ts.ticks >= 125000000)
     	{
     		ts.ticks -= 125000000;
@@ -217,7 +241,7 @@ static inline void do_input ()
         /* Pass the timestamp to triggering/TX logic */
         do_channel( channel, &ts );
     }
-    
+
     /* Flush the RMQ buffer if it contains anything */
     if(coalesce_count)
         flush_tx();
@@ -225,7 +249,7 @@ static inline void do_input ()
 };
 
 
-/* 
+/*
  * WRTD Command Handlers
  */
 
@@ -261,7 +285,7 @@ static inline void ctl_chan_enable (uint32_t seq, struct wrnc_msg *ibuf)
     /* Deserailize the request */
     wrnc_msg_int32 (ibuf, &channel);
     wrnc_msg_int32 (ibuf, &enable);
-    
+
     pp_printf("channel %d enable %d bufp %d maxl %d\n", channel, enable, ibuf->offset, ibuf->datalen);
 
     uint32_t mask = dp_readl(DR_REG_CHAN_ENABLE);
@@ -274,7 +298,7 @@ static inline void ctl_chan_enable (uint32_t seq, struct wrnc_msg *ibuf)
     } else {
 	   mask &= ~(1 << channel);
        ch->flags &= ~WRTD_ENABLED | WRTD_ARMED | WRTD_TRIGGERED | WRTD_LAST_VALID;
-    } 
+    }
 
     /* Update TDC FIFO channel mask */
     dp_writel(mask, DR_REG_CHAN_ENABLE);
@@ -289,12 +313,12 @@ static inline void ctl_chan_set_dead_time (uint32_t seq, struct wrnc_msg *ibuf)
     /* Deserailize the request */
     wrnc_msg_int32 (ibuf, &channel);
     wrnc_msg_int32 (ibuf, &dead_time);
-     
+
     dp_writel( dead_time, DR_REG_DEAD_TIME);
-    
+
     for(i=0; i < TDC_NUM_CHANNELS; i++)
         channels[i].dead_time = dead_time;
-    
+
     ctl_ack(seq);
 }
 
@@ -327,7 +351,7 @@ static inline void ctl_chan_get_state (uint32_t seq, struct wrnc_msg *ibuf)
 {
     int channel;
     uint32_t id_state = WRTD_REP_STATE;
-    
+
     wrnc_msg_int32(ibuf, &channel);
 
     struct tdc_channel_state *st = &channels[channel];
@@ -347,7 +371,7 @@ static inline void ctl_chan_get_state (uint32_t seq, struct wrnc_msg *ibuf)
     wrnc_msg_uint32 (&obuf, &st->dead_time);
     wrtd_msg_trigger_entry (&obuf, &st->last_sent);
     wrnc_msg_uint32 (&obuf, &sent_packets);
-    
+
     hmq_msg_send (&obuf);
 }
 
@@ -356,7 +380,7 @@ static inline void ctl_software_trigger (uint32_t seq, struct wrnc_msg *ibuf)
     struct wrtd_trigger_message *msg = mq_map_out_buffer(1, WRTD_REMOTE_OUT_TDC);
 
     mq_claim(1, WRTD_REMOTE_OUT_TDC);
-    
+
     /* assemble a trigger message on the spot */
     msg->hdr.target_ip = 0xffffffff; // broadcast
     msg->hdr.target_port = 0xebd0;   // port
@@ -367,12 +391,12 @@ static inline void ctl_software_trigger (uint32_t seq, struct wrnc_msg *ibuf)
 
     /* and dumbly copy the trigger entry */
     struct wrtd_trigger_entry ent;
-    wrtd_msg_trigger_entry(ibuf, &ent);  
+    wrtd_msg_trigger_entry(ibuf, &ent);
 
     msg->triggers[0] = ent;
 
     mq_send(1, WRTD_REMOTE_OUT_TDC, sizeof(struct wrtd_trigger_message) / 4); // fixme
-    
+
     ctl_ack(seq);
 }
 
@@ -432,19 +456,19 @@ static inline void ctl_chan_assign_trigger (uint32_t seq, struct wrnc_msg *ibuf)
     wrnc_msg_int32(ibuf, &channel);
     wrnc_msg_int32(ibuf, &assign);
 
-    struct tdc_channel_state *ch = &channels[channel];    
+    struct tdc_channel_state *ch = &channels[channel];
 
     if(assign)
     {
         wrtd_msg_trig_id(ibuf, &ch->id);
-        
+
         ch->flags |= WRTD_TRIGGER_ASSIGNED;
         ch->flags &= ~WRTD_LAST_VALID;
     } else {
         ch->id.system = 0;
         ch->id.source_port = 0;
         ch->id.trigger = 0;
-        
+
         ch->flags &= ~WRTD_TRIGGER_ASSIGNED;
     }
 
@@ -454,10 +478,10 @@ static inline void ctl_chan_assign_trigger (uint32_t seq, struct wrnc_msg *ibuf)
 static inline void ctl_chan_reset_counters (uint32_t seq, struct wrnc_msg *ibuf)
 {
     int channel;
-    
+
     wrnc_msg_int32(ibuf, &channel);
 
-    struct tdc_channel_state *ch = &channels[channel];    
+    struct tdc_channel_state *ch = &channels[channel];
 
     ch->total_pulses = 0;
     ch->sent_pulses = 0;
@@ -471,12 +495,12 @@ static inline void ctl_chan_set_log_level (uint32_t seq, struct wrnc_msg *ibuf)
 {
     int channel;
     uint32_t log_level;
-    
+
     wrnc_msg_int32(ibuf, &channel);
     wrnc_msg_uint32(ibuf, &log_level);
-    
-    channels[channel].log_level = log_level;    
-    
+
+    channels[channel].log_level = log_level;
+
     ctl_ack(seq);
 }
 
@@ -490,11 +514,11 @@ static inline void do_control()
     if(! ( p & ( 1<< WRTD_IN_TDC_CONTROL )))
         return;
 
-    
+
     struct wrnc_msg ibuf = ctl_claim_in_buf();
 
-    wrnc_msg_header(&ibuf, &cmd, &seq);    
-    
+    wrnc_msg_header(&ibuf, &cmd, &seq);
+
 #define _CMD(id, func)          \
     case id:                    \
     {                           \
@@ -546,9 +570,9 @@ void init()
 }
 
 main()
-{   
+{
     init();
-    
+
     for(;;)
     {
         do_input();

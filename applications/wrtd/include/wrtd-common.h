@@ -33,8 +33,6 @@
 
 
 /* Command and log message IDs */
-#define WRTD_LOG_RAW_INPUT	  	 0x1
-#define WRTD_LOG_SENT_TRIGGER 	 0x2
 
 #define WRTD_CMD_TDC_CHAN_ENABLE		0x1
 #define WRTD_CMD_TDC_CHAN_SET_DEAD_TIME		0x2
@@ -52,26 +50,34 @@
 #define WRTD_CMD_TDC_CHAN_RESET_COUNTERS      0xf
 
 
+#define WRTD_CMD_FD_TRIG_ENABLE          0x10
+#define WRTD_CMD_FD_TRIG_REMOVE          0x11
+#define WRTD_CMD_FD_TRIG_ASSIGN          0x12
+#define WRTD_CMD_FD_TRIG_GET_BY_ID       0x13
+#define WRTD_CMD_FD_TRIG_GET_STATE       0x14
+#define WRTD_CMD_FD_TRIG_SET_COND_DELAY  0x15
+#define WRTD_CMD_FD_TRIG_SET_DELAY       0x16
+#define WRTD_CMD_FD_TRIG_RESET_COUNTERS  0x17
+
 #define WRTD_CMD_FD_CHAN_ENABLE               0x1
-#define WRTD_CMD_FD_CHAN_ASSIGN_TRIGGER       0x2
-#define WRTD_CMD_FD_READ_HASH	    	      0x3
-#define WRTD_CMD_FD_CHAN_REMOVE_TRIGGER       0x4
-#define WRTD_CMD_FD_CHAN_GET_STATE            0x5
-#define WRTD_CMD_FD_CHAN_SET_DELAY            0x6
-#define WRTD_CMD_FD_CHAN_SET_WIDTH            0x7
-#define WRTD_CMD_FD_CHAN_SET_MODE             0x8
-#define WRTD_CMD_FD_SOFTWARE_TRIGGER          0x9
-#define WRTD_CMD_FD_CHAN_ARM                  0xa
-#define WRTD_CMD_FD_CHAN_ENABLE_TRIGGER       0xb
-#define WRTD_CMD_FD_CHAN_SET_LOG_LEVEL        0xc
-#define WRTD_CMD_FD_CHAN_RESET_COUNTERS       0xd
+#define WRTD_CMD_FD_READ_HASH	    	      0x2
+#define WRTD_CMD_FD_CHAN_GET_STATE            0x3
+#define WRTD_CMD_FD_CHAN_SET_WIDTH            0x4
+#define WRTD_CMD_FD_CHAN_SET_MODE             0x5
+#define WRTD_CMD_FD_SOFTWARE_TRIGGER          0x6
+#define WRTD_CMD_FD_CHAN_ARM                  0x7
+#define WRTD_CMD_FD_CHAN_SET_LOG_LEVEL        0x8
+#define WRTD_CMD_FD_CHAN_RESET_COUNTERS       0x9
+
 
 #define WRTD_REP_ACK_ID			0x100
 #define WRTD_REP_STATE			0x101
 #define WRTD_REP_NACK			0x102
-#define WRTD_REP_TRIGGER_HANDLE		0x103
+#define WRTD_REP_TRIGGER_HANDLE	0x103
 #define WRTD_REP_HASH_ENTRY		0x104
 #define WRTD_REP_TIMESTAMP		0x105
+#define WRTD_REP_LOG_MESSAGE    0x106
+
 
 
 
@@ -129,6 +135,13 @@ enum wrtd_log_level {
     WRTD_LOG_ALL = 0xff,
 };
 
+enum wrtd_log_miss_reason {
+    WRTD_MISS_DEAD_TIME = 0,
+    WRTD_MISS_OVERFLOW = 1,
+    WRTD_MISS_NO_WR = 2,
+    WRTD_MISS_TIMEOUT = 3
+};
+
 
 #define HASH_ENT_EMPTY          (0 << 0)
 #define HASH_ENT_DIRECT         (1 << 0)
@@ -161,6 +174,7 @@ struct wrtd_log_entry {
     int channel;
     struct wrtd_trig_id id;
     struct wr_timestamp ts;
+    enum wrtd_log_miss_reason miss_reason;
 };
 
 #ifdef WRNODE_RT

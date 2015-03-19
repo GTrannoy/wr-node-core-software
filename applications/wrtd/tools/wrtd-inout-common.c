@@ -69,6 +69,8 @@ void decode_log_level(char *buf, uint32_t flags)
         strcat(buf, "Filtered ");
     if (flags & WRTD_LOG_EXECUTED)
         strcat(buf, "Exceuted ");
+    if (flags & WRTD_LOG_MISSED)
+        strcat(buf, "Missed ");
 }
 
 
@@ -138,7 +140,57 @@ int parse_delay(char *dly, uint64_t *delay_ps)
     return 0;
 }
 
+int parse_mode (char *mode_str, enum wrtd_trigger_mode *mode)
+{
+    if(!strcmp(mode_str, "auto"))
+        *mode = WRTD_TRIGGER_MODE_AUTO;
+    else if(!strcmp(mode_str, "single"))
+        *mode = WRTD_TRIGGER_MODE_SINGLE;
+    else
+        return -1;
+
+    return 0;
+}
+
 int parse_trigger_id(const char *str, struct wrtd_trig_id *id)
 {
     return (sscanf(str,"%i:%i:%i", &id->system, &id->source_port, &id->trigger) == 3 ? 0 : -1);
+}
+
+int parse_log_level (char *list[], int count, int *log_level)
+{
+    int l = 0;
+
+    while(count--)
+    {
+        if(!list[0])
+            return -1;
+
+        if(!strcmp(list[0], "all")) {
+            l = WRTD_LOG_ALL;
+            break;
+        }
+        else if(!strcmp(list[0], "off")) {
+            l = 0;
+            break;
+        } else if(!strcmp(list[0], "promisc"))
+            l |= WRTD_LOG_PROMISC;
+        else if(!strcmp(list[0], "raw"))
+            l |= WRTD_LOG_RAW;
+        else if(!strcmp(list[0], "executed"))
+            l |= WRTD_LOG_EXECUTED;
+        else if( !strcmp(list[0], "missed"))
+            l |= WRTD_LOG_MISSED;
+        else if( !strcmp(list[0], "sent"))
+            l |= WRTD_LOG_SENT;
+        else if( !strcmp(list[0], "filtered"))
+            l |= WRTD_LOG_FILTERED;
+        else
+            return -1;
+
+        list++;
+    }
+
+    *log_level = l;
+    return 0;
 }

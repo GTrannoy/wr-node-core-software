@@ -31,5 +31,7 @@ extern void format_id(char *buf, struct wrtd_trig_id id);
 extern uint64_t ts_to_picos(struct wr_timestamp ts);
 extern int parse_delay(char *dly, uint64_t *delay_ps);
 extern int parse_trigger_id(const char *str, struct wrtd_trig_id *id);
+extern int parse_mode (char *mode_str, enum wrtd_trigger_mode *mode);
+extern int parse_log_level (char *list[], int count, int *log_level);
 
 #endif

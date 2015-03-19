@@ -35,6 +35,7 @@ static void help()
 	fprintf(stderr, "-D   WRNC device identificator\n");
 	fprintf(stderr, "-t   path to TDC real-time application\n");
 	fprintf(stderr, "-f   path to Fine-Delay real-time application\n");
+	fprintf(stderr, "-o   set base offset\n");
 	exit(1);
 }
 
@@ -120,7 +121,7 @@ static int offset_get(unsigned int dev_id, unsigned int channel, int32_t *offset
 
 int main(int argc, char *argv[])
 {
-	int err, i;
+	int err, i, setoff = 0;
 	uint32_t dev_id = 0;
 	char *tdc = NULL, *fd =NULL, c;
 	struct wrtd_node *wrtd;
@@ -129,7 +130,7 @@ int main(int argc, char *argv[])
 
 	atexit(wrtd_exit);
 
-	while ((c = getopt (argc, argv, "hD:t:f:")) != -1) {
+	while ((c = getopt (argc, argv, "hD:t:f:o")) != -1) {
 		switch (c) {
 		case 'h':
 		case '?':
@@ -143,6 +144,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'f':
 			fd = optarg;
+			break;
+		case 'o':
+			setoff = 1;
 			break;
 		}
 	}
@@ -200,19 +204,21 @@ int main(int argc, char *argv[])
 	if (err)
 		exit(1);
 
-	/* Inform the input real-time channels about the offset */
-	for (i = 0; i < TDC_NUM_CHANNELS; ++i) {
-		err = offset_get(dev_id, i, &offset);
-		if (err) {
-			fprintf(stderr, "Cannot calculate offset: %s\n",
-				wrtd_strerror(errno));
-			exit(1);
-		}
-		err = wrtd_in_timebase_offset_set(wrtd, i, offset);
-		if (err) {
-			fprintf(stderr, "Cannot set offset: %s\n",
-				wrtd_strerror(errno));
-			exit(1);
+	if (setoff) {
+		/* Inform the input real-time channels about the offset */
+		for (i = 0; i < TDC_NUM_CHANNELS; ++i) {
+			err = offset_get(dev_id, i, &offset);
+			if (err) {
+				fprintf(stderr, "Cannot calculate offset: %s\n",
+					wrtd_strerror(errno));
+				exit(1);
+			}
+			err = wrtd_in_timebase_offset_set(wrtd, i, offset);
+			if (err) {
+				fprintf(stderr, "Cannot set offset: %s\n",
+					wrtd_strerror(errno));
+				exit(1);
+			}
 		}
 	}
 

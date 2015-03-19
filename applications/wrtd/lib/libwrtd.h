@@ -235,7 +235,7 @@ extern int wrtd_out_is_enabled(struct wrtd_node *dev, unsigned int output,
 extern int wrtd_out_is_armed(struct wrtd_node *dev, unsigned int output,
 			     unsigned int *armed);
 extern int wrtd_out_has_trigger(struct wrtd_node *dev, unsigned int output,
-				unsigned int *assigned);
+				struct wrtd_trig_id *id, unsigned int *assigned);
 
 /**
  * @file libwrtd-internal.c

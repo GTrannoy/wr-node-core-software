@@ -561,6 +561,7 @@ static inline void ctl_trig_assign (uint32_t seq, struct wrnc_msg *ibuf)
 	struct wrtd_trig_id id;
 	struct lrt_output_rule rule;
 	struct lrt_trigger_handle handle;
+	struct lrt_output *out;
 
 	wrnc_msg_int32(ibuf, &ch);
 
@@ -584,6 +585,11 @@ static inline void ctl_trig_assign (uint32_t seq, struct wrnc_msg *ibuf)
 	handle.channel = ch;
 	handle.cond = NULL;
 	handle.trig = hash_add ( &id, ch, &rule );
+
+	/* Notify that there is at least one trigger
+	   assigned to the current channel */
+	out = &outputs[ch];
+	out->flags |= WRTD_TRIGGER_ASSIGNED;
 
 	struct wrnc_msg obuf = ctl_claim_out_buf();
 	uint32_t id_trigger_handle = WRTD_REP_TRIGGER_HANDLE;
@@ -622,15 +628,15 @@ static inline void ctl_trig_assign (uint32_t seq, struct wrnc_msg *ibuf)
 static inline void ctl_trig_remove (uint32_t seq, struct wrnc_msg *ibuf)
 {
 	struct lrt_trigger_handle handle;
+	struct lrt_output *out;
 
 	wrnc_msg_int32(ibuf, &handle.channel);
 	wrnc_msg_uint32(ibuf, (uint32_t *) &handle.cond);
 	wrnc_msg_uint32(ibuf, (uint32_t *) &handle.trig);
 
+	out = &outputs[handle.channel];
 	if(handle.cond)
 	{
-		struct lrt_output *out = &outputs[handle.channel];
-
 		/* check if this wasn't a pending conditional trigger and re-arm the output
 		   if so */
 		if(out->state == OUT_ST_CONDITION_HIT && out->pending_trig == (struct lrt_output_rule *)handle.trig)
@@ -642,6 +648,10 @@ static inline void ctl_trig_remove (uint32_t seq, struct wrnc_msg *ibuf)
 
 	}
 	hash_remove(handle.trig, handle.channel);
+
+	/* Remove assigned flag when no trigger is assigned to a channel */
+	if (hash_count_rules(handle.channel) == 0)
+		out->flags &= ~WRTD_TRIGGER_ASSIGNED;
 
 	ctl_ack(seq);
 }

@@ -37,4 +37,5 @@ struct wr_timestamp picos_to_ts(uint64_t p);
 int wrtd_validate_acknowledge(struct wrnc_msg *msg);
 int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
 		  int count);
+int wrtd_trig_id_cmp(struct wrtd_trig_id *id1, struct wrtd_trig_id *id2);
 #endif

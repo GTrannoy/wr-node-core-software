@@ -31,6 +31,8 @@ void decode_flags(char *buf, uint32_t flags)
         strcat(buf, "Armed ");
     if( flags & WRTD_TRIGGERED )
         strcat(buf, "Triggered ");
+    if( flags & WRTD_NO_WR )
+        strcat(buf, "NoWRTiming ");
 
     l = strlen(buf);
     if(l)

@@ -35,7 +35,6 @@ static void help()
 	fprintf(stderr, "-D   WRNC device identificator\n");
 	fprintf(stderr, "-t   path to TDC real-time application\n");
 	fprintf(stderr, "-f   path to Fine-Delay real-time application\n");
-	fprintf(stderr, "-T   seconds to wait for White-Rabbit synchronization\n");
 	exit(1);
 }
 
@@ -126,12 +125,11 @@ int main(int argc, char *argv[])
 	char *tdc = NULL, *fd =NULL, c;
 	struct wrtd_node *wrtd;
 	struct wrnc_dev *wrnc;
-	unsigned long timeout = 180;
 	int32_t offset;
 
 	atexit(wrtd_exit);
 
-	while ((c = getopt (argc, argv, "hD:t:f:T:")) != -1) {
+	while ((c = getopt (argc, argv, "hD:t:f:")) != -1) {
 		switch (c) {
 		case 'h':
 		case '?':
@@ -145,9 +143,6 @@ int main(int argc, char *argv[])
 			break;
 		case 'f':
 			fd = optarg;
-			break;
-		case 'T':
-			sscanf(optarg, "%lu", &timeout);
 			break;
 		}
 	}
@@ -172,15 +167,6 @@ int main(int argc, char *argv[])
 	wrtd = wrtd_open_by_fmc(dev_id);
 	if (!wrtd) {
 		fprintf(stderr, "Cannot open WRNC: %s\n", wrtd_strerror(errno));
-		exit(1);
-	}
-
-	/* Synchronize TDC and FD mezzanines */
-	fprintf(stdout, "Synchronizing TDC and FD to White-Rabbit\n");
-	err = wrtd_white_rabbit_sync(wrtd, timeout);
-	if (err) {
-		fprintf(stderr, "Cannot synchronize mezzanines: %s\n",
-			wrtd_strerror(errno));
 		exit(1);
 	}
 

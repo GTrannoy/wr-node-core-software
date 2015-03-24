@@ -19,6 +19,8 @@
 #include "rt.h"
 #include "wrtd-common.h"
 #include "hw/fd_channel_regs.h"
+#include "hw/fd_main_regs.h"
+
 #include "hash.h"
 #include "loop-queue.h"
 #include "wrtd-serializers.h"
@@ -105,7 +107,7 @@ static struct wrtd_trigger_entry last_received;
 
 
 /* Adjusts the timestamp in-place by adding cycles/frac value */
-static inline void ts_adjust_delay(struct wr_timestamp *ts, uint32_t cycles, uint32_t frac)
+static void ts_adjust_delay(struct wr_timestamp *ts, uint32_t cycles, uint32_t frac)
 {
 	ts->frac += frac;
 
@@ -122,7 +124,7 @@ static inline void ts_adjust_delay(struct wr_timestamp *ts, uint32_t cycles, uin
 }
 
 /* Puts a trigger message in the log buffer */
-static inline void log_trigger(int type, int miss_reason, struct lrt_output *out, struct wrtd_trigger_entry *ent)
+static void log_trigger(int type, int miss_reason, struct lrt_output *out, struct wrtd_trigger_entry *ent)
 {
     	uint32_t id = WRTD_REP_LOG_MESSAGE;
     	uint32_t seq = 0;
@@ -201,7 +203,7 @@ void pulse_queue_pop(struct lrt_pulse_queue *p)
 
 /* Checks if the timestamp of the pulse (ts) does not violate the dead time on the output out
    by comparing it with the last processed pulse timestamp. */
-static inline int check_dead_time( struct lrt_output *out, struct wr_timestamp *ts )
+static int check_dead_time( struct lrt_output *out, struct wr_timestamp *ts )
 {
 	if(out->idle)
 		return 1;
@@ -277,37 +279,55 @@ void update_latency_stats (struct pulse_queue_entry *pq_ent)
 	rule->latency_avg_nsamples++;
 }
 
+void drop_trigger( struct lrt_output *out, struct pulse_queue_entry *pq_ent, struct lrt_pulse_queue *q, int reason)
+{
+	out->idle = 1;
+
+	if(pulse_queue_empty(q))
+	    return;
+
+	/* Drop the pulse */
+	pulse_queue_pop(q);
+	pq_ent->rule->misses ++;
+
+	if(reason == WRTD_MISS_TIMEOUT)
+		out->miss_timeout ++;
+	else if (reason == WRTD_MISS_NO_WR)
+		out->miss_no_timing ++;
+
+	out->last_lost = pq_ent->trig;
+
+	/* Disarm the FD output */
+	fd_ch_writel(out, FD_DCR_MODE, FD_REG_DCR);
+
+	if(out->state == OUT_ST_TEST_PENDING)
+		out->state = OUT_ST_IDLE;
+
+	log_trigger (WRTD_LOG_MISSED, reason,
+		     out, &pq_ent->trig);
+}
+
 /* Output driving function. Reads pulses from the output queue,
    programs the output and updates the output statistics. */
 void do_output (struct lrt_output *out)
 {
 	struct lrt_pulse_queue *q = &out->queue;
 	struct pulse_queue_entry *pq_ent = pulse_queue_front(q);
-	uint32_t dcr = fd_ch_readl(out, FD_REG_DCR);
 	struct lrt_output_rule dummy_rule;
 	struct lrt_output_rule *rule = (pq_ent->rule ? pq_ent->rule : &dummy_rule);
 
+	uint32_t dcr = fd_ch_readl(out, FD_REG_DCR);
+
 	/* Check if the output has triggered */
 	if(!out->idle) {
-		if (!(dcr & FD_DCR_PG_TRIG)) { /* Nope, armed but still waiting for trigger */
-			if (check_output_timeout (out))
-			{
-				/* Drop the pulse */
-				pulse_queue_pop(q);
-				rule->misses ++;
 
-				out->miss_timeout ++;
-				out->last_lost = pq_ent->trig;
-				out->idle = 1;
-
-				/* Disarm the FD output */
-				fd_ch_writel(out, FD_DCR_MODE, FD_REG_DCR);
-
-				if(out->state == OUT_ST_TEST_PENDING)
-					out->state = OUT_ST_IDLE;
-
-				log_trigger (WRTD_LOG_MISSED, WRTD_MISS_TIMEOUT,
-					     out, &pq_ent->trig);
+		if( !wr_is_timing_ok() ) {
+			drop_trigger(out, pq_ent, q, WRTD_MISS_NO_WR);
+		} 
+		else if (!(dcr & FD_DCR_PG_TRIG)) { /* Nope, armed but still waiting for trigger */
+			if (check_output_timeout (out))	{
+				drop_trigger(out, pq_ent, q, WRTD_MISS_TIMEOUT);
+				
 			}
 		} else {
 			out->last_executed = pq_ent->trig;
@@ -331,6 +351,10 @@ void do_output (struct lrt_output *out)
 
 	pq_ent = pulse_queue_front(q);
 	struct wr_timestamp *ts = &pq_ent->trig.ts;
+
+	if( !wr_is_timing_ok() )
+		drop_trigger(out, pq_ent, q, WRTD_MISS_NO_WR);
+
 
 	/* Program the output start time */
 	fd_ch_writel(out, ts->seconds, FD_REG_U_STARTL);
@@ -390,7 +414,7 @@ void enqueue_trigger(int output, struct lrt_output_rule *rule,
 	switch(out->state)
 	{
 		case OUT_ST_IDLE:
-			break;
+			return; // output not armed
 
 		case OUT_ST_ARMED:
 			if (rule->state & HASH_ENT_CONDITION)
@@ -444,7 +468,7 @@ void enqueue_trigger(int output, struct lrt_output_rule *rule,
 
 }
 
-static inline void filter_trigger(struct wrtd_trigger_entry *trig)
+static void filter_trigger(struct wrtd_trigger_entry *trig)
 {
 	struct lrt_hash_entry *ent = hash_search (&trig->id, NULL);
 	int j;
@@ -824,6 +848,12 @@ static inline void ctl_chan_get_state (uint32_t seq, struct wrnc_msg *ibuf)
 	if(st->state != OUT_ST_IDLE)
 		st->flags |= WRTD_ARMED;
 
+
+	st->flags &= ~WRTD_NO_WR;		
+
+	if( !wr_is_timing_ok() )
+		st->flags |= WRTD_NO_WR;		
+
 	/* Create the response */
 	wrnc_msg_header(&obuf, &id_state, &seq);
 	wrnc_msg_int32(&obuf, &ch);
@@ -1032,23 +1062,88 @@ void init_outputs()
     }
 }
 
+#define WR_LINK_OFFLINE		1
+#define WR_LINK_ONLINE		2
+#define WR_LINK_SYNCING		3
+#define WR_LINK_SYNCED		4
+
+static int wr_state;
+
+int wr_link_up()
+{
+	return dp_readl ( FD_REG_TCR ) & FD_TCR_WR_LINK;
+}
+
+int wr_time_locked()
+{
+	return dp_readl ( FD_REG_TCR ) & FD_TCR_WR_LOCKED;
+}
+
+int wr_time_ready()
+{
+	return 1;
+}
+
+int wr_enable_lock( int enable )
+{
+	if(enable)
+		dp_writel ( FD_TCR_WR_ENABLE, FD_REG_TCR );
+	else
+		dp_writel ( 0, FD_REG_TCR);
+}
+
+void wr_update_link()
+{
+	switch(wr_state)
+	{
+		case WR_LINK_OFFLINE:
+			if ( wr_link_up() )
+			{
+				wr_state = WR_LINK_ONLINE;
+			}
+			break;
+		
+		case WR_LINK_ONLINE:
+			if (wr_time_ready())
+			{
+				wr_state = WR_LINK_SYNCING;
+				wr_enable_lock(1);
+			}
+			break;
+
+		case WR_LINK_SYNCING:
+			if (wr_time_locked())
+			{
+				pp_printf("WR link up!\n");
+				wr_state = WR_LINK_SYNCED;
+			}
+			break;
+
+		case WR_LINK_SYNCED:
+			break;
+	}
+
+	if( wr_state != WR_LINK_OFFLINE && !wr_link_up() )
+	{
+		wr_state = WR_LINK_OFFLINE;
+		wr_enable_lock(0);
+	}
+}
+
+int wr_is_timing_ok()
+{
+	return (wr_state == WR_LINK_SYNCED);
+}
+
 void init()
 {
+	wr_state = WR_LINK_OFFLINE;
+	wr_enable_lock(0);
+
 	hash_init();
 	init_outputs();
 
-	/* reset Fine Delay */
-	dp_writel( (0xdead << 16) | 0x0, 0x0);
-	delay(1000);
-	dp_writel( (0xdead << 16) | 0x3, 0x0);
-	delay(1000);
-
-	pp_printf("RT_FD locking WR\n");
-	/* Lock to white-rabbit */
-	dp_writel((1 << 1), 0xC);
-
-	pp_printf("RT_FD firmware initialized.\n");
-
+	pp_printf("rt-fd firmware initialized.\n");
 }
 
 int main()
@@ -1059,6 +1154,7 @@ int main()
 		do_rx();
 		do_outputs();
 		do_control();
+		wr_update_link();
 	}
 
 	return 0;

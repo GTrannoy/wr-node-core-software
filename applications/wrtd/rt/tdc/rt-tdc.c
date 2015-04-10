@@ -25,8 +25,8 @@
 
 #define DEFAULT_DEAD_TIME (80000/16)
 
-#define BASE_DP_TDC_REGS    0x31000
-#define BASE_DP_TDC_DIRECT  0x10000
+#define BASE_DP_TDC_REGS    0x2000
+#define BASE_DP_TDC_DIRECT  0x8000
 
 /* Structure describing state of each TDC channel*/
 struct tdc_channel_state {
@@ -578,13 +578,13 @@ int wr_enable_lock( int enable )
 {
     int i = 0;
 	
-	//dp_writel (TDC_CTRL_DIS_ACQ, BASE_DP_TDC_REGS + TDC_REG_CTRL);
+	dp_writel (TDC_CTRL_DIS_ACQ, BASE_DP_TDC_REGS + TDC_REG_CTRL);
 	if(enable)
 		dp_writel (TDC_WR_CTRL_ENABLE, BASE_DP_TDC_REGS + TDC_REG_WR_CTRL);
 	else
 		dp_writel (0, BASE_DP_TDC_REGS + TDC_REG_WR_CTRL);
    
-//	dp_writel (TDC_CTRL_EN_ACQ, BASE_DP_TDC_REGS + TDC_REG_CTRL);
+	dp_writel (TDC_CTRL_EN_ACQ, BASE_DP_TDC_REGS + TDC_REG_CTRL);
 }
 
 
@@ -595,7 +595,6 @@ void wr_update_link()
 		case WR_LINK_OFFLINE:
 			if ( wr_link_up() )
 			{
-				pp_printf("rt-tdc: WR link up\n");
 				wr_state = WR_LINK_ONLINE;
 			}
 			break;
@@ -622,7 +621,7 @@ void wr_update_link()
 
 	if( wr_state != WR_LINK_OFFLINE && !wr_link_up() )
 	{
-        pp_printf("rt-tdc: WR sync lost\n");
+	        pp_printf("rt-tdc: WR sync lost\n");
                 
 		wr_state = WR_LINK_OFFLINE;
 		wr_enable_lock(0);

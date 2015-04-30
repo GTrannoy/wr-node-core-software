@@ -189,10 +189,22 @@ struct wrnc_dev *wrnc_open_by_fmc(uint32_t device_id)
  */
 struct wrnc_dev *wrnc_open_by_lun(unsigned int lun)
 {
-	char name[12];
+	char path[16], dev_id_str[4];
+	uint32_t dev_id;
+	int ret;
 
-	snprintf(name, 12, "wrnc.%d", lun);
-	return wrnc_open(name);
+	ret = snprintf(path, sizeof(path), "/dev/wrnc.%d", lun);
+	if (ret < 0 || ret >= sizeof(path)) {
+		errno = EINVAL;
+		return NULL;
+	}
+	ret = readlink(path, dev_id_str, sizeof(dev_id_str));
+	if (sscanf(dev_id_str, "%4x", &dev_id) != 1) {
+		errno = ENODEV;
+		return NULL;
+	}
+
+	return wrnc_open_by_fmc(dev_id);
 }
 
 

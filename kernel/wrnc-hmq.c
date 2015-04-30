@@ -880,7 +880,7 @@ dispatch_irq:
 	if (status)
 		goto dispatch_irq;
 
-	fmc->op->irq_ack(fmc);
+	fmc_irq_ack(fmc);
 
 	return IRQ_HANDLED;
 }

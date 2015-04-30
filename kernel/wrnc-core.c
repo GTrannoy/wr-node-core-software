@@ -634,9 +634,9 @@ int wrnc_probe(struct fmc_device *fmc)
 	 * now and start working.
 	 */
 	fmc->irq = wrnc->base_core;
-	err = fmc->op->irq_request(fmc, wrnc_irq_handler,
-				   (char *)dev_name(&wrnc->dev),
-				   0 /*VIC is used */);
+	err = fmc_irq_request(fmc, wrnc_irq_handler,
+			      (char *)dev_name(&wrnc->dev),
+			      0 /*VIC is used */);
 	if (err) {
 		dev_err(&wrnc->dev,
 			"Cannot request IRQ 0x%x - we'll not receive/send messages\n",
@@ -658,9 +658,9 @@ int wrnc_probe(struct fmc_device *fmc)
 
 	/* Enable debug interrupts */
 	fmc->irq = wrnc->base_core + 1;
-	err = fmc->op->irq_request(fmc,  wrnc_irq_handler_debug,
-				   (char *)dev_name(&wrnc->cpu[i].dev),
-				   0 /*VIC is used */);
+	err = fmc_irq_request(fmc,  wrnc_irq_handler_debug,
+			      (char *)dev_name(&wrnc->cpu[i].dev),
+			      0 /*VIC is used */);
 	if (err) {
 		dev_err(&wrnc->dev,
 			"Cannot request IRQ 0x%x - we'll not receive debug messages\n",
@@ -700,11 +700,11 @@ int wrnc_remove(struct fmc_device *fmc)
 
 	fmc_writel(fmc, 0x0, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
 	fmc->irq = wrnc->base_core;
-	fmc->op->irq_free(fmc);
+	fmc_irq_free(fmc);
 
 	fmc_writel(fmc, 0x0, wrnc->base_csr + WRN_CPU_CSR_REG_DBG_IMSK);
 	fmc->irq = wrnc->base_core + 1;
-	fmc->op->irq_free(fmc);
+	fmc_irq_free(fmc);
 
 	debugfs_remove_recursive(wrnc->dbg_dir);
 

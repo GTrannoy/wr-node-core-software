@@ -669,8 +669,12 @@ int wrnc_probe(struct fmc_device *fmc)
 	fmc_writel(fmc, 0xFFFFFFFF/*(wrnc->n_cpu - 1)*/,
 		   wrnc->base_csr + WRN_CPU_CSR_REG_DBG_IMSK);
 
+	/* Pin the carrier */
+	if (!try_module_get(fmc->owner))
+		goto out_mod;
 	return 0;
 
+out_mod:
 out_hmq_out:
 	while (--i)
 		device_unregister(&wrnc->hmq_out[i].dev);
@@ -720,6 +724,9 @@ int wrnc_remove(struct fmc_device *fmc)
 	/* FIXME cannot explain why, but without sleep the _kernel_ crash */
 	msleep(50);
 	device_unregister(&wrnc->dev);
+
+	/* Release the carrier */
+	module_put(fmc->owner);
 
 	return 0;
 }

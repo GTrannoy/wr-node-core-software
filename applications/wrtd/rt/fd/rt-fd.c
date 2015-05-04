@@ -323,11 +323,10 @@ void do_output (struct lrt_output *out)
 
 		if( !wr_is_timing_ok() ) {
 			drop_trigger(out, pq_ent, q, WRTD_MISS_NO_WR);
-		} 
+		}
 		else if (!(dcr & FD_DCR_PG_TRIG)) { /* Nope, armed but still waiting for trigger */
 			if (check_output_timeout (out))	{
 				drop_trigger(out, pq_ent, q, WRTD_MISS_TIMEOUT);
-				
 			}
 		} else {
 			out->last_executed = pq_ent->trig;
@@ -849,10 +848,10 @@ static inline void ctl_chan_get_state (uint32_t seq, struct wrnc_msg *ibuf)
 		st->flags |= WRTD_ARMED;
 
 
-	st->flags &= ~WRTD_NO_WR;		
+	st->flags &= ~WRTD_NO_WR;
 
 	if( !wr_is_timing_ok() )
-		st->flags |= WRTD_NO_WR;		
+		st->flags |= WRTD_NO_WR;
 
 	/* Create the response */
 	wrnc_msg_header(&obuf, &id_state, &seq);
@@ -1102,7 +1101,7 @@ void wr_update_link()
 				wr_state = WR_LINK_ONLINE;
 			}
 			break;
-		
+
 		case WR_LINK_ONLINE:
 			if (wr_time_ready())
 			{

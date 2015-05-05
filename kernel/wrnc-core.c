@@ -734,9 +734,6 @@ int wrnc_remove(struct fmc_device *fmc)
 
 /**
  * List of device to match.
- *
- * @FIXME for the time being we match the TDC mezzanine because we do not have
- *        the capability to match single FPGA components
  */
 static struct fmc_fru_id wrnc_fru_id[] = {
 	{

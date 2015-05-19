@@ -260,6 +260,10 @@ int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
 	int n_read = 0;
 	uint32_t id = 0, seq = 0;
 
+	/* Clean up errno to be able to distinguish between error cases and
+	   normal behaviour when the function return less messages
+	   than expected */
+	errno = 0;
 	while (remaining) {
 		struct wrtd_trigger_entry ent;
 		msg = wrnc_hmq_receive(hmq_log);

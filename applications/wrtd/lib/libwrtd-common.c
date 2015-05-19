@@ -248,8 +248,8 @@ int wrtd_load_application(struct wrtd_node *dev, char *rt_tdc,
  * @param[in] hmq_log logging HMQ.
  * @param[out] log log message
  * @param[in] count number of messages to read
- * @return number of read messages on success, -1 on error and errno is set
- *         appropriately
+ * @return number of read messages on success (check errno if it returns less
+ *         messages than expected), -1 on error and errno is set appropriately
  */
 int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
 		  int count)
@@ -270,8 +270,9 @@ int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
 
 		if (id != WRTD_REP_LOG_MESSAGE)
 		{
+			free(msg);
 			errno = EWRTD_INVALID_ANSWER_STATE;
-			return -1;
+			break;
 		}
 
 		wrnc_msg_uint32 (msg, &cur->type);
@@ -284,8 +285,9 @@ int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
 		cur->id = ent.id;
 
 		if ( wrnc_msg_check_error(msg) ) {
+			free(msg);
 			errno = EWRTD_INVALID_ANSWER_STATE;
-			return -1;
+			break;
 		}
 
 		remaining--;

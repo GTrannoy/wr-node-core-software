@@ -88,10 +88,7 @@ static void dump_output_state(struct wrtd_output_state *state)
 	char tmp[1024], tmp2[1024];
 
 	if(! (state->flags & WRTD_ENABLED))
-        {
 		printf("Channel %d: disabled\n", state->output);
-    		return;
-	}
 
 	decode_flags(tmp, state->flags);
 	printf("Output %d state:\n", state->output);

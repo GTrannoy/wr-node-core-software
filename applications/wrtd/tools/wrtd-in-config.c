@@ -79,10 +79,8 @@ void dump_input_state(struct wrtd_input_state *state)
 {
 	char tmp[1024], tmp2[1024];
 
-	if(!(state->flags & WRTD_ENABLED)) {
+	if(!(state->flags & WRTD_ENABLED)) 
 		printf("Channel %d: disabled\n", state->input );
-		return;
-	}
 
 	decode_flags(tmp,state->flags);
 	printf("Channel %d state:\n", state->input);

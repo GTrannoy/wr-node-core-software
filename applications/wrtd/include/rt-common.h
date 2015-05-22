@@ -67,4 +67,32 @@ static inline void delay(int n)
     for(i=0;i<n;i++) asm volatile("nop");
 }
 
+static uint32_t _get_ticks()
+{
+    volatile uint32_t seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
+    /* Need to read the seconds to latch the cycles value */
+    volatile uint32_t ticks = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
+    return ticks;
+}
+
+static inline void delay_ticks(uint32_t ticks)
+{
+    uint32_t start = _get_ticks(); 
+
+    while(1)
+    {
+	uint32_t v = _get_ticks() - start;
+	if (v < 0)
+	    v += 125 * 1000 * 1000;
+	if (v >= ticks)
+	    return;
+    }
+}
+
+static inline void delay_us(uint32_t usecs)
+{
+    return delay_ticks(usecs * 125);
+}
+
+
 #endif

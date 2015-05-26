@@ -188,7 +188,6 @@ extern int wrtd_in_trigger_mode_set(struct wrtd_node *dev, unsigned int input,
 extern int wrtd_in_trigger_software(struct wrtd_node *dev,
 			     struct wrtd_trigger_entry *trigger);
 extern int wrtd_in_arm(struct wrtd_node *dev, unsigned int input, int armed);
-extern int wrtd_in_disarm(struct wrtd_node *dev, unsigned int input);
 extern int wrtd_in_dead_time_set(struct wrtd_node *dev, unsigned int input,
 				 uint64_t dead_time_ps);
 extern int wrtd_in_delay_set(struct wrtd_node *dev, unsigned int input,

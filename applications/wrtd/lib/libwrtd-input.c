@@ -324,18 +324,6 @@ int wrtd_in_arm(struct wrtd_node *dev, unsigned int input, int armed)
 
 
 /**
- * Disarm the WRTD input. It is just an helper that internally use wrtd_in_arm()
- * @param[in] dev device token
- * @param[in] input index (0-based) of input channel
- * @return 0 on success, -1 on error and errno is set appropriately
- */
-int wrtd_in_disarm(struct wrtd_node *dev, unsigned int input)
-{
-	return wrtd_in_arm(dev, input, 0);
-}
-
-
-/**
  * Set the dead time (the minimum gap between input pulses, below which
  * the TDC ignores the subsequent pulses; limits maximum input pulse rate,
  * 16 ns granularity)

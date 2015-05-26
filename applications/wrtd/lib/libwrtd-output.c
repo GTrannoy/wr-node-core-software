@@ -605,7 +605,7 @@ int wrtd_out_pulse_width_set(struct wrtd_node *dev, unsigned int output,
 	id = WRTD_CMD_FD_CHAN_SET_WIDTH;
 	wrnc_msg_header (&msg, &id, &seq);
    	wrnc_msg_uint32 (&msg, &output);
-   	
+
    	tmp = width_ps / 8000ULL;
 
    	wrnc_msg_int32 (&msg, &tmp);
@@ -616,7 +616,7 @@ int wrtd_out_pulse_width_set(struct wrtd_node *dev, unsigned int output,
 		errno = EWRTD_INVALID_ANSWER_STATE;
 		return -1;
 	}
-	
+
 	return wrtd_validate_acknowledge(&msg);
 }
 
@@ -847,7 +847,7 @@ int wrtd_out_arm(struct wrtd_node *dev, unsigned int output, int armed)
 {
 	struct wrnc_msg msg = wrnc_msg_init(4);
 	uint32_t seq = 0, id = WRTD_CMD_FD_CHAN_ARM;
-	
+
 	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;

@@ -10,6 +10,7 @@ LIBFD ?= ../fine-delay-sw/lib
 LIB = libwrtd.a
 LOBJ := libwrtd-internal.o
 LOBJ += libwrtd-common.o
+LOBJ += libwrtd-logging.o
 LOBJ += libwrtd-input.o
 LOBJ += libwrtd-output.o
 

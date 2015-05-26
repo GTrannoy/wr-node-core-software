@@ -43,6 +43,11 @@ enum wrtd_error_list {
 	__EWRTD_MAX_ERROR_NUMBER,
 };
 
+enum wrtd_core {
+	WRTD_CORE_IN = 0,
+	WRTD_CORE_OUT = 1,
+};
+
 struct wrtd_trigger_handle {
     uint32_t ptr_cond;
     uint32_t ptr_trig;

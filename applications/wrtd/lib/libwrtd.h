@@ -109,8 +109,11 @@ struct wrtd_output_state {
 /**
  * @file libwrtd-common.c
  */
-extern const char *wrtd_strerror(int err);
-extern const char *wrtd_strlogging(enum wrtd_log_level lvl);
+/**
+ * @defgroup dev
+ * Set of functions to manage the basic device and library configuration.
+ * @{
+ */
 extern int wrtd_init();
 extern void wrtd_exit();
 extern struct wrtd_node *wrtd_open_by_fmc(uint32_t device_id);
@@ -121,18 +124,58 @@ extern int wrtd_load_application(struct wrtd_node *dev, char *rt_tdc,
 					 char *rt_fd);
 extern int wrtd_white_rabbit_sync(struct wrtd_node *dev,
 				  unsigned long timeout_s);
-extern int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
-			 int count);
-extern void wrtd_log_close(struct wrnc_hmq *hmq);
+/**@}*/
+
+/**
+ * @defgroup util Utilities
+ * Set of utilities
+ * @{
+ */
+extern const char *wrtd_strerror(int err);
 extern void wrtd_ts_to_pico(struct wr_timestamp *ts, uint64_t *pico);
 extern void wrtd_pico_to_ts(uint64_t *pico, struct wr_timestamp *ts);
 extern void wrtd_ts_to_sec_pico(struct wr_timestamp *ts,
 				uint64_t *sec, uint64_t *pico);
 extern void wrtd_sec_pico_to_ts(uint64_t sec, uint64_t pico,
 				struct wr_timestamp *ts);
+extern struct wr_timestamp picos_to_ts(uint64_t p);
+/**@}*/
+
+
+/**
+ * @defgroup log Logging
+ * Set of logging functions for input and output channels
+ * @{
+ */
+extern const char *wrtd_strlogging(enum wrtd_log_level lvl);
+extern int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
+			 int count);
+extern void wrtd_log_close(struct wrnc_hmq *hmq);
+extern struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev,
+					 uint32_t lvl,
+					 int input);
+extern int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
+				 uint32_t log_level);
+extern int wrtd_in_log_share_set(struct wrtd_node *dev, unsigned int shared);
+extern int wrtd_in_log_share_get(struct wrtd_node *dev, unsigned int *shared);
+extern int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
+				  uint32_t log_level);
+extern int wrtd_out_log_share_set(struct wrtd_node *dev, unsigned int shared);
+extern int wrtd_out_log_share_get(struct wrtd_node *dev, unsigned int *shared);
+extern struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev,
+					  uint32_t lvl,
+					  int output);
+/**@}*/
+
+
 
 /**
  * @file libwrtd-input.c
+ */
+/**
+ * @defgroup input Input Management
+ * Set of functions to handle input channels
+ * @{
  */
 extern int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 			     struct wrtd_input_state *state);
@@ -153,13 +196,6 @@ extern int wrtd_in_delay_set(struct wrtd_node *dev, unsigned int input,
 extern int wrtd_in_timebase_offset_set(struct wrtd_node *dev,
 				       unsigned int input, uint64_t offset);
 extern int wrtd_in_counters_reset(struct wrtd_node *dev, unsigned int input);
-extern int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
-				 uint32_t log_level);
-extern int wrtd_in_log_share_set(struct wrtd_node *dev, unsigned int shared);
-extern int wrtd_in_log_share_get(struct wrtd_node *dev, unsigned int *shared);
-extern struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev,
-					 uint32_t lvl,
-					 int input);
 extern int wrtd_in_seq_counter_set (struct wrtd_node *dev, unsigned int input,
 				    unsigned int value);
 extern int wrtd_in_is_enabled(struct wrtd_node *dev, unsigned int input,
@@ -175,9 +211,15 @@ extern int wrtd_in_dead_time_get(struct wrtd_node *dev, unsigned int input,
 				 uint64_t *dead_time_ps);
 extern int wrtd_in_delay_get(struct wrtd_node *dev, unsigned int input,
 			     uint64_t *delay_ps);
+/**@}*/
 
 /**
  * @file libwrtd-output.c
+ */
+/**
+ * @defgroup output Output Management
+ * Set of functions to handle output channels
+ * @{
  */
 extern int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 			     struct wrtd_output_state *state);
@@ -209,13 +251,6 @@ extern int wrtd_out_dead_time_set(struct wrtd_node *dev, unsigned int output,
 				  uint64_t dead_time_ps);
 extern int wrtd_out_pulse_width_set(struct wrtd_node *dev, unsigned int output,
 				  uint64_t pulse_width_ps);
-extern int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
-				  uint32_t log_level);
-extern int wrtd_out_log_share_set(struct wrtd_node *dev, unsigned int shared);
-extern int wrtd_out_log_share_get(struct wrtd_node *dev, unsigned int *shared);
-extern struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev,
-					  uint32_t lvl,
-					  int output);
 extern int wrtd_out_trig_enable(struct wrtd_node *dev,
 				struct wrtd_trigger_handle *handle, int enable);
 extern int wrtd_out_ping(struct wrtd_node *dev);
@@ -236,11 +271,7 @@ extern int wrtd_out_is_armed(struct wrtd_node *dev, unsigned int output,
 			     unsigned int *armed);
 extern int wrtd_out_has_trigger(struct wrtd_node *dev, unsigned int output,
 				struct wrtd_trig_id *id, unsigned int *assigned);
-
-/**
- * @file libwrtd-internal.c
- */
-extern struct wr_timestamp picos_to_ts(uint64_t p);
+/**@}*/
 
 #ifdef __cplusplus
 };

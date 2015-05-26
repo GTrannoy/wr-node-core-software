@@ -196,8 +196,6 @@ struct wrnc_dev *wrtd_get_wrnc_dev(struct wrtd_node *dev)
 }
 
 
-
-
 /**
  * It loads a set of real-time applications for TDC and FD
  * @param[in] dev device token

@@ -35,7 +35,7 @@ static char *wrnc_error_str[] = {
  * It returns a string messages corresponding to a given error code. If
  * it is not a libwrnc error code, it will run strerror(3)
  * @param[in] err error code. Typically 'errno' variable
- * @return a message error
+ * @return a message error. No need to free the string.
  */
 char *wrnc_strerror(int err)
 {
@@ -93,6 +93,7 @@ void wrnc_exit()
  * It returns the number of available WRNCs. This is not calculated on demand.
  * It depends on library initialization.
  * @return the number of WRNC available
+ * @todo make it dynamically computed
  */
 uint32_t wrnc_count()
 {
@@ -103,9 +104,10 @@ uint32_t wrnc_count()
 /**
  * It allocates and returns the list of available WRNC devices. The user is
  * in charge to free(3) the allocated memory. The list contains
- * @link wrnc_count() @endlink + 1 elements. The last element is an
+ * wrnc_count() + 1 elements. The last element is an
  * emtpy string.
  * @return a list of WRNC device's names
+ * @todo dynamically discover devices
  */
 char (*wrnc_list())[WRNC_NAME_LEN]
 {
@@ -124,7 +126,7 @@ char (*wrnc_list())[WRNC_NAME_LEN]
 
 /**
  * It opens a WRNC device using a string descriptor. The descriptor correspond
- * to the char device name of the white-rabbit node-core.
+ * to the main char device name of the white-rabbit node-core.
  * @param[in] device name of the device to open
  * @return the WRNC token, NULL on error and errno is appropriately set
  */
@@ -182,8 +184,8 @@ struct wrnc_dev *wrnc_open_by_fmc(uint32_t device_id)
  * is an instance number of a particular hardware. The LUN to use is the carrier
  * one, and not the mezzanine one (if any).
  * The driver is not aware of LUNs but only of FMC-id. So, if this function does
- * not work it means that your installation miss symbolic link that converts LUN
- * to FMC-id.
+ * not work it means that your installation lacks of symbolic links that
+ * convert LUNs to FMC-ids.
  * @param[in] lun Logical Unit Number of the device to use
  * @return the WRNC token, NULL on error and errno is appropriately set
  */
@@ -825,9 +827,12 @@ int wrnc_bind(struct wrnc_dev *wrnc, struct wrnc_msg_filter *flt,
 
 
 /**
- * It starts to execute code on a given CPU
+ * It starts to execute code on a given CPU.
+ * This function is a wrapper of wrnc_cpu_run_set() that allow you to safely
+ * start a single CPU.
  * @param[in] wrnc device token
  * @param[in] index CPU index
+ * @return 0 on success, -1 otherwise and errno is set appropriately
  */
 int wrnc_cpu_start(struct wrnc_dev *wrnc, unsigned int index)
 {
@@ -840,8 +845,11 @@ int wrnc_cpu_start(struct wrnc_dev *wrnc, unsigned int index)
 
 /**
  * It stops the execution of code on a given CPU
+ * This function is a wrapper of wrnc_cpu_run_set() that allow you to safely
+ * stop a single CPU.
  * @param[in] wrnc device token
  * @param[in] index CPU index
+ * @return 0 on success, -1 otherwise and errno is set appropriately
  */
 int wrnc_cpu_stop(struct wrnc_dev *wrnc, unsigned int index)
 {
@@ -853,7 +861,9 @@ int wrnc_cpu_stop(struct wrnc_dev *wrnc, unsigned int index)
 
 
 /**
- * It enables a CPU; in other words, it clear the reset line of a CPU
+ * It enables a CPU; in other words, it clear the reset line of a CPU.
+ * This function is a wrapper of wrnc_cpu_reset_set() that allow you to safely
+ * enable a single CPU.
  * @param[in] wrnc device token
  * @param[in] index CPU index
  * @return 0 on success, -1 otherwise and errno is set appropriately
@@ -867,7 +877,9 @@ int wrnc_cpu_enable(struct wrnc_dev *wrnc, unsigned int index)
 }
 
 /**
- * It disables a CPU; in other words, it sets the reset line of a CPU
+ * It disables a CPU; in other words, it sets the reset line of a CPU.
+ * This function is a wrapper of wrnc_cpu_reset_set() that allow you to safely
+ * disable a single CPU.
  * @param[in] wrnc device token
  * @param[in] index CPU index
  * @return 0 on success, -1 otherwise and errno is set appropriately
@@ -968,7 +980,7 @@ int wrnc_hmq_filter_clean(struct wrnc_hmq *hmq)
 
 
 /**
- * It returns the name of the device
+ * It returns the device name
  * @param[in] wrnc device token
  * @return the string representing the name of the device
  */

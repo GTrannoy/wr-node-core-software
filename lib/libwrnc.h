@@ -77,6 +77,11 @@ enum wrnc_error_number {
 /**
  * @file libwrnc.c
  */
+/**
+ * @defgroup dev Device
+ * Set of functions to perform basic openartion on the device
+ * @{
+ */
 extern char *wrnc_strerror(int err);
 extern int wrnc_init();
 extern void wrnc_exit();
@@ -89,7 +94,13 @@ extern struct wrnc_dev *wrnc_open_by_lun(unsigned int lun);
 extern void wrnc_close(struct wrnc_dev *wrnc);
 extern char *wrnc_name_get(struct wrnc_dev *wrnc);
 extern int wrnc_app_id_get(struct wrnc_dev *wrnc, uint32_t *app_id);
+/**@}*/
 
+/**
+ * @defgroup cpu CPU
+ * Set of function that allow you to manage the FPGA cores
+ * @{
+ */
 extern int wrnc_cpu_load_application_raw(struct wrnc_dev *wrnc,
 					 unsigned int index,
 					 void *code, size_t length,
@@ -114,7 +125,13 @@ extern int wrnc_cpu_enable(struct wrnc_dev *wrnc, unsigned int index);
 extern int wrnc_cpu_disable(struct wrnc_dev *wrnc, unsigned int index);
 extern int wrnc_cpu_start(struct wrnc_dev *wrnc, unsigned int index);
 extern int wrnc_cpu_stop(struct wrnc_dev *wrnc, unsigned int index);
+/**@}*/
 
+/**
+ * @defgroup hmq Host Message Queue
+ * Functions to manage the HMQ slots: configuration and transmission
+ * @{
+ */
 extern struct wrnc_hmq *wrnc_hmq_open(struct wrnc_dev *wrnc,
 				      unsigned int index,
 				      unsigned long flags);
@@ -135,18 +152,32 @@ extern int wrnc_hmq_filter_add(struct wrnc_hmq *hmq,
 			       struct wrnc_msg_filter *filter);
 /* FIXME to be tested */
 extern int wrnc_hmq_filter_clean(struct wrnc_hmq *hmq);
+extern int wrnc_bind(struct wrnc_dev *wrnc, struct wrnc_msg_filter *flt,
+		     unsigned int length);
+/**@}*/
+
+/**
+ * @defgroup smem Shared Memory
+ * Functions to access the shared memory from the host
+ * @{
+ */
 extern int wrnc_smem_read(struct wrnc_dev *wrnc, uint32_t addr, uint32_t *data,
 			  size_t count, enum wrnc_smem_modifier mod);
 extern int wrnc_smem_write(struct wrnc_dev *wrnc, uint32_t addr, uint32_t *data,
 			   size_t count, enum wrnc_smem_modifier mod);
-extern int wrnc_bind(struct wrnc_dev *wrnc, struct wrnc_msg_filter *flt,
-		     unsigned int length);
+/**@}*/
 
+/**
+ * @defgroup dbg Debug
+ * Functions to access the debug serial stream
+ * @{
+ */
 extern struct wrnc_dbg *wrnc_debug_open(struct wrnc_dev *wrnc,
 					unsigned int index);
 extern void wrnc_debug_close(struct wrnc_dbg *dbg);
 extern int wrnc_debug_message_get(struct wrnc_dbg *dbg,
 				  char *buf, size_t count);
+/**@}*/
 
 #ifdef __cplusplus
 };

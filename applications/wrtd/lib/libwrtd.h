@@ -138,7 +138,6 @@ extern void wrtd_ts_to_sec_pico(struct wr_timestamp *ts,
 				uint64_t *sec, uint64_t *pico);
 extern void wrtd_sec_pico_to_ts(uint64_t sec, uint64_t pico,
 				struct wr_timestamp *ts);
-extern struct wr_timestamp picos_to_ts(uint64_t p);
 /**@}*/
 
 

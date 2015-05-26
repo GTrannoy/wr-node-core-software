@@ -389,7 +389,7 @@ int wrtd_in_delay_set(struct wrtd_node *dev, unsigned int input,
 		return -1;
 	}
 
-        t = picos_to_ts(delay_ps);
+        wrtd_pico_to_ts(&delay_ps, &t);
 
 	/* Build the message */
 	msg.datalen = 6;
@@ -433,7 +433,7 @@ int wrtd_in_timebase_offset_set(struct wrtd_node *dev, unsigned int input,
 		return -1;
 	}
 
-	t = picos_to_ts(offset);
+	wrtd_pico_to_ts(&offset, &t);
 
 	/* Build the message */
 	msg.datalen = 6;

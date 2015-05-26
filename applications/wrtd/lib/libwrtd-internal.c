@@ -29,25 +29,6 @@ int wrtd_validate_acknowledge(struct wrnc_msg *msg)
 
 
 /**
- * It converts a pico-second value to a wr_timestamp structure
- * @param[in] p pico-second value to convert
- * @return a wr_timestamp structure corresponding to the given pico-second value
- */
-struct wr_timestamp picos_to_ts(uint64_t p)
-{
-	struct wr_timestamp t;
-
-	t.seconds = p / (1000ULL * 1000ULL * 1000ULL * 1000ULL);
-	p %= (1000ULL * 1000ULL * 1000ULL * 1000ULL);
-	t.ticks = p / 8000;
-	p %= 8000;
-	t.frac = p * 4096 / 8000;
-
-	return t;
-}
-
-
-/**
  * It extracts a wr_timestamp from a given buffer (arriving from a real-time
  * application)
  * @param[in] buf answer of the real time application

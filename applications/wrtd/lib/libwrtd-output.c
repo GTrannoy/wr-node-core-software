@@ -548,7 +548,7 @@ static int wrtd_out_rule_delay_set(struct wrtd_node *dev,
 
 	}
 
-	t = picos_to_ts(delay_ps);
+	wrtd_pico_to_ts(&delay_ps, &t);
 
 	id = WRTD_CMD_FD_TRIG_SET_DELAY;
 	wrnc_msg_header (&msg, &id, &seq);

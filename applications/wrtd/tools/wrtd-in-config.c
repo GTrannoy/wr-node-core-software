@@ -251,7 +251,7 @@ static int wrtd_cmd_sw_trigger(struct wrtd_node *wrtd, int input,
 
 	if (argv[1] != NULL) {
 		parse_delay(argv[1], &ts);
-		ent.ts = picos_to_ts(ts);
+		wrtd_pico_to_ts(&ts, &ent.ts);
 	} else {
 		ent.ts.seconds = 0;
 		ent.ts.ticks = 100000000000ULL / 8000ULL; /* 100ms */

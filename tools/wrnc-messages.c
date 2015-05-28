@@ -108,7 +108,7 @@ int print_debug(struct wrnc_dbg *dbg)
 
 	n = wrnc_debug_message_get(dbg, c, 256);
 	if (n < 0)
-		return 0;
+		return -1;
 	if (strlen(c) > 0)
 		return fprintf(stderr, "%s-cpu-%02d: %s\n",
 			       wrnc_name_get(dbg->wrnc), dbg->cpu_index, c);
@@ -157,8 +157,8 @@ void *debug_thread(void *arg)
 				if (!(p[i].revents & POLLIN))
 					continue;
 				ret = print_debug(wdbg[i]);
-				if (!ret)
-					continue;
+				if (ret < 0)
+					goto out;
 				pthread_mutex_lock(&mtx);
 				cnt_dbg++;
 				pthread_mutex_unlock(&mtx);

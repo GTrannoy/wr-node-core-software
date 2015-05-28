@@ -149,7 +149,7 @@ void *debug_thread(void *arg)
 	/* Start dumping messages */
 	while (N == 0 || N > cnt_dbg) {
 		/* Polling debug messages */
-		ret = poll(p, th_data->n_cpu, 10000);
+		ret = poll(p, th_data->n_cpu, 10);
 		switch (ret) {
 		default:
 			/* Dump from the slot */

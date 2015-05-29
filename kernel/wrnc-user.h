@@ -5,6 +5,7 @@
  */
 #ifndef __WRNC_USER_H__
 #define  __WRNC_USER_H__
+/** @file wrnc-user.h */
 
 #define WRNC_MAX_CARRIER 20 /**< Maximum number of WRNC components on a
 			       single computer*/
@@ -14,6 +15,11 @@
 
 #define WRNC_MAX_PAYLOAD_SIZE 128
 
+/**
+ * @enum wrnc_smem_modifier
+ * Shared memory operation modifier. This is a list of operation modifier
+ * that you can use to access the shared memory.
+ */
 enum wrnc_smem_modifier {
 	WRNC_SMEM_DIRECT = 0, /**< direct read/write of the memory */
 	WRNC_SMEM_OR, /**< on write, atomic OR with memory content */
@@ -24,11 +30,12 @@ enum wrnc_smem_modifier {
 };
 
 /**
- * Messages directions
+ * @enum wrnc_msg_direction
+ * Message direction on the Host Message Queue
  */
 enum wrnc_msg_direction {
-    WRNC_MSG_DIR_SEND = 0,
-    WRNC_MSG_DIR_RECEIVE = 1
+	WRNC_MSG_DIR_SEND = 0, /**< from Host to RealTime Application */
+	WRNC_MSG_DIR_RECEIVE = 1, /**< from RealTime application to Host */ 
 };
 
 /**
@@ -36,10 +43,12 @@ enum wrnc_msg_direction {
  */
 struct wrnc_msg {
 	uint32_t datalen; /**< payload length*/
-	uint32_t data[WRNC_MAX_PAYLOAD_SIZE]; /**< payload */
+	uint32_t data[WRNC_MAX_PAYLOAD_SIZE]; /**< payload, free content
+						 (no official protocol) */
 	uint32_t max_size; /**< maximum message size for chosen slot */
 	uint32_t offset; /**< serialization/deserialization offset */
-	enum wrnc_msg_direction direction; /**< serialization direction (used by wrnc_msg_x functions) */
+	enum wrnc_msg_direction direction; /**< serialization direction
+					      (used by wrnc_msg_x functions) */
 	int error; /** serialization error status */
 };
 
@@ -55,6 +64,7 @@ struct wrnc_msg_sync {
 };
 
 /**
+ * @enum wrnc_msg_filter_operation_type
  * List of available filter's operations
  */
 enum wrnc_msg_filter_operation_type {
@@ -68,8 +78,7 @@ enum wrnc_msg_filter_operation_type {
  * It describe a filter to apply to messages
  */
 struct wrnc_msg_filter {
-	uint32_t operation; /**< kind of operation
-							  to perform */
+	uint32_t operation; /**< kind of operation to perform */
 	uint32_t word_offset; /**< offset of the word to check */
 	uint32_t mask; /**< mask to apply before the operation */
 	uint32_t value; /**< second operand of the operation */
@@ -88,6 +97,7 @@ struct wrnc_smem_io {
 };
 
 /**
+ * @enum wrnc_ioctl_commands
  * Available ioctl() messages
  */
 enum wrnc_ioctl_commands {

@@ -1036,6 +1036,7 @@ void wrnc_debug_close(struct wrnc_dbg *dbg)
 }
 
 
+#define N_RETRY 100
 /**
  * It retrieves a message from the debug channel. It fills the buffer with a
  * NULL terminated string.
@@ -1049,7 +1050,6 @@ void wrnc_debug_close(struct wrnc_dbg *dbg)
  * @return number of byte read on success, -1 otherwise and errno is set
  *         appropriately
  */
-#define N_RETRY 100
 int wrnc_debug_message_get(struct wrnc_dbg *dbg, char *buf, size_t count)
 {
 	int n = 0, real_count = 0, retry = N_RETRY;

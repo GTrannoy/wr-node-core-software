@@ -7,6 +7,7 @@
 
 #ifndef __LIB_WRNC_H__
 #define __LIB_WRNC_H__
+/** @file libwrnc.h */
 
 #ifdef __cplusplus
 extern "C" {

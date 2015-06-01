@@ -558,6 +558,8 @@ int wrtd_in_has_trigger(struct wrtd_node *dev, unsigned int input,
  * @param[in] input index (0-based) of input channel
  * @param[out] dead_time_ps dead time in pico-seconds
  * @return 0 on success, -1 on error and errno is set appropriately
+ *
+ * @todo to be implemented
  */
 int wrtd_in_dead_time_get(struct wrtd_node *dev, unsigned int input,
 			  uint64_t *dead_time_ps)
@@ -573,6 +575,8 @@ int wrtd_in_dead_time_get(struct wrtd_node *dev, unsigned int input,
  * @param[in] input index (0-based) of input channel
  * @param[out] delay_ps delay in pico-seconds
  * @return 0 on success, -1 on error and errno is set appropriately
+ *
+ * @todo to be implemented
  */
 int wrtd_in_delay_get(struct wrtd_node *dev, unsigned int input,
 		      uint64_t *delay_ps)

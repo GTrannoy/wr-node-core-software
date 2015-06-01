@@ -42,10 +42,9 @@ const char *wrtd_strlogging(enum wrtd_log_level lvl)
 
 
 /**
- * It opens the logging interface for device a given divice. The  default
+ * It opens the logging interface for a given divice. The  default
  * logging level will be applied to all device channels. You can change it
  * later using wrtd_log_level_set()
- * @todo reduce code duplication wrtd_out_log_open()
  * @param[in] dev device token
  * @param[in] lvl default logging level
  * @param[in] input channel number [-1, 4]. [-1] for all channels, [0,4] for a
@@ -104,8 +103,8 @@ static struct wrnc_hmq *wrtd_log_open(struct wrtd_node *dev,
 
 
 /**
- * It reads one or more log entry from a given hmq_log. The user of this function
- * must check that the hmq_log used correspond to a logging interface
+ * It reads one or more log entry from a given hmq_log. The user of this
+ * function must check that the hmq_log used correspond to a logging interface
  * @param[in] hmq_log logging HMQ.
  * @param[out] log log message
  * @param[in] count number of messages to read
@@ -204,7 +203,7 @@ static int wrtd_log_level_set(struct wrtd_node *dev, unsigned int channel,
 
 
 /**
- * It opens the logging interface for device a given divice. The  default
+ * It opens the logging interface for a given divice. The  default
  * logging level will be applied to all device channels. You can change it
  * later using wrtd_out_log_level_set()
  * @param[in] dev device token
@@ -222,6 +221,7 @@ struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev,
 
 
 /**
+ * It sets the logging level for an output channel
  * @param[in] dev device token
  * @param[in] output index (0-based) of output channel
  * @param[in] log_level log level to apply to the logging messages
@@ -289,7 +289,7 @@ struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev,
 
 
 /**
- * Set the log level of a given input channel
+ * It sets the logging level for an input channel
  * @param[in] dev device token
  * @param[in] input index (0-based) of input channel
  * @param[in] log_level log level to apply to the logging messages

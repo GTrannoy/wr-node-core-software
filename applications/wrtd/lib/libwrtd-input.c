@@ -389,7 +389,7 @@ int wrtd_in_delay_set(struct wrtd_node *dev, unsigned int input,
 		return -1;
 	}
 
-        t = picos_to_ts(delay_ps);
+        wrtd_pico_to_ts(&delay_ps, &t);
 
 	/* Build the message */
 	msg.datalen = 6;
@@ -433,7 +433,7 @@ int wrtd_in_timebase_offset_set(struct wrtd_node *dev, unsigned int input,
 		return -1;
 	}
 
-	t = picos_to_ts(offset);
+	wrtd_pico_to_ts(&offset, &t);
 
 	/* Build the message */
 	msg.datalen = 6;
@@ -482,133 +482,6 @@ int wrtd_in_counters_reset(struct wrtd_node *dev, unsigned int input)
 		return err;
 
 	return wrtd_validate_acknowledge(&msg);
-}
-
-
-/**
- * Set the log level of a given input channel
- * @param[in] dev device token
- * @param[in] input index (0-based) of input channel
- * @param[in] log_level log level to apply to the logging messages
- * @return 0 on success, -1 on error and errno is set appropriately
- */
-int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
-			  uint32_t log_level)
-{
-	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg;
-	int err;
-
-	if (input >= TDC_NUM_CHANNELS) {
-		errno = EWRTD_INVALID_CHANNEL;
-		return -1;
-	}
-
-	/* Build the message */
-	msg.datalen = 4;
-	msg.data[0] = WRTD_CMD_TDC_CHAN_SET_LOG_LEVEL;
-	msg.data[1] = 0;
-	msg.data[2] = input;
-	msg.data[3] = log_level;
-
-	/* Send the message and get answer */
-	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
-        if (err)
-		return err;
-
-	return wrtd_validate_acknowledge(&msg);
-}
-
-
-/**
- * It sets the logging interface shared mode. When the logging interface
- * is shared all users will receive the same messages.
- * Rembember that the logging interface is not "per-channel" but "per-core".
- * Even if it is possible to fake a per-channel behaviour
- * for wrtd_in_log_open(); there is no way to set the shared mode for
- * single channel
- * @param[in] dev device token
- * @param[in] shared 1 share, 0 not share
- * @return 0 on success, -1 on error and errno is set appropriately
- */
-int wrtd_in_log_share_set(struct wrtd_node *dev, unsigned int shared)
-{
-	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-
-	return wrnc_hmq_share_set(wrtd->wrnc, WRNC_HMQ_OUTCOMING,
-				  WRTD_OUT_TDC_LOGGING, shared);
-}
-
-
-/**
- * It gets the current shared mode status for the logging interface
- * @param[in] dev device token
- * @param[out] shared 1 share, 0 not share
- * @return 0 on success, -1 on error and errno is set appropriately
- */
-int wrtd_in_log_share_get(struct wrtd_node *dev, unsigned int *shared)
-{
-	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-
-	return wrnc_hmq_share_get(wrtd->wrnc, WRNC_HMQ_OUTCOMING,
-				  WRTD_OUT_TDC_LOGGING, shared);
-}
-
-
-/**
- * It opens the logging interface for the input device. You can provide a
- * default logging level.
- * @todo reduce code duplication wrtd_out_log_open()
- * @param[in] dev device token
- * @param[in] lvl default logging level
- * @param[in] input channel number [-1, 4]. [-1] for all channels, [0,4] for a
- *                  specific one.
- * @return a HMQ token on success, NULL on error and errno is set appropriately
- */
-struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev,
-				  uint32_t lvl,
-				  int input)
-{
-	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg_filter filter = {
-		.operation = WRNC_MSG_FILTER_AND,
-		.word_offset = 2, /* channel field */
-		.mask = 0xFFFF, /* entire field */
-		.value = input, /* required channel */
-	};
-	struct wrnc_hmq *hmq = NULL;
-	int i, err;
-
-	if (input < -1 || input >= TDC_NUM_CHANNELS) {
-		errno = EWRTD_INVALID_CHANNEL;
-		return NULL;
-	}
-
-	if (input > -1) {
-		err = wrtd_in_log_level_set(dev, input, lvl);
-		if (err)
-			return NULL;
-
-		hmq = wrnc_hmq_open(wrtd->wrnc, WRTD_OUT_TDC_LOGGING, 0);
-		if (!hmq)
-			return NULL;
-
-		err = wrnc_hmq_filter_add(hmq, &filter);
-		if (err) {
-			wrnc_hmq_close(hmq);
-			return NULL;
-		}
-	} else {
-		/* Set the same logging level to all channels */
-		for (i = 0; i < TDC_NUM_CHANNELS; ++i) {
-			err = wrtd_in_log_level_set(dev, i, lvl);
-			if (err)
-				return NULL;
-		}
-		hmq = wrnc_hmq_open(wrtd->wrnc, WRTD_OUT_TDC_LOGGING, 0);
-	}
-
-	return hmq;
 }
 
 
@@ -685,6 +558,8 @@ int wrtd_in_has_trigger(struct wrtd_node *dev, unsigned int input,
  * @param[in] input index (0-based) of input channel
  * @param[out] dead_time_ps dead time in pico-seconds
  * @return 0 on success, -1 on error and errno is set appropriately
+ *
+ * @todo to be implemented
  */
 int wrtd_in_dead_time_get(struct wrtd_node *dev, unsigned int input,
 			  uint64_t *dead_time_ps)
@@ -700,6 +575,8 @@ int wrtd_in_dead_time_get(struct wrtd_node *dev, unsigned int input,
  * @param[in] input index (0-based) of input channel
  * @param[out] delay_ps delay in pico-seconds
  * @return 0 on success, -1 on error and errno is set appropriately
+ *
+ * @todo to be implemented
  */
 int wrtd_in_delay_get(struct wrtd_node *dev, unsigned int input,
 		      uint64_t *delay_ps)

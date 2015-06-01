@@ -7,6 +7,7 @@
 
 #ifndef __WRTD_LIB_H__
 #define __WRTD_LIB_H__
+/** @file libwrtd.h */
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,6 +23,7 @@ struct wrtd_node;
 #define WRTD_DEFAULT_TIMEOUT	1000
 
 /**
+ * @enum wrtd_error_list
  * White Rabbit Trigger Distribution errors
  */
 enum wrtd_error_list {
@@ -43,67 +45,103 @@ enum wrtd_error_list {
 	__EWRTD_MAX_ERROR_NUMBER,
 };
 
+/**
+ * @enum wrtd_core
+ * Core indexes according to their main purpose
+ */
+enum wrtd_core {
+	WRTD_CORE_IN = 0, /**< Input core that manages incoming pulses */
+	WRTD_CORE_OUT = 1, /**< Output core that manages pulses generation */
+};
+
+
+/**
+ * Trigger token
+ */
 struct wrtd_trigger_handle {
-    uint32_t ptr_cond;
-    uint32_t ptr_trig;
-    int channel;
+	uint32_t ptr_cond;
+	uint32_t ptr_trig;
+	int channel;
 };
 
+
+/**
+ * Status description for an input channel
+ */
 struct wrtd_input_state {
-    int input;
+	int input; /**< Input channel index */
 
-    uint32_t flags;           ///> enum list_io_flags
-    uint32_t log_level;       ///> enum list_log_level
-    enum wrtd_trigger_mode mode;
+	uint32_t flags;           /**< enum list_io_flags */
+	uint32_t log_level;       /**< enum list_log_level */
+	enum wrtd_trigger_mode mode; /**< Trigger mode in use */
 
-    uint32_t tagged_pulses;
-    uint32_t sent_triggers;
-    uint32_t sent_packets;
+	uint32_t tagged_pulses; /**< Number of incoming pulses detected */
+	uint32_t sent_triggers; /**< Number of triggers sent over the
+				   white-rabbit network  */
+	uint32_t sent_packets; /**< Number of packets sent over the
+				   white-rabbit network  */
 
-    struct wrtd_trigger_entry last_sent;
-    struct wrtd_trig_id assigned_id;
-    struct wr_timestamp dead_time;
-    struct wr_timestamp delay;
-    struct wr_timestamp last_tagged_pulse;
-    struct wr_timestamp tdc_timebase_offset;
+	struct wrtd_trigger_entry last_sent; /**< Description of the last
+						trigger sent */
+	struct wrtd_trig_id assigned_id; /**< trigger assigned to this channel */
+	struct wr_timestamp dead_time; /**< Configured dead time  */
+	struct wr_timestamp delay; /**< Time delay assined */
+	struct wr_timestamp last_tagged_pulse; /** Time stamp of the last
+						   detected pulse*/
+	struct wr_timestamp tdc_timebase_offset; /**< TDC time base offset */
 };
 
+/**
+ * Status description for a trigger on output
+ */
 struct wrtd_output_trigger_state {
-    int is_conditional;
-    int enabled;
-    struct wrtd_trig_id trigger;
-    struct wrtd_trig_id condition;
-    struct wr_timestamp delay_trig;
-    struct wr_timestamp delay_cond;
-    struct wrtd_trigger_handle handle;
-    int latency_worst_us;
-    int latency_average_us;
-    uint32_t executed_pulses;
-    uint32_t missed_pulses;
+	int is_conditional; /**< tell if the trigger is under condition or not */
+	int enabled; /**< tell if the trigger is enable, so it may be
+			generater as output */
+	struct wrtd_trig_id trigger; /**< Trigger identifier */
+	struct wrtd_trig_id condition; /**< Trigger identifier for the trigger
+					  condition */
+	struct wr_timestamp delay_trig; /**< Configured trigger delay */
+	struct wr_timestamp delay_cond; /**< Configured trigger condition delay */
+	struct wrtd_trigger_handle handle;
+	int latency_worst_us; /**< Worst latency in micro-seconds */
+	int latency_average_us; /**< Average latency in micro-seconds */
+	uint32_t executed_pulses; /**< Number of executed pulses */
+	uint32_t missed_pulses; /**< Number of missed pulses */
 };
 
+/**
+ * Status description for an output channel
+ */
 struct wrtd_output_state {
-    int output;
+	int output; /**< Output channel index */
 
-    uint32_t executed_pulses;
-    uint32_t missed_pulses_late;
-    uint32_t missed_pulses_deadtime;
-    uint32_t missed_pulses_overflow;
-    uint32_t missed_pulses_no_timing;
+	uint32_t executed_pulses; /**< Number of generated pulses */
+	uint32_t missed_pulses_late; /**< Number of missed pulses due to: */
+	uint32_t missed_pulses_deadtime; /**< Number of missed pulses due to: */
+	uint32_t missed_pulses_overflow; /**< Number of missed pulses due to: */
+	uint32_t missed_pulses_no_timing; /**< Number of missed pulses due to: */
 
-    struct wrtd_trigger_entry last_executed;
-    struct wrtd_trigger_entry last_received;
-    struct wrtd_trigger_entry last_enqueued;
-    struct wrtd_trigger_entry last_lost;
+	struct wrtd_trigger_entry last_executed; /**< Trigger description of the
+						    last generated trigger */
+	struct wrtd_trigger_entry last_received; /**< Trigger description of the
+						    last received trigger from
+						    the white-rabbit network */
+	struct wrtd_trigger_entry last_enqueued;  /**< Trigger description of
+						     the last enqueued trigger
+						     in the execution queue */
+	struct wrtd_trigger_entry last_lost; /**< Trigger description of the
+						last lost trigger */
 
-    uint32_t flags;           ///> enum list_io_flags
-    uint32_t log_level;       ///> enum list_log_level
-    enum wrtd_trigger_mode mode;
-    struct wr_timestamp dead_time;
-    struct wr_timestamp pulse_width;
-    
-    uint32_t received_messages;
-    uint32_t received_loopback;
+	uint32_t flags;           /**< enum list_io_flags */
+	uint32_t log_level;       /**< enum list_log_level */
+	enum wrtd_trigger_mode mode; /**< Trigger mode in use */
+	struct wr_timestamp dead_time; /**< Configured dead time */
+	struct wr_timestamp pulse_width; /**< Pulse width */
+
+	uint32_t received_messages; /**< Number of received packets from
+				       the network */
+	uint32_t received_loopback;
 };
 
 /**
@@ -138,7 +176,6 @@ extern void wrtd_ts_to_sec_pico(struct wr_timestamp *ts,
 				uint64_t *sec, uint64_t *pico);
 extern void wrtd_sec_pico_to_ts(uint64_t sec, uint64_t pico,
 				struct wr_timestamp *ts);
-extern struct wr_timestamp picos_to_ts(uint64_t p);
 /**@}*/
 
 
@@ -204,8 +241,6 @@ extern int wrtd_in_is_armed(struct wrtd_node *dev, unsigned int input,
 extern int wrtd_in_has_trigger(struct wrtd_node *dev, unsigned int input,
 			       unsigned int *assigned);
 extern int wrtd_in_ping(struct wrtd_node *dev);
-
-/* TODO implements the following prototypes */
 extern int wrtd_in_dead_time_get(struct wrtd_node *dev, unsigned int input,
 				 uint64_t *dead_time_ps);
 extern int wrtd_in_delay_get(struct wrtd_node *dev, unsigned int input,
@@ -256,8 +291,6 @@ extern int wrtd_out_ping(struct wrtd_node *dev);
 extern int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
 				     unsigned int output,
 				     enum wrtd_trigger_mode mode);
-
-/* TODO implements the following prototypes */
 extern int wrtd_out_trig_condition_delay_set(struct wrtd_node *dev,
 					     struct wrtd_trigger_handle *handle,
 					     uint64_t delay_ps);

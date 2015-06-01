@@ -33,9 +33,14 @@ struct wrtd_desc {
  * @file libwrtd-interal.c
  */
 void unbag_ts(uint32_t *buf, int offset, struct wr_timestamp *ts);
-struct wr_timestamp picos_to_ts(uint64_t p);
 int wrtd_validate_acknowledge(struct wrnc_msg *msg);
 int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
 		  int count);
 int wrtd_trig_id_cmp(struct wrtd_trig_id *id1, struct wrtd_trig_id *id2);
+extern int wrtd_trivial_request(struct wrtd_node *dev,
+				struct wrnc_msg *request_msg,
+				enum wrtd_core core);
+extern int wrtd_send_and_receive_sync(struct wrtd_desc *wrtd,
+				      struct wrnc_msg *msg,
+				      enum wrtd_core core);
 #endif

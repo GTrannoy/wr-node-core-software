@@ -51,35 +51,6 @@ const char *wrtd_strerror(int err)
 
 
 /**
- * It returns a string that describe a given log level
- * @param[in] lvl log level
- * @return a string if the log level is mapped, otherwise an empty string
- */
-const char *wrtd_strlogging(enum wrtd_log_level lvl)
-{
-	switch (lvl) {
-	case WRTD_LOG_NOTHING:
-		return "No logging";
-	case WRTD_LOG_RAW:
-		return "incoming pulse";
-	case WRTD_LOG_SENT:
-		return "trigger message sent";
-	case WRTD_LOG_PROMISC:
-		return "received trigger message";
-	case WRTD_LOG_FILTERED:
-		return "trigger message assigned";
-	case WRTD_LOG_EXECUTED:
-		return "pulse generated";
-	case WRTD_LOG_MISSED:
-		return "pulse missed";
-	case WRTD_LOG_ALL:
-		return "all";
-	}
-
-	return "n/a";
-}
-
-/**
  * It initializes the WRTD library. It must be called before doing
  * anything else. If you are going to load/unload WRTD devices, then
  * you have to un-load (wrtd_exit()) e reload (wrtd_init()) the library.
@@ -240,74 +211,7 @@ int wrtd_load_application(struct wrtd_node *dev, char *rt_tdc,
 }
 
 
-/**
- * It reads one or more log entry from a given hmq_log. The user of this function
- * must check that the hmq_log used correspond to a logging interface
- * @param[in] hmq_log logging HMQ.
- * @param[out] log log message
- * @param[in] count number of messages to read
- * @return number of read messages on success (check errno if it returns less
- *         messages than expected), -1 on error and errno is set appropriately
- */
-int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
-		  int count)
-{
-	struct wrtd_log_entry *cur = log;
-	struct wrnc_msg *msg;
-	int remaining = count;
-	int n_read = 0;
-	uint32_t id = 0, seq = 0;
 
-	/* Clean up errno to be able to distinguish between error cases and
-	   normal behaviour when the function return less messages
-	   than expected */
-	errno = 0;
-	while (remaining) {
-		struct wrtd_trigger_entry ent;
-		msg = wrnc_hmq_receive(hmq_log);
-		if (!msg)
-			break;
-
-		wrnc_msg_header (msg, &id, &seq);
-
-		if (id != WRTD_REP_LOG_MESSAGE)
-		{
-			free(msg);
-			errno = EWRTD_INVALID_ANSWER_STATE;
-			break;
-		}
-
-		wrnc_msg_uint32 (msg, &cur->type);
-		wrnc_msg_int32 (msg, &cur->channel);
-		wrnc_msg_uint32 (msg, &cur->miss_reason);
-		wrtd_msg_trigger_entry(msg, &ent);
-
-		cur->ts = ent.ts;
-		cur->seq = ent.seq;
-		cur->id = ent.id;
-
-		if ( wrnc_msg_check_error(msg) ) {
-			free(msg);
-			errno = EWRTD_INVALID_ANSWER_STATE;
-			break;
-		}
-
-		remaining--;
-		n_read++;
-		cur++;
-		free(msg);
-	}
-
-	return n_read ? n_read : -1;
-}
-
-/**
- * It closes the logging interface
- */
-void wrtd_log_close(struct wrnc_hmq *hmq)
-{
-	wrnc_hmq_close(hmq);
-}
 
 
 /**

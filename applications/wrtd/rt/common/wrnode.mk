@@ -1,12 +1,12 @@
 # and don't touch the rest unless you know what you're doing.
-CROSS_COMPILE ?= lm32-elf-
+CROSS_COMPILE_TARGET ?= lm32-elf-
 INSTALL_PREFIX ?= .
 
-CC =		$(CROSS_COMPILE)gcc
-LD =		$(CROSS_COMPILE)ld
-OBJDUMP =	$(CROSS_COMPILE)objdump
-OBJCOPY =	$(CROSS_COMPILE)objcopy
-SIZE =		$(CROSS_COMPILE)size
+CC =		$(CROSS_COMPILE_TARGET)gcc
+LD =		$(CROSS_COMPILE_TARGET)ld
+OBJDUMP =	$(CROSS_COMPILE_TARGET)objdump
+OBJCOPY =	$(CROSS_COMPILE_TARGET)objcopy
+SIZE =		$(CROSS_COMPILE_TARGET)size
 
 CFLAGS = -DWRNODE_RT -g -O3 -I. -I../common -I../../include -mmultiply-enabled -mbarrel-shift-enabled
 OBJS += ../common/wrn-crt0.o ../common/vsprintf-xint.o ../common/printf.o ../common/rt-common.o ../common/loop-queue.o
@@ -22,6 +22,6 @@ $(OUTPUT): $(LDSCRIPT) $(OBJS)
 
 clean:
 	rm -f $(OBJS) $(OUTPUT).bin
-	
+
 install:
 	cp $(OUTPUT).bin $(INSTALL_PREFIX)

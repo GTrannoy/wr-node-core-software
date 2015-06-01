@@ -288,7 +288,7 @@ static inline void ctl_chan_enable (uint32_t seq, struct wrnc_msg *ibuf)
        ch->flags |= WRTD_ENABLED;
     } else {
 	   mask &= ~(1 << channel);
-       ch->flags &= ~WRTD_ENABLED | WRTD_ARMED | WRTD_TRIGGERED | WRTD_LAST_VALID;
+       ch->flags &= ~WRTD_ENABLED;
     }
 
     /* Update TDC FIFO channel mask */
@@ -407,8 +407,6 @@ static inline void ctl_chan_set_mode (uint32_t seq, struct wrnc_msg *ibuf)
     struct tdc_channel_state *ch = &channels[channel];
 
     ch->mode = mode;
-    /* Changing the mode resets triggering state */
-    ch->flags &= ~(WRTD_ARMED | WRTD_TRIGGERED | WRTD_LAST_VALID) ;
 
     ctl_ack(seq);
 }

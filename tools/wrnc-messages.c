@@ -92,7 +92,7 @@ static int dump_message(struct wrnc_dev *wrnc, struct wrnc_hmq *hmq)
 		fprintf(stdout, " %s\n", str);
 		break;
 	default:
-		fprintf(stdout, " unknown message\n");
+		fprintf(stdout, " unknown message ID 0x%x\n", wmsg->data[0]);
 		break;
 	}
 

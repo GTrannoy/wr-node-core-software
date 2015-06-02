@@ -45,6 +45,7 @@ static void help()
 	fprintf(stderr, "-t   print message timestamp\n");
 	fprintf(stderr, "-d <CPU index>  show debug messages for given CPU\n");
 	fprintf(stderr, "-N   number of total debug messages\n");
+	fprintf(stderr, "-Q   show debug messages for all found WRN CPUs\n");
 	fprintf(stderr, "-h   show this help\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr,
@@ -120,14 +121,16 @@ void *debug_thread(void *arg)
 	struct wrnc_thread_desc *th_data = arg;
 	struct pollfd p[MAX_SLOT];
 	struct wrnc_dbg *wdbg[MAX_CPU];
-	struct wrnc_dev *wrnc;
+	struct wrnc_dev *wrnc = th_data->wrnc;
 	int ret, i;
 
 	if (!th_data->n_cpu)
 		return NULL;
 
   	/* Open the device */
-	wrnc = wrnc_open_by_fmc(th_data->dev_id);
+	if (!wrnc)
+    	    wrnc = wrnc_open_by_fmc(th_data->dev_id);
+
 	if (!wrnc) {
 		fprintf(stderr, "Cannot open WRNC: %s\n", wrnc_strerror(errno));
 	        pthread_exit(NULL);
@@ -191,7 +194,7 @@ void *message_thread(void *arg)
 {
 	struct wrnc_thread_desc *th_data = arg;
 	struct pollfd p[MAX_SLOT];
-	struct wrnc_dev *wrnc;
+	struct wrnc_dev *wrnc = th_data->wrnc;
 	struct wrnc_hmq *hmq[th_data->n_slot];
 	int ret, err, i;
 
@@ -199,7 +202,9 @@ void *message_thread(void *arg)
 		return NULL;
 
 	/* Open the device */
-	wrnc = wrnc_open_by_fmc(th_data->dev_id);
+	if (!wrnc)
+	    wrnc = wrnc_open_by_fmc(th_data->dev_id);
+
 	if (!wrnc) {
 		fprintf(stderr, "Cannot open WRNC: %s\n", wrnc_strerror(errno));
 	        pthread_exit(NULL);
@@ -260,6 +265,7 @@ int main(int argc, char *argv[])
 	struct wrnc_thread_desc th_data[MAX_DEV], *last;
 	unsigned long i;
 	unsigned int di = 0;
+	int show_all_debug = 0;
 	pthread_t tid_msg[MAX_DEV], tid_dbg[MAX_DEV];
 	int err;
 	char c;
@@ -268,7 +274,7 @@ int main(int argc, char *argv[])
 
 	memset(th_data, 0, sizeof(struct wrnc_thread_desc) * MAX_DEV);
 
-	while ((c = getopt (argc, argv, "hi:D:n:N:td:")) != -1) {
+	while ((c = getopt (argc, argv, "Qhi:D:n:N:td:")) != -1) {
 		switch (c) {
 		default:
 			help();
@@ -307,6 +313,9 @@ int main(int argc, char *argv[])
 			sscanf(optarg, "%d", &last->cpu_index[last->n_cpu]);
 		        last->n_cpu++;
 			break;
+		case 'Q':
+			show_all_debug = 1;
+			break;
 		}
 	}
 
@@ -320,6 +329,27 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Cannot init White Rabbit Node Core lib: %s\n",
 			wrnc_strerror(errno));
 		exit(1);
+	}
+
+	if(show_all_debug)
+	{
+		int count = wrnc_count();
+		char (*list)[WRNC_NAME_LEN] = wrnc_list();
+		unsigned int cpucount = 0;
+
+		di = count;
+		for (i = 0; i < count; ++i) {
+			int j;
+			struct wrnc_dev *wrnc = wrnc_open(list[i]);
+
+			wrnc_cpu_count(wrnc, &cpucount);
+			printf("ID %s n_cpu %d\n", list[i], cpucount);
+			th_data[i].wrnc = wrnc;
+			for(j = 0; j < cpucount; j++)
+			    th_data[i].cpu_index[j] = j;
+			th_data[i].n_cpu = cpucount;
+			th_data[i].n_slot = 0;
+		}
 	}
 
 	/* Run dumping on in parallel from several devices */

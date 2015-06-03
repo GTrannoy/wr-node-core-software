@@ -395,7 +395,7 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 	for (i = 0; i < n; i++, curbuf += sizeof(struct wrnc_msg)) {
 		/* Allocate and fill message structure */
 		msgel = kmalloc(sizeof(struct wrnc_msg_element), GFP_KERNEL);
-		if (msgel) {
+		if (!msgel) {
 			err = -ENOMEM;
 			break;
 		}

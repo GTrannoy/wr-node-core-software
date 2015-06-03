@@ -142,7 +142,8 @@ void *debug_thread(void *arg)
 		if (!wdbg[i]) {
 			fprintf(stderr, "Cannot open WRNC debug channel: %s\n",
 				wrnc_strerror(errno));
-			fprintf(stderr, "NOTE: the debug interface is on debugfs, be sure that is mounted\n");
+			fprintf(stderr,
+				"NOTE: the debug interface is on debugfs, be sure that is mounted\n");
 			goto out;
 		}
 		p[i].fd = wdbg[i]->fd;
@@ -354,17 +355,21 @@ int main(int argc, char *argv[])
 
 	/* Run dumping on in parallel from several devices */
 	for (i = 0; i < di; i++) {
-	        err = pthread_create(&tid_msg[i], NULL, message_thread, (void *)(&th_data[i]));
+	        err = pthread_create(&tid_msg[i], NULL, message_thread,
+				     (void *)(&th_data[i]));
 		if (err)
-			fprintf(stderr, "Cannot create 'dump_thread' instance %ld: %s\n",
+			fprintf(stderr,
+				"Cannot create 'dump_thread' instance %ld: %s\n",
 				i, strerror(errno));
 	}
 
 	/* Run dumping on in parallel from several devices */
 	for (i = 0; i < di; i++) {
-	        err = pthread_create(&tid_dbg[i], NULL, debug_thread, (void *)(&th_data[i]));
+	        err = pthread_create(&tid_dbg[i], NULL, debug_thread,
+				     (void *)(&th_data[i]));
 		if (err)
-			fprintf(stderr, "Cannot create 'dump_thread' instance %ld: %s\n",
+			fprintf(stderr,
+				"Cannot create 'dump_thread' instance %ld: %s\n",
 				i, strerror(errno));
 	}
 

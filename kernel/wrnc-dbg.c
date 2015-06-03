@@ -70,9 +70,13 @@ static ssize_t wrnc_dbg_read(struct file *f, char __user *buf,
 
 	/* Copy to user the minumum number of char */
 	lcount = min(lcount, count);
-	for (i = 0; i < lcount; i++)
-		if (cpu->cbuf.buf[i] == '\0')
+	for (i = 0; i < lcount; i++) {
+		if (cpu->cbuf.buf[cpu->cbuf.tail + i] == '\0') {
+			i++; /* We want to include the terminator */
 			break;
+		}
+	}
+
 	lcount = i;
 	if (copy_to_user(buf, cpu->cbuf.buf + cpu->cbuf.tail, lcount)) {
 		spin_unlock(&cpu->lock);

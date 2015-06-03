@@ -365,9 +365,12 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 {
 	struct wrnc_hmq_user *user = f->private_data;
 	struct wrnc_hmq *hmq = user->hmq;
+	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
+	struct fmc_device *fmc = to_fmc_dev(wrnc);
 	struct wrnc_msg_element *msgel;
 	unsigned int i, n, free_slot;
 	char *curbuf = buf;
+	uint32_t mask;
 	int err = 0;
 
 	if (!(hmq->flags & WRNC_FLAG_HMQ_DIR)) {
@@ -420,6 +423,11 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 		spin_unlock(&hmq->lock);
 	}
 	mutex_unlock(&hmq->mtx);
+
+	/* Enable interrupts for CPU input SLOT */
+	mask = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
+	mask |= (1 << (hmq->index + MQUEUE_GCR_IRQ_MASK_IN_SHIFT));
+	fmc_writel(fmc, mask, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
 
 	/* Update counter */
 	count = i * sizeof(struct wrnc_msg);
@@ -783,7 +791,7 @@ static void wrnc_irq_handler_input(struct wrnc_hmq *hmq)
 		 * interrupts
 		 */
 		mask = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
-		mask &= ~((1 << hmq->index) + MAX_MQUEUE_SLOTS);
+		mask &= ~(1 << (hmq->index + MQUEUE_GCR_IRQ_MASK_IN_SHIFT));
 		fmc_writel(fmc, mask, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
 		spin_unlock_irqrestore(&hmq->lock, flags);
 
@@ -837,6 +845,7 @@ static void wrnc_irq_handler_output(struct wrnc_hmq *hmq)
 	wake_up_interruptible(&hmq->q_msg);
 }
 
+#define MAX_DISPATCH_IRQ_LOOP 5
 /**
  * It handles HMQ interrupts. It checks if any of the slot has a pending
  * interrupt. If the interrupt is pending it will handle it, otherwise it
@@ -849,12 +858,15 @@ irqreturn_t wrnc_irq_handler(int irq_core_base, void *arg)
 	struct fmc_device *fmc = arg;
 	struct wrnc_dev *wrnc = fmc_get_drvdata(fmc);
 	uint32_t status;
-	int i, j;
+	int i, j, n_disp = 0;
 
 	/* Get the source of interrupt */
 	status = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_SLOT_STATUS);
+	if (!status)
+		return IRQ_NONE;
 	status &= wrnc->irq_mask;
-dispatch_irq:
+ dispatch_irq:
+	n_disp++;
 	i = -1;
 	while (status && i < WRNC_MAX_HMQ_SLOT) {
 		++i;
@@ -877,7 +889,7 @@ dispatch_irq:
 	 */
 	status = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_SLOT_STATUS);
 	status &= wrnc->irq_mask;
-	if (status)
+	if (status && n_disp < MAX_DISPATCH_IRQ_LOOP)
 		goto dispatch_irq;
 
 	fmc_irq_ack(fmc);

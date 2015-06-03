@@ -643,16 +643,12 @@ int wrnc_probe(struct fmc_device *fmc)
 			fmc->irq);
 	}
 
-	/*
-	 * Don't raise interrupts on output for the time being. we are
-	 * going to use only synchronous messages
-	 */
-	if (0)
-		wrnc->irq_mask = (((1 << wrnc->n_hmq_in) - 1)
-				  << MQUEUE_GCR_IRQ_MASK_IN_SHIFT);
-	else
-		wrnc->irq_mask = 0;
-	wrnc->irq_mask |= (1 << wrnc->n_hmq_out) - 1;
+	/* Enable only necessary interrupts */
+	wrnc->irq_mask = 0;
+	if (wrnc->n_hmq_out)
+		wrnc->irq_mask |= (((1 << wrnc->n_hmq_out) - 1)
+				   << MQUEUE_GCR_IRQ_MASK_OUT_SHIFT);
+
 	fmc_writel(fmc, wrnc->irq_mask, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
 	tmp = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
 

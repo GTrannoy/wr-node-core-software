@@ -19,7 +19,7 @@
 
 #ifdef WRNODE_RT
 
-#include "wrtd-common.h"
+#include "wr-d3s-common.h"
 
 enum wrnc_msg_direction {
     WRNC_MSG_DIR_SEND = 0,

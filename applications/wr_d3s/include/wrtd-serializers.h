@@ -17,9 +17,10 @@
 #ifndef __WRTD_SERIALIZERS_H
 #define __WRTD_SERIALIZERS_H
 
-#include "wrtd-common.h"
+#include "wr-d3s-common.h"
 
 #ifdef WRNODE_RT
+#include "rt.h"
 #include "rt-message.h"
 #endif
 
@@ -106,8 +107,8 @@ static inline int wrnc_msg_header ( struct wrnc_msg *buf, uint32_t *id, uint32_t
 	buf->data[buf->datalen + 1] = *seq_no;
         buf->datalen += 2;
     } else {
-	*id =		buf->data[buf->offset + 0];
-	*seq_no = 	buf->data[buf->offset + 1];
+    	*id =		buf->data[buf->offset + 0];
+	   *seq_no = 	buf->data[buf->offset + 1];
         buf->offset += 2;
     }
     
@@ -129,7 +130,7 @@ static inline void wrnc_msg_seek ( struct wrnc_msg *buf, int pos )
     buf->datalen = pos;
 }
 
-static inline int wrtd_msg_timestamp ( struct wrnc_msg *buf, struct wr_timestamp *ts )
+static inline int wrnc_msg_timestamp ( struct wrnc_msg *buf, struct wr_timestamp *ts )
 {
     if (_wrnc_msg_check_buffer ( buf, 3 ) < 0)
 	return -1;
@@ -148,37 +149,6 @@ static inline int wrtd_msg_timestamp ( struct wrnc_msg *buf, struct wr_timestamp
     }
 
     return 0;
-}
-
-static inline int wrtd_msg_trig_id ( struct wrnc_msg *buf, struct wrtd_trig_id *id )
-{
-    if (_wrnc_msg_check_buffer ( buf, 3 ) < 0)
-	return -1;
-    
-    if (buf->direction == WRNC_MSG_DIR_SEND)
-    {
-	buf->data[buf->datalen + 0] = id->system;
-        buf->data[buf->datalen + 1] = id->source_port;
-        buf->data[buf->datalen + 2] = id->trigger;
-	buf->datalen += 3;
-    } else {
-	id->system =		buf->data[buf->offset + 0];
-        id->source_port =	buf->data[buf->offset + 1];
-        id->trigger =		buf->data[buf->offset + 2];
-	buf->offset += 3;
-    }
-
-    return 0;
-}
-
-static inline int wrtd_msg_trigger_entry ( struct wrnc_msg *buf, struct wrtd_trigger_entry *ent )
-{
-    if (wrtd_msg_timestamp (buf, &ent->ts) < 0)
-	return -1;
-    if (wrtd_msg_trig_id (buf, &ent->id) < 0)
-	return -1;
-    
-    return wrnc_msg_int32 (buf, (int *) &ent->seq);
 }
 
 static inline struct wrnc_msg wrnc_msg_init(int max_size)

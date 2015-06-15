@@ -943,9 +943,10 @@ int wrnc_hmq_send(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
 		return -1;
 	}
 
-	msg = malloc(sizeof(struct wrnc_msg));
-	if (!msg)
+	if (msg->datalen >= WRNC_MAX_PAYLOAD_SIZE) {
+		errno = EINVAL;
 		return -1;
+	}
 
 	/* Get a message from the driver */
 	n = write(hmq->fd, msg, sizeof(struct wrnc_msg));

@@ -15,6 +15,7 @@
 #include <linux/wait.h>
 #include <linux/poll.h>
 #include <linux/sched.h>
+#include <linux/delay.h>
 
 #include <linux/fmc.h>
 
@@ -39,6 +40,15 @@ int hmq_shared = 0; /**< Maximum number connection for each slot */
 module_param_named(slot_share, hmq_shared, int, 0444);
 MODULE_PARM_DESC(slot_share, "Set if by default slot are shared or not.");
 
+static int hmq_in_irq = 0;
+module_param_named(hmq_in_irq_enable, hmq_in_irq, int, 0444);
+MODULE_PARM_DESC(hmq_in_irq, "Set it if you want to use interrupts to communicate from host to the cores. Default 0");
+
+static int hmq_in_no_irq_wait = 10;
+module_param_named(hmq_in_no_irq_wait_us, hmq_in_no_irq_wait, int, 0444);
+MODULE_PARM_DESC(hmq_in_irq, "Time (us) to wait after sending a message from the host to the core in a no-interrupt context. Default 10us");
+
+static uint32_t wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg);
 
 /**
  * It applies filters on a given message.
@@ -279,6 +289,7 @@ static int wrnc_hmq_open(struct inode *inode, struct file *file)
 {
 	struct wrnc_hmq_user *user;
 	struct wrnc_hmq *hmq;
+	unsigned long flags;
 	int m = iminor(inode);
 
 	hmq = to_wrnc_hmq(minors[m]);
@@ -295,21 +306,21 @@ static int wrnc_hmq_open(struct inode *inode, struct file *file)
 		INIT_LIST_HEAD(&user->list_filters);
 
 		/* Add new user to the list */
-		spin_lock(&hmq->lock);
+		spin_lock_irqsave(&hmq->lock, flags);
 		list_add(&user->list, &hmq->list_usr);
 		hmq->n_user++;
-		spin_unlock(&hmq->lock);
+		spin_unlock_irqrestore(&hmq->lock, flags);
 	} else {
 		/*
 		 * It is NOT empty and it is NOT shared. So it means that there is
 		 * a single instance shared by different user-space processes
 		 */
-		spin_lock(&hmq->lock);
+		spin_lock_irqsave(&hmq->lock, flags);
 		/* Use the same instance for all the consumers */
 		user = list_entry(hmq->list_usr.next,
 				   struct wrnc_hmq_user, list);
 		hmq->n_user++;
-		spin_unlock(&hmq->lock);
+		spin_unlock_irqrestore(&hmq->lock, flags);
 	}
 
 	file->private_data = user;
@@ -323,10 +334,11 @@ static int wrnc_hmq_release(struct inode *inode, struct file *f)
 	struct wrnc_hmq_user *user = f->private_data;
 	struct wrnc_hmq *hmq = user->hmq;
 	struct wrnc_msg_element *msgel, *tmp;
+	unsigned long flags;
 
 
 	/* Remove user from the list */
-	spin_lock(&hmq->lock);
+	spin_lock_irqsave(&hmq->lock, flags);
 	hmq->n_user--;
 
 	if (hmq->flags & WRNC_FLAG_HMQ_SHR_USR || hmq->n_user == 0) {
@@ -338,7 +350,7 @@ static int wrnc_hmq_release(struct inode *inode, struct file *f)
 			list_del(&msgel->list);
 			kfree(msgel);
 		}
-		spin_unlock(&user->lock);
+		spin_unlock_irqrestore(&user->lock, flags);
 
 		kfree(user);
 	}
@@ -350,7 +362,7 @@ static int wrnc_hmq_release(struct inode *inode, struct file *f)
 		else
 			hmq->flags &= ~WRNC_FLAG_HMQ_SHR_USR;
 	}
-	spin_unlock(&hmq->lock);
+	spin_unlock_irqrestore(&hmq->lock, flags);
 
 	return 0;
 }
@@ -365,9 +377,14 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 {
 	struct wrnc_hmq_user *user = f->private_data;
 	struct wrnc_hmq *hmq = user->hmq;
+	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
+	struct fmc_device *fmc = to_fmc_dev(wrnc);
 	struct wrnc_msg_element *msgel;
+	struct wrnc_msg msg;
+	unsigned long flags;
 	unsigned int i, n, free_slot;
-	char *curbuf = buf;
+	const char __user *curbuf = buf;
+	uint32_t mask;
 	int err = 0;
 
 	if (!(hmq->flags & WRNC_FLAG_HMQ_DIR)) {
@@ -393,33 +410,52 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 	mutex_lock(&hmq->mtx);
 
 	for (i = 0; i < n; i++, curbuf += sizeof(struct wrnc_msg)) {
-		/* Allocate and fill message structure */
-		msgel = kmalloc(sizeof(struct wrnc_msg_element), GFP_KERNEL);
-		if (msgel) {
-			err = -ENOMEM;
-			break;
-		}
-
-		msgel->msg = kmalloc(sizeof(struct wrnc_msg), GFP_KERNEL);
-		if (!msgel->msg) {
-			kfree(msgel);
-			err = -ENOMEM;
-			break;
-		}
-
-		if (copy_from_user(msgel->msg, curbuf, sizeof(struct wrnc_msg))) {
-			kfree(msgel->msg);
-			kfree(msgel);
+		if (copy_from_user(&msg, curbuf, sizeof(struct wrnc_msg))) {
 			err = -EFAULT;
 			break;
 		}
 
-		spin_lock(&hmq->lock);
-		list_add_tail(&msgel->list, &hmq->list_msg_input);
-		hmq->n_input++;
-		spin_unlock(&hmq->lock);
+		/* Enqueue messages if we are going to send them using
+		   interrupts; otherwise sen them immediately */
+		if (hmq_in_irq) {
+			/* Allocate and fill message structure */
+			msgel = kmalloc(sizeof(struct wrnc_msg_element), GFP_KERNEL);
+			if (!msgel) {
+				err = -ENOMEM;
+				break;
+			}
+
+			msgel->msg = kmalloc(sizeof(struct wrnc_msg), GFP_KERNEL);
+			if (!msgel->msg) {
+				kfree(msgel);
+				err = -ENOMEM;
+				break;
+			}
+			memcpy(msgel->msg, &msg, sizeof(struct wrnc_msg));
+
+			spin_lock_irqsave(&hmq->lock, flags);
+			list_add_tail(&msgel->list, &hmq->list_msg_input);
+			hmq->n_input++;
+			spin_unlock_irqrestore(&hmq->lock, flags);
+		} else {
+			spin_lock_irqsave(&hmq->lock, flags);
+			wrnc_message_push(hmq, &msg);
+			spin_unlock_irqrestore(&hmq->lock, flags);
+
+			/* wait to give time to the core to get and consume
+			   the message before sending the next one */
+			ndelay(hmq_in_no_irq_wait * 1000);
+		}
+
 	}
 	mutex_unlock(&hmq->mtx);
+
+	/* Enable interrupts for CPU input SLOT */
+	if (hmq_in_irq) {
+		mask = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
+		mask |= (1 << (hmq->index + MQUEUE_GCR_IRQ_MASK_IN_SHIFT));
+		fmc_writel(fmc, mask, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
+	}
 
 	/* Update counter */
 	count = i * sizeof(struct wrnc_msg);
@@ -454,7 +490,7 @@ static uint32_t wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
 	/* Assign a sequence number to the message */
 	msg->data[1] = seq;
 	/* Write data into the slot */
-	for (i = 0; i < msg->datalen; ++i) {
+	for (i = 0; i < msg->datalen && i < WRNC_MAX_PAYLOAD_SIZE; ++i) {
 		fmc_writel(fmc, msg->data[i],
 			   hmq->base_sr + MQUEUE_SLOT_DATA_START + i * 4);
 	}
@@ -505,6 +541,7 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	struct wrnc_msg msg_ans;
 	struct wrnc_msg_sync msg;
 	struct wrnc_hmq *hmq_out;
+	unsigned long flags;
 	uint32_t seq;
 	int err = 0, to;
 
@@ -525,19 +562,19 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	hmq_out = &wrnc->hmq_out[msg.index_out];
 
 	/* Rise wait flag */
-	spin_lock(&hmq_out->lock);
+	spin_lock_irqsave(&hmq_out->lock, flags);
 	hmq_out->flags |= WRNC_FLAG_HMQ_SYNC_WAIT;
-	spin_unlock(&hmq_out->lock);
+	spin_unlock_irqrestore(&hmq_out->lock, flags);
 
 	/* Send the message */
-	spin_lock(&hmq->lock);
+	spin_lock_irqsave(&hmq->lock, flags);
 	seq = wrnc_message_push(hmq, &msg.msg);
-	spin_unlock(&hmq->lock);
+	spin_unlock_irqrestore(&hmq->lock, flags);
 
 	/* Set message sequance to wait */
-	spin_lock(&hmq_out->lock);
+	spin_lock_irqsave(&hmq_out->lock, flags);
 	hmq_out->waiting_seq = seq;
-	spin_unlock(&hmq_out->lock);
+	spin_unlock_irqrestore(&hmq_out->lock, flags);
 
 	/*
 	 * Wait our synchronous answer. If after 1000ms we don't receive
@@ -547,10 +584,10 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 					      hmq_out->flags & WRNC_FLAG_HMQ_SYNC_READY,
 					      msecs_to_jiffies(hmq_sync_timeout));
 
-	spin_lock(&hmq_out->lock);
+	spin_lock_irqsave(&hmq_out->lock, flags);
 	hmq_out->flags &= ~WRNC_FLAG_HMQ_SYNC_READY;
 	msg_ans = hmq_out->sync_answer;
-	spin_unlock(&hmq_out->lock);
+	spin_unlock_irqrestore(&hmq_out->lock, flags);
 
 	if (unlikely(to <= 0)) {
 		if (to == 0)
@@ -783,7 +820,7 @@ static void wrnc_irq_handler_input(struct wrnc_hmq *hmq)
 		 * interrupts
 		 */
 		mask = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
-		mask &= ~((1 << hmq->index) + MAX_MQUEUE_SLOTS);
+		mask &= ~(1 << (hmq->index + MQUEUE_GCR_IRQ_MASK_IN_SHIFT));
 		fmc_writel(fmc, mask, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
 		spin_unlock_irqrestore(&hmq->lock, flags);
 
@@ -837,6 +874,7 @@ static void wrnc_irq_handler_output(struct wrnc_hmq *hmq)
 	wake_up_interruptible(&hmq->q_msg);
 }
 
+#define MAX_DISPATCH_IRQ_LOOP 5
 /**
  * It handles HMQ interrupts. It checks if any of the slot has a pending
  * interrupt. If the interrupt is pending it will handle it, otherwise it
@@ -849,12 +887,15 @@ irqreturn_t wrnc_irq_handler(int irq_core_base, void *arg)
 	struct fmc_device *fmc = arg;
 	struct wrnc_dev *wrnc = fmc_get_drvdata(fmc);
 	uint32_t status;
-	int i, j;
+	int i, j, n_disp = 0;
 
 	/* Get the source of interrupt */
 	status = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_SLOT_STATUS);
+	if (!status)
+		return IRQ_NONE;
 	status &= wrnc->irq_mask;
-dispatch_irq:
+ dispatch_irq:
+	n_disp++;
 	i = -1;
 	while (status && i < WRNC_MAX_HMQ_SLOT) {
 		++i;
@@ -877,7 +918,7 @@ dispatch_irq:
 	 */
 	status = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_SLOT_STATUS);
 	status &= wrnc->irq_mask;
-	if (status)
+	if (status && n_disp < MAX_DISPATCH_IRQ_LOOP)
 		goto dispatch_irq;
 
 	fmc_irq_ack(fmc);

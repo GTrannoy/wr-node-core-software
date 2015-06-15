@@ -15,6 +15,7 @@
 #include <linux/wait.h>
 #include <linux/poll.h>
 #include <linux/sched.h>
+#include <linux/delay.h>
 
 #include <linux/fmc.h>
 
@@ -39,6 +40,15 @@ int hmq_shared = 0; /**< Maximum number connection for each slot */
 module_param_named(slot_share, hmq_shared, int, 0444);
 MODULE_PARM_DESC(slot_share, "Set if by default slot are shared or not.");
 
+static int hmq_in_irq = 0;
+module_param_named(hmq_in_irq_enable, hmq_in_irq, int, 0444);
+MODULE_PARM_DESC(hmq_in_irq, "Set it if you want to use interrupts to communicate from host to the cores. Default 0");
+
+static int hmq_in_no_irq_wait = 10;
+module_param_named(hmq_in_no_irq_wait_us, hmq_in_no_irq_wait, int, 0444);
+MODULE_PARM_DESC(hmq_in_irq, "Time (us) to wait after sending a message from the host to the core in a no-interrupt context. Default 10us");
+
+static uint32_t wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg);
 
 /**
  * It applies filters on a given message.
@@ -368,8 +378,9 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
 	struct wrnc_msg_element *msgel;
+	struct wrnc_msg msg;
 	unsigned int i, n, free_slot;
-	char *curbuf = buf;
+	const char __user *curbuf = buf;
 	uint32_t mask;
 	int err = 0;
 
@@ -396,38 +407,51 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 	mutex_lock(&hmq->mtx);
 
 	for (i = 0; i < n; i++, curbuf += sizeof(struct wrnc_msg)) {
-		/* Allocate and fill message structure */
-		msgel = kmalloc(sizeof(struct wrnc_msg_element), GFP_KERNEL);
-		if (!msgel) {
-			err = -ENOMEM;
-			break;
-		}
-
-		msgel->msg = kmalloc(sizeof(struct wrnc_msg), GFP_KERNEL);
-		if (!msgel->msg) {
-			kfree(msgel);
-			err = -ENOMEM;
-			break;
-		}
-
-		if (copy_from_user(msgel->msg, curbuf, sizeof(struct wrnc_msg))) {
-			kfree(msgel->msg);
-			kfree(msgel);
+		if (copy_from_user(&msg, curbuf, sizeof(struct wrnc_msg))) {
 			err = -EFAULT;
 			break;
 		}
 
-		spin_lock(&hmq->lock);
-		list_add_tail(&msgel->list, &hmq->list_msg_input);
-		hmq->n_input++;
-		spin_unlock(&hmq->lock);
+		/* Enqueue messages if we are going to send them using
+		   interrupts; otherwise sen them immediately */
+		if (hmq_in_irq) {
+			/* Allocate and fill message structure */
+			msgel = kmalloc(sizeof(struct wrnc_msg_element), GFP_KERNEL);
+			if (!msgel) {
+				err = -ENOMEM;
+				break;
+			}
+
+			msgel->msg = kmalloc(sizeof(struct wrnc_msg), GFP_KERNEL);
+			if (!msgel->msg) {
+				kfree(msgel);
+				err = -ENOMEM;
+				break;
+			}
+			memcpy(msgel->msg, &msg, sizeof(struct wrnc_msg));
+
+			spin_lock(&hmq->lock);
+			list_add_tail(&msgel->list, &hmq->list_msg_input);
+			hmq->n_input++;
+			spin_unlock(&hmq->lock);
+		} else {
+			spin_lock(&hmq->lock);
+			wrnc_message_push(hmq, &msg);
+			spin_unlock(&hmq->lock);
+			/* wait to give time to the core to get and consume
+			   the message before sending the next one */
+			ndelay(hmq_in_no_irq_wait * 1000);
+		}
+
 	}
 	mutex_unlock(&hmq->mtx);
 
 	/* Enable interrupts for CPU input SLOT */
-	mask = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
-	mask |= (1 << (hmq->index + MQUEUE_GCR_IRQ_MASK_IN_SHIFT));
-	fmc_writel(fmc, mask, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
+	if (hmq_in_irq) {
+		mask = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
+		mask |= (1 << (hmq->index + MQUEUE_GCR_IRQ_MASK_IN_SHIFT));
+		fmc_writel(fmc, mask, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
+	}
 
 	/* Update counter */
 	count = i * sizeof(struct wrnc_msg);

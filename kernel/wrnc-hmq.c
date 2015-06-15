@@ -490,7 +490,7 @@ static uint32_t wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
 	/* Assign a sequence number to the message */
 	msg->data[1] = seq;
 	/* Write data into the slot */
-	for (i = 0; i < msg->datalen; ++i) {
+	for (i = 0; i < msg->datalen && i < WRNC_MAX_PAYLOAD_SIZE; ++i) {
 		fmc_writel(fmc, msg->data[i],
 			   hmq->base_sr + MQUEUE_SLOT_DATA_START + i * 4);
 	}

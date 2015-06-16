@@ -121,7 +121,7 @@ static int offset_get(unsigned int dev_id, unsigned int channel, int32_t *offset
 
 int main(int argc, char *argv[])
 {
-	int err, i, setoff = 0;
+	int err, cerr = 0, i, setoff = 0;
 	uint32_t dev_id = 0;
 	char *tdc = NULL, *fd =NULL, c;
 	struct wrtd_node *wrtd;
@@ -209,22 +209,30 @@ int main(int argc, char *argv[])
 		for (i = 0; i < TDC_NUM_CHANNELS; ++i) {
 			err = offset_get(dev_id, i, &offset);
 			if (err) {
-				fprintf(stderr, "Cannot calculate offset: %s\n",
-					wrtd_strerror(errno));
-				exit(1);
+				fprintf(stderr,
+					"Channel %d cannot calculate offset: %s\n",
+					i, wrtd_strerror(errno));
+				cerr++;
+				continue;
 			}
 			err = wrtd_in_timebase_offset_set(wrtd, i, offset);
 			if (err) {
-				fprintf(stderr, "Cannot set offset: %s\n",
-					wrtd_strerror(errno));
-				exit(1);
+				fprintf(stderr,
+					"Channel %d cannot set offset: %s\n",
+					i, wrtd_strerror(errno));
+				cerr++;
+				continue;
 			}
 		}
 	}
 
 	wrtd_close(wrtd);
 
-	fprintf(stdout,
-		"white rabbit trigger distribution node succesfully programmed\n");
+	if (cerr)
+		fprintf(stderr, "White Rabbit Trigger Distribution programmed but with %d problems\n", cerr);
+	else
+		fprintf(stdout,
+			"White Rabbit Trigger Distribution node succesfully programmed\n");
+
 	exit(0);
 }

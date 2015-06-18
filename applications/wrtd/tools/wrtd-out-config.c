@@ -355,7 +355,7 @@ static int wrtd_cmd_log_level(struct wrtd_node *wrtd, int output,
 		return -1;
 	}
 
-	parse_log_level(argv + 1, argc, &log_level);
+	parse_log_level(argv, argc, &log_level);
 
 	return wrtd_out_log_level_set(wrtd, output, log_level);
 }

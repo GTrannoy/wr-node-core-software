@@ -16,6 +16,9 @@ extern "C" {
 #include <stdint.h>
 #include <stdio.h>
 #include "libwrnc.h"
+/**
+ * @file wrtd-common.h
+ */
 #include "wrtd-common.h"
 
 struct wrtd_node;

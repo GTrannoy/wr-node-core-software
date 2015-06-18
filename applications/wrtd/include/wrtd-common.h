@@ -95,11 +95,11 @@
  * availables trigger mode
  */
 enum wrtd_trigger_mode {
-    WRTD_TRIGGER_MODE_SINGLE = 1, /**< In SINGLE mode, the input/output will
-				     trigger only on the 1st pulse/trigger
-				     message after arming.*/
-    WRTD_TRIGGER_MODE_AUTO = 2, /**< In AUTO mode, the input/output will
-				   trigger on every pulse/trigger message.*/
+	WRTD_TRIGGER_MODE_SINGLE = 1, /**< In SINGLE mode, the input/output will
+					 trigger only on the 1st pulse/trigger
+					 message after arming.*/
+	WRTD_TRIGGER_MODE_AUTO = 2, /**< In AUTO mode, the input/output will
+				       trigger on every pulse/trigger message.*/
 };
 
 
@@ -108,42 +108,49 @@ enum wrtd_trigger_mode {
  * structures to pass state information
  */
 enum wrtd_io_flags {
-    WRTD_ENABLED = (1 << 0),          /*!< I/O is physically enabled */
-    WRTD_TRIGGER_ASSIGNED = (1 << 1), /*!< I/O is has a trigger assigned */
-    WRTD_LAST_VALID = (1 << 2),       /*!< I/O processed at least one pulse.
-					It's timestamp/ID is in the "last"
-					field. */
-    WRTD_ARMED = (1 << 3),            /*!< I/O is armed */
-    WRTD_TRIGGERED = (1 << 4),        /*!< I/O has triggered */
-    WRTD_NO_WR = (1 << 5),            /*!< I/O has no WR timing */
+	WRTD_ENABLED = (1 << 0),          /*!< I/O is physically enabled */
+	WRTD_TRIGGER_ASSIGNED = (1 << 1), /*!< I/O is has a trigger assigned */
+	WRTD_LAST_VALID = (1 << 2),       /*!< I/O processed at least one pulse.
+					    It's timestamp/ID is in the "last"
+					    field. */
+	WRTD_ARMED = (1 << 3),            /*!< I/O is armed */
+	WRTD_TRIGGERED = (1 << 4),        /*!< I/O has triggered */
+	WRTD_NO_WR = (1 << 5),            /*!< I/O has no WR timing */
 
 };
 
-
+/**
+ * Log level flag description
+ */
 enum wrtd_log_level {
-    WRTD_LOG_NOTHING = 0,
-    WRTD_LOG_RAW = (1 << 0), /**< Input only: log all pulses coming to
-				the TDC input */
-    WRTD_LOG_SENT = (1 << 1), /**< Input only: log all sent triggers */
-    WRTD_LOG_PROMISC = (1 << 2), /**< Output only: promiscious mode -
-				    log all trigger messages received
-				    from WR network */
-    WRTD_LOG_FILTERED = (1 << 3), /**< Output only: log all trigger
-				     messages that have been assigned
-				     to the output */
-    WRTD_LOG_EXECUTED = (1 << 4), /**< Output only: log all triggers
-				     executed on the output */
-    WRTD_LOG_MISSED   = (1 << 5), /**< Output only: log all triggers
-				     missed by the output */
+	WRTD_LOG_NOTHING = 0, /**< disable logging */
+	WRTD_LOG_RAW = (1 << 0), /**< Input only: log all pulses coming to
+				    the TDC input */
+	WRTD_LOG_SENT = (1 << 1), /**< Input only: log all sent triggers */
+	WRTD_LOG_PROMISC = (1 << 2), /**< Output only: promiscious mode -
+					log all trigger messages received
+					from WR network */
+	WRTD_LOG_FILTERED = (1 << 3), /**< Output only: log all trigger
+					 messages that have been assigned
+					 to the output */
+	WRTD_LOG_EXECUTED = (1 << 4), /**< Output only: log all triggers
+					 executed on the output */
+	WRTD_LOG_MISSED   = (1 << 5), /**< Output only: log all triggers
+					 missed by the output */
 
-    WRTD_LOG_ALL = 0xff,
+	WRTD_LOG_ALL = 0xff, /**< all events will be logged */
 };
 
+
+/**
+ * Possible causes for missed trigger
+ */
 enum wrtd_log_miss_reason {
-    WRTD_MISS_DEAD_TIME = 0,
-    WRTD_MISS_OVERFLOW = 1,
-    WRTD_MISS_NO_WR = 2,
-    WRTD_MISS_TIMEOUT = 3
+	WRTD_MISS_DEAD_TIME = 0, /**< trigger during dead time period */
+	WRTD_MISS_OVERFLOW = 1, /**< too many trigger events, trigger queue
+				   overflow */
+	WRTD_MISS_NO_WR = 2, /**< No White-Rabbit network */
+	WRTD_MISS_TIMEOUT = 3, /**< timeout for trigger generation */
 };
 
 
@@ -153,32 +160,49 @@ enum wrtd_log_miss_reason {
 #define HASH_ENT_CONDITIONAL    (1 << 2)
 #define HASH_ENT_DISABLED       (1 << 3)
 
+/**
+ * White-Rabbit Time-Stamp format
+ */
 struct wr_timestamp {
 	uint64_t seconds;
 	uint32_t ticks;
 	uint32_t frac;
 };
 
+
+/**
+ * Trigger identifier
+ */
 struct wrtd_trig_id {
 	uint32_t system;
 	uint32_t source_port;
 	uint32_t trigger;
 };
 
+
+/**
+ * Trigger event
+ */
 struct wrtd_trigger_entry {
-     struct wr_timestamp ts;
-     struct wrtd_trig_id id;
-     uint32_t seq;
+	struct wr_timestamp ts; /**< when it fired */
+	struct wrtd_trig_id id; /**< which trigger */
+	uint32_t seq; /**< its sequence number */
 };
 
 
+/**
+ * Log event descriptor
+ */
 struct wrtd_log_entry {
-    uint32_t type;
-    uint32_t seq;
-    int channel;
-    struct wrtd_trig_id id;
-    struct wr_timestamp ts;
-    enum wrtd_log_miss_reason miss_reason;
+	uint32_t type; /**< type of logging */
+	uint32_t seq; /**< log sequence number */
+	int channel; /**< channel that generate the logging message */
+	struct wrtd_trig_id id; /**< trigger id associated with the log event */
+	struct wr_timestamp ts; /**< when the log message was sent from
+				   the RT application*/
+	enum wrtd_log_miss_reason miss_reason; /**< trigger failure reason.
+						  It is valid only when type
+						  is WRTD_LOG_MISSED */
 };
 
 #ifdef WRNODE_RT

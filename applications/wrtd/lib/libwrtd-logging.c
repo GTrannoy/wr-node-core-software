@@ -59,17 +59,17 @@ static struct wrnc_hmq *wrtd_log_open(struct wrtd_node *dev,
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrnc_msg_filter filter = {
 		.operation = WRNC_MSG_FILTER_AND,
-		.word_offset = 2, /* channel field */
+		.word_offset = 3, /* channel field */
 		.mask = 0xFFFF, /* entire field */
 		.value = channel, /* required channel */
 	};
 	struct wrnc_hmq *hmq = NULL;
 	int i, err;
-	int n_chan = core ? TDC_NUM_CHANNELS : FD_NUM_CHANNELS;
-	unsigned int hmq_back_index = core ? WRTD_OUT_TDC_LOGGING :
-					     WRTD_OUT_FD_LOGGING;
+	int n_chan = core ? FD_NUM_CHANNELS : TDC_NUM_CHANNELS;
+	unsigned int hmq_back_index = core ? WRTD_OUT_FD_LOGGING :
+					     WRTD_OUT_TDC_LOGGING;
 
-	if (channel < -1 || channel >= n_chan) {
+	if (channel < -1 || channel > n_chan) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return NULL;
 	}
@@ -184,9 +184,9 @@ static int wrtd_log_level_set(struct wrtd_node *dev, unsigned int channel,
 {
 	struct wrnc_msg msg = wrnc_msg_init(4);
 	uint32_t seq = 0;
-	uint32_t id = core ? WRTD_CMD_TDC_CHAN_SET_LOG_LEVEL :
-			     WRTD_CMD_FD_CHAN_SET_LOG_LEVEL;
-	int n_chan = core ? TDC_NUM_CHANNELS : FD_NUM_CHANNELS;
+	uint32_t id = core ? WRTD_CMD_FD_CHAN_SET_LOG_LEVEL :
+			     WRTD_CMD_TDC_CHAN_SET_LOG_LEVEL;
+	int n_chan = core ? FD_NUM_CHANNELS : TDC_NUM_CHANNELS;
 
 	if (channel > n_chan) {
 		errno = EWRTD_INVALID_CHANNEL;

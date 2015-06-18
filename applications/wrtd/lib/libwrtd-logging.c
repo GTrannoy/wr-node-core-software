@@ -160,7 +160,7 @@ int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
 		free(msg);
 	}
 
-	return n_read ? n_read : -1;
+	return (n_read > 0 || errno == 0 ? n_read : -1);
 }
 
 /**

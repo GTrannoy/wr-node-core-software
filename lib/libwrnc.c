@@ -247,11 +247,14 @@ void wrnc_close(struct wrnc_dev *wrnc)
 	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
 	int i;
 
-	if (wdesc->fd_dev)
+	if (!wrnc)
+		return;
+
+	if (wdesc->fd_dev >= 0)
 		close(wdesc->fd_dev);
 
 	for (i = 0; i < WRNC_MAX_CPU; ++i)
-		if (wdesc->fd_cpu[i] > 0)
+		if (wdesc->fd_cpu[i] >= 0)
 			close(wdesc->fd_cpu[i]);
 
 	free(wdesc);

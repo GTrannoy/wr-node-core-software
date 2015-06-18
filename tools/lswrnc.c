@@ -54,6 +54,11 @@ int main(int argc, char *argv[])
 	for (i = 0; list[i]; ++i) {
 		fprintf(stdout, "%s\n" , list[i]);
 		wrnc = wrnc_open(list[i]);
+		if (!wrnc) {
+			fprintf(stderr, "Cannot open device: %s\n",
+				wrnc_strerror(errno));
+			continue;
+		}
 		if (verbose == 1) {
 			wrnc_app_id_get(wrnc, &appid);
 			wrnc_cpu_count(wrnc, &cpucount);

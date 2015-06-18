@@ -41,6 +41,8 @@ static int wrtd_cmd_reset(struct wrtd_node *wrtd, int input,
 			  int argc, char *argv[]);
 static int wrtd_cmd_sw_trigger(struct wrtd_node *wrtd, int input,
 			  int argc, char *argv[]);
+static int wrtd_cmd_log_level(struct wrtd_node *wrtd, int input,
+				  int argc, char *argv[]);
 
 static struct wrtd_commands cmds[] = {
 	{ "state", "shows input state", wrtd_cmd_state },
@@ -55,6 +57,7 @@ static struct wrtd_commands cmds[] = {
 	{ "disarm", "disarms the input", wrtd_cmd_disarm },
 	{ "reset", "resets statistics counters", wrtd_cmd_reset },
 	{ "swtrig", "sends a software trigger", wrtd_cmd_sw_trigger },
+	{ "log_level", "set logging level", wrtd_cmd_log_level },
 	{ NULL }
 };
 
@@ -259,6 +262,22 @@ static int wrtd_cmd_sw_trigger(struct wrtd_node *wrtd, int input,
 	}
 
 	return wrtd_in_trigger_software(wrtd, &ent);
+}
+
+static int wrtd_cmd_log_level(struct wrtd_node *wrtd, int input,
+				  int argc, char *argv[])
+{
+	int log_level;
+
+	if (argc < 1) {
+		fprintf(stderr,
+			"Missing arguments: log_level <all off executed missed filtered promisc>\n");
+		return -1;
+	}
+
+	parse_log_level(argv, argc, &log_level);
+
+	return wrtd_in_log_level_set(wrtd, input, log_level);
 }
 
 int main(int argc, char *argv[])

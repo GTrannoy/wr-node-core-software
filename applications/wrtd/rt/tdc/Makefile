@@ -1,4 +1,8 @@
-OBJS = rt-tdc.o
+OBJS := rt-tdc.o
+OBJS += ../common/loop-queue.o
 OUTPUT = rt-tdc
+PATH_COMMON = ../../../common/
+EXTRA_CFLAGS += -I../../include
+EXTRA_CFLAGS += -I../common
 
-include ../common/wrnode.mk
+include $(PATH_COMMON)/rt/Makefile

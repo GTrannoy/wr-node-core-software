@@ -1,4 +1,7 @@
 OBJS = rt-demo.o
 OUTPUT = rt-demo
+PATH_COMMON = ../../../common/
 
-include ../common/wrnode.mk
+EXTRA_CFLAGS += -I../../include
+
+include $(PATH_COMMON)/rt/Makefile

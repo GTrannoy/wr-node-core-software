@@ -1,4 +1,5 @@
 OBJS = autodemo.o
 OUTPUT = autodemo
+PATH_COMMON = ../../../common/
 
-include ../common/wrnode.mk
+include $(PATH_COMMON)/rt/Makefile

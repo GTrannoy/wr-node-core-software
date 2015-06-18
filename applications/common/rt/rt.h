@@ -7,33 +7,22 @@
  * Released according to the GNU GPL, version 2 or any later version.
  */
 
+
 /*.
  * White Rabbit Node Core
  *
- * rt-common.c: common RT CPU functions
+ * rt.h: all common stuff in a single header
  */
 
-#include <stdio.h>
+#ifndef __WRN_RT_H
+#define __WRN_RT_H
+
 #include <stdint.h>
-#include <string.h>
 
 #include "rt-mqueue.h"
+#include "rt-message.h"
 #include "rt-common.h"
+#include "rt-smem.h"
+#include "pp-printf.h"
 
-int puts(const char *p)
-{
-	char c;
-	int i = 0;
-
-	while (c = *(p++)) {
-		lr_writel(c, WRN_CPU_LR_REG_DBG_CHR);
-		++i;
-	}
-
-	/* Provide a string terminator */
-	lr_writel('\0', WRN_CPU_LR_REG_DBG_CHR);
-
-	return i;
-}
-
-
+#endif

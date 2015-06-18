@@ -87,7 +87,8 @@ extern char *wrnc_strerror(int err);
 extern int wrnc_init();
 extern void wrnc_exit();
 extern uint32_t wrnc_count();
-extern char (*wrnc_list())[WRNC_NAME_LEN];
+extern char **wrnc_list();
+extern void wrnc_list_free(char **list);
 
 extern struct wrnc_dev *wrnc_open(const char *device);
 extern struct wrnc_dev *wrnc_open_by_fmc(uint32_t device_id);

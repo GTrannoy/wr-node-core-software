@@ -334,12 +334,10 @@ int main(int argc, char *argv[])
 
 	if(show_all_debug)
 	{
-		int count = wrnc_count();
-		char (*list)[WRNC_NAME_LEN] = wrnc_list();
+		char **list = wrnc_list();
 		unsigned int cpucount = 0;
 
-		di = count;
-		for (i = 0; i < count; ++i) {
+		for (i = 0; list[i]; ++i) {
 			int j;
 			struct wrnc_dev *wrnc = wrnc_open(list[i]);
 
@@ -347,10 +345,12 @@ int main(int argc, char *argv[])
 			printf("ID %s n_cpu %d\n", list[i], cpucount);
 			th_data[i].wrnc = wrnc;
 			for(j = 0; j < cpucount; j++)
-			    th_data[i].cpu_index[j] = j;
+				th_data[i].cpu_index[j] = j;
 			th_data[i].n_cpu = cpucount;
 			th_data[i].n_slot = 0;
 		}
+		di = i - 1;
+		wrnc_list_free(list);
 	}
 
 	/* Run dumping on in parallel from several devices */

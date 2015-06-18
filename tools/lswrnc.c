@@ -24,10 +24,9 @@ static void help()
 
 int main(int argc, char *argv[])
 {
-	char (*list)[WRNC_NAME_LEN];
+	char **list;
 	unsigned int appid = 0, cpucount = 0;
 	struct wrnc_dev *wrnc;
-	uint32_t count;
 	char c;
 	int i, verbose = 0, err;
 
@@ -51,9 +50,8 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	count = wrnc_count();
 	list = wrnc_list();
-	for (i = 0; i < count; ++i) {
+	for (i = 0; list[i]; ++i) {
 		fprintf(stdout, "%s\n" , list[i]);
 		wrnc = wrnc_open(list[i]);
 		if (verbose == 1) {
@@ -64,7 +62,7 @@ int main(int argc, char *argv[])
 		}
 		wrnc_close(wrnc);
 	}
-	free(list);
+	wrnc_list_free(list);
 
         exit(0);
 }

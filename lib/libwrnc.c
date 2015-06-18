@@ -20,8 +20,6 @@
 
 #include "libwrnc-internal.h"
 
-static uint32_t count;
-static char wrnc_dev_list[WRNC_MAX_CARRIER + 1][WRNC_NAME_LEN];
 static char *wrnc_error_str[] = {
 	"Cannot parse data from sysfs attribute",
 	"Invalid slot",
@@ -53,24 +51,16 @@ char *wrnc_strerror(int err)
  */
 int wrnc_init()
 {
-	glob_t g;
-	int err, i;
-
-	err = glob("/dev/wrnc-[A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9]",
-		   GLOB_NOSORT, NULL, &g);
-	if (err != GLOB_NOMATCH)
-		return -1;
-	err = glob("/dev/wr-node-core/wrnc-[A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9]",
-		   GLOB_NOSORT | GLOB_APPEND, NULL, &g);
-	if (err)
-		return -1;
-
-	count = g.gl_pathc;
-	for (i = 0; i < count; ++i)
-		strncpy(wrnc_dev_list[i], basename(g.gl_pathv[i]), WRNC_NAME_LEN);
-	for (i = count; i < WRNC_MAX_CARRIER; ++i)
-		wrnc_dev_list[i][0] = '\0';
-
+	/* As you can see there is nothing to do because everything is
+	   dynamical and does not require a special initialization.
+	   Instead of removing this function and force the user to use it
+	   I choosed to keep it even if it's empty. The reason is simple:
+	   I do not know in the future if we need this library initialization,
+	   if we will need it and we don't have it than we have to force ALL
+	   our users to change all the software stack behind this library
+	   which is not trivial and not backward compatible. I prefer to avoid
+	   it and force people today to use this function and save a lot of
+	   time in the future */
 	return 0;
 }
 
@@ -82,10 +72,7 @@ int wrnc_init()
  */
 void wrnc_exit()
 {
-	int i;
-
-	for (i = 0; i < WRNC_MAX_CARRIER; ++i)
-		wrnc_dev_list[i][0] = '\0';
+	/* READ wrnc_init() */
 }
 
 
@@ -93,34 +80,74 @@ void wrnc_exit()
  * It returns the number of available WRNCs. This is not calculated on demand.
  * It depends on library initialization.
  * @return the number of WRNC available
- * @todo make it dynamically computed
  */
 uint32_t wrnc_count()
 {
+	glob_t g;
+	uint32_t count;
+	int err;
+
+	err = glob("/dev/wrnc-[A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9]",
+		   GLOB_NOSORT, NULL, &g);
+	if (err != GLOB_NOMATCH)
+		return 0;
+	err = glob("/dev/wr-node-core/wrnc-[A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9]",
+		   GLOB_NOSORT | GLOB_APPEND, NULL, &g);
+	if (err)
+		return 0;
+	count = g.gl_pathc;
+	globfree(&g);
+
 	return count;
 }
 
 
 /**
  * It allocates and returns the list of available WRNC devices. The user is
- * in charge to free(3) the allocated memory. The list contains
- * wrnc_count() + 1 elements. The last element is an
- * emtpy string.
- * @return a list of WRNC device's names
- * @todo dynamically discover devices
+ * in charge to free the allocated memory wit wrnc_list_free(). The list
+ * contains wrnc_count() + 1 elements. The last element is a NULL pointer.
+ * @return a list of WRNC device's names. NULL on error
  */
-char (*wrnc_list())[WRNC_NAME_LEN]
+char **wrnc_list()
 {
-	char *list;
-	int n = wrnc_count();
+	char **list = NULL;
+	glob_t g;
+	int err, i, count;
 
-	list = malloc((n + 1) * WRNC_NAME_LEN);
+	err = glob("/dev/wrnc-[A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9]",
+		   GLOB_NOSORT, NULL, &g);
+	if (err != GLOB_NOMATCH)
+		return NULL;
+	err = glob("/dev/wr-node-core/wrnc-[A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9]",
+		   GLOB_NOSORT | GLOB_APPEND, NULL, &g);
+	if (err)
+		return NULL;
+	count = g.gl_pathc;
+
+	list = malloc(sizeof(char *) * (count + 1));
 	if (!list)
 		return NULL;
-	memset(list, 0, (n + 1) * WRNC_NAME_LEN); /* To se the terminator */
-	memcpy(list, wrnc_dev_list, n * WRNC_NAME_LEN);
+	for (i = 0; i < count; ++i)
+		list[i] = strdup(basename(g.gl_pathv[i]));
+	list[i] = NULL;
 
-	return (char (*)[WRNC_NAME_LEN])list;
+	globfree(&g);
+
+	return list;
+}
+
+
+/**
+ * It release the list allocated memory
+ * @param[in] list device list to release
+ */
+void wrnc_list_free(char **list)
+{
+	int i;
+
+	for (i = 0; list[i]; i++)
+		free(list[i]);
+	free(list);
 }
 
 

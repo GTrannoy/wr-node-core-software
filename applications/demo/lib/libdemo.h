@@ -40,5 +40,6 @@ extern struct wrnc_dev *demo_get_wrnc_dev(struct demo_node *dev);
 extern int demo_led_set(struct demo_node *dev, uint32_t value,
 			enum demo_color color);
 extern int demo_lemo_set(struct demo_node *dev, uint32_t value);
+extern int demo_lemo_dir_set(struct demo_node *dev, uint32_t value);
 extern int demo_status_get(struct demo_node *dev, struct demo_status *status);
 #endif

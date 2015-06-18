@@ -178,7 +178,7 @@ struct wrnc_dev *wrnc_open(const char *device)
 			 "/dev/wr-node-core/%s", wrnc->name);
 		err = stat(path, &sb);
 		if (err)
-			return NULL;
+			goto out_stat;
 		strncpy(wrnc->path, "/dev/wr-node-core", WRNC_PATH_LEN);
 	}
 
@@ -187,6 +187,10 @@ struct wrnc_dev *wrnc_open(const char *device)
 		wrnc->fd_cpu[i] = -1;
 
 	return (struct wrnc_dev *)wrnc;
+
+out_stat:
+	free(wrnc);
+	return NULL;
 }
 
 

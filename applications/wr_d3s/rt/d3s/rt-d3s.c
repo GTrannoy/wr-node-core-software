@@ -111,18 +111,9 @@ void d3s_reset()
     dp_writel(0, DDS_REG_RSTR);
     delay(1000);
 
-    pp_printf("Reset done\n");
-
     delay(1000000);
     
 }
-
-void d3s_set_tune(uint64_t tune)
-{
-
-}
-
-
 
 #define RESP_LOG_BUF_SIZE 64
 
@@ -218,6 +209,18 @@ struct dds_loop_stats {
     int sent_tunes;
 };
 
+
+struct dds_tune_entry {
+    int target_sample;
+    int target_tai;
+    int tune;
+};
+
+#define TUNE_QUEUE_ENTRIES 8
+
+static uint32_t _tune_queue_buf[ TUNE_QUEUE_ENTRIES * sizeof(struct dds_tune_entry) / 4];
+
+
 struct dds_loop_state {
     int master; // non-zero: master mode
     int locked; // lock detect
@@ -235,6 +238,7 @@ struct dds_loop_state {
     int stream_id;
     int sampling_divider;
     struct dds_loop_stats stats;
+    struct generic_queue tune_queue;
 };
 
 
@@ -278,7 +282,7 @@ int dds_pi_update(struct dds_loop_state *state, int phase_error)
 
 struct dds_loop_state dds_loop;
 
-static inline volatile struct wr_d3s_remote_message* dds_prepare_message( int type )
+static inline volatile struct wr_d3s_remote_message* dds_prepare_message(struct dds_loop_state *state, int type )
 {
     volatile struct wr_d3s_remote_message *msg = mq_map_out_buffer(1, WR_D3S_REMOTE_OUT_STREAM);
 
@@ -292,20 +296,22 @@ static inline volatile struct wr_d3s_remote_message* dds_prepare_message( int ty
     msg->transmit_seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
     msg->transmit_cycles = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
     msg->type = type;
+    msg->stream_id = state->stream_id;
+    msg->sampling_divider = state->sampling_divider;
 
     return msg;
 }
 
 static inline void dds_send_phase_fixup( struct dds_loop_state *state, int64_t fixup_phase, struct wr_timestamp *ts )
 {
-    volatile struct wr_d3s_remote_message *msg = dds_prepare_message ( D3S_MSG_PHASE_FIXUP );
+    volatile struct wr_d3s_remote_message *msg = dds_prepare_message ( state, D3S_MSG_PHASE_FIXUP );
 
-    msg->phase_fixup.ts = *ts;
+    msg->phase_fixup.tai = ts->seconds;
     msg->phase_fixup.fixup_value = fixup_phase;
 
 //  pp_printf("fixup-phase %x %x\n", ((uint32_t) fixup_phase ) >> 32, (uint32_t)fixup_phase & 0xffffffff);
 
-    mq_send(1, WR_D3S_REMOTE_OUT_STREAM, 16);
+    mq_send(1, WR_D3S_REMOTE_OUT_STREAM, 32);
 
     state->stats.sent_packets++;
     state->stats.sent_fixups++;
@@ -313,13 +319,13 @@ static inline void dds_send_phase_fixup( struct dds_loop_state *state, int64_t f
 
 static inline void dds_send_tune_update( struct dds_loop_state *state, int sample_id, int tune, struct wr_timestamp *ts )
 {
-    volatile struct wr_d3s_remote_message *msg = dds_prepare_message ( D3S_MSG_PHASE_FIXUP );
+    volatile struct wr_d3s_remote_message *msg = dds_prepare_message ( state, D3S_MSG_TUNE_UPDATE );
 
-    msg->tune_update.ts = *ts;
+    msg->tune_update.tai = ts->seconds;
     msg->tune_update.tune = tune;
     msg->tune_update.sample_id = sample_id;
 
-    mq_send(1, WR_D3S_REMOTE_OUT_STREAM, 16);
+    mq_send(1, WR_D3S_REMOTE_OUT_STREAM, 32);
 
     state->stats.sent_packets++;
     state->stats.sent_tunes++;
@@ -355,39 +361,29 @@ static inline void dds_master_update(struct dds_loop_state *state)
             uint32_t snap_lo = dp_readl ( DDS_REG_ACC_SNAP_LO );
             uint32_t snap_hi = dp_readl ( DDS_REG_ACC_SNAP_HI );
 
-            pp_printf("Snap: %x %x\n", snap_lo, snap_hi);
+            pp_printf("Snap: %x %x pkts %d\n", snap_lo, snap_hi, state->stats.sent_packets);
 
             int64_t acc_snap = snap_lo;
             acc_snap |= ((int64_t) snap_hi ) << 32;
 
             dds_send_phase_fixup(state, acc_snap, &ts );
         }
-
+ 
         dds_send_tune_update(state, sample_idx, y, &ts);
-}
+ }
 
 
-struct tune_entry {
-    int target_sample;
-    int target_tai;
-    int tune;
-};
-
-struct tune_queue {
-    int head, tail, count;
-    struct tune_entry queue[8];
-};
 
 void do_rx()
 {
     if (rmq_poll( WR_D3S_REMOTE_IN_STREAM )) {
         struct wr_d3s_remote_message *msg = mq_map_in_buffer (1, WR_D3S_REMOTE_IN_STREAM) - sizeof(struct rmq_message_addr);
 
-
+        pp_printf("Git Packet!\n");
         switch(msg->type) 
         {
             case D3S_MSG_PHASE_FIXUP:
-                pp_printf("Got Phase fixup: stream %d tai %d\n", msg->stream_id, (uint32_t) msg->phase_fixup.ts.seconds);
+                pp_printf("Got Phase fixup: stream %d tai %d\n", msg->stream_id, (uint32_t) msg->phase_fixup.tai);
                 break;
         }
 

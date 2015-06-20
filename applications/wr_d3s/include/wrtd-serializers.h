@@ -67,6 +67,25 @@ static inline int wrnc_msg_int32 ( struct wrnc_msg *buf, int *value )
     return 0;
 }
 
+static inline int wrnc_msg_int64 ( struct wrnc_msg *buf, int64_t *value )
+{
+    if ( _wrnc_msg_check_buffer ( buf, 2 ) < 0 )
+    return -1;
+
+    if (buf->direction == WRNC_MSG_DIR_SEND)
+    {
+    buf->data[buf->datalen] = (*value) >> 32;
+    buf->data[buf->datalen + 1] = (*value) & 0xffffffff;
+
+    buf->datalen+=2;
+    } else {
+    *value = buf->data[buf->offset + 1];
+    *value |= ( (int64_t) buf->data[buf->offset ]) << 32;
+    buf->offset+=2;
+    }
+
+    return 0;
+}
 
 static inline int wrnc_msg_int16 ( struct wrnc_msg *buf, int16_t *value )
 {

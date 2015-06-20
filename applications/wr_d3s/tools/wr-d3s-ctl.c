@@ -136,7 +136,66 @@ void cmd_pll_response( int argc, char *argv[] )
     fprintf(stderr,"done!\n");
 
     wrnc_hmq_close(hmq);
+}
 
+int d3s_stream_config( int mode, int stream_id, double center_freq )
+{
+	double dds_freq = center_freq / 8.0;
+	const double sample_rate = 500e6;
+	uint64_t tune = (uint64_t) ( (double)(1LL<<42) * (dds_freq / sample_rate) * 8.0 );
+
+	uint32_t tune_hi = (tune >> 32) & 0xffffffff;
+	uint32_t tune_lo = (tune >> 0) & 0xffffffff;
+
+	printf("HI=0x%x\n", tune_hi);
+    	printf("LO=0x%x\n", tune_lo);
+
+   	struct wrnc_msg msg = wrnc_msg_init(10); /* FIXME cannot use 2 */
+    	uint32_t id, seq = 0;
+    	int err;
+
+    	id = WR_D3S_CMD_STREAM_CONFIG;
+
+    	wrnc_msg_header(&msg, &id, &seq);
+    	wrnc_msg_int32(&msg, &mode);
+	wrnc_msg_int32(&msg, &stream_id);
+	wrnc_msg_int64(&msg, &tune);
+	
+    	send_and_receive_sync(&msg);
+
+	return validate_acknowledge(&msg);
+}
+
+void cmd_stream_config( int argc, char *argv[] )
+{
+	int mode;
+
+	if(argc < 1)
+		return;
+
+	if(!strcmp(argv[1],"master"))
+	{
+		mode = D3S_STREAM_MASTER;
+	}
+	else if(!strcmp(argv[1],"master"))
+	{
+		mode = D3S_STREAM_SLAVE;
+	} if(!strcmp(argv[1],"off"))
+	{
+		fprintf(stderr,"RF streaming: disabled.\n");
+		mode = D3S_STREAM_OFF;
+		d3s_stream_config( mode, 0, 0 );
+		return;
+	}
+
+
+	if(argc >= 3)
+	{
+		int stream_id = atoi(argv[2]);
+		double center_freq = atof(argv[3]);
+		fprintf(stderr,"RF streaming: mode %s, stream_id = %d, center_freq = %.6f MHz\n", mode == D3S_STREAM_SLAVE?"slave":"master",stream_id, center_freq);
+		d3s_stream_config( mode, stream_id, center_freq );
+	}
 
 
 }
@@ -200,6 +259,8 @@ int main(int argc, char *argv[])
 		cmd_ping(cmd_params_count, cmd_params);
 	    if(!strcasecmp(cmd,"pll_response"))
 		cmd_pll_response(cmd_params_count, cmd_params);
+	    if(!strcasecmp(cmd,"stream"))
+		cmd_stream_config(cmd_params_count, cmd_params);
 	}
 
 	wrnc_close(wrnc);

@@ -400,13 +400,20 @@ void enqueue_trigger(int output, struct lrt_output_rule *rule,
 
 	ts_adjust_delay (&adjusted, rule->delay_cycles, rule->delay_frac);
 
+	struct wrtd_trigger_entry ent;
+	ent.ts = *ts;
+	ent.id = *id;
+	ent.seq = seq;
+
 	if (!check_dead_time(out, &adjusted)) {
-		struct wrtd_trigger_entry ent;
-		ent.ts = *ts;
-		ent.id = *id;
-		ent.seq = seq;
 		out->miss_deadtime ++;
 		log_trigger (WRTD_LOG_MISSED, WRTD_MISS_DEAD_TIME, out, &ent);
+		return;
+	}
+
+	if (!wr_is_timing_ok()) {
+		out->miss_no_timing ++;
+		log_trigger (WRTD_LOG_MISSED, WRTD_MISS_NO_WR, out, &ent);
 		return;
 	}
 

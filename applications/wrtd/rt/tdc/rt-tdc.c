@@ -137,7 +137,7 @@ static inline void flush_tx ()
     msg->transmit_cycles = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
     msg->count = coalesce_count;
 
-    mq_send(1, WRTD_REMOTE_OUT_TDC, 6 + 7 * coalesce_count);
+    mq_send(1, WRTD_REMOTE_OUT_TDC, 7 + 7 * coalesce_count);
     coalesce_count = 0;
     sent_packets ++;
 }
@@ -550,6 +550,7 @@ static inline void do_control()
 #define WR_LINK_ONLINE		2
 #define WR_LINK_SYNCING		3
 #define WR_LINK_SYNCED		4
+#define WR_LINK_TDC_WAIT	5
 
 
 static int wr_state;
@@ -586,8 +587,11 @@ int wr_enable_lock( int enable )
 }
 
 
+static uint32_t tai_start;
+
 void wr_update_link()
 {
+
 	switch(wr_state)
 	{
 		case WR_LINK_OFFLINE:
@@ -608,7 +612,17 @@ void wr_update_link()
 		case WR_LINK_SYNCING:
 			if (wr_time_locked())
 			{
-				pp_printf("rt-tdc: WR synced\n");
+				pp_printf("rt-tdc: WR synced, waiting for TDC plumbing to catch up...\n");
+				wr_state = WR_LINK_TDC_WAIT;
+				tai_start = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
+
+			}
+			break;
+
+		case WR_LINK_TDC_WAIT:
+			if (lr_readl(WRN_CPU_LR_REG_TAI_SEC) == (tai_start + 4))
+			{
+				pp_printf("rt-tdc: WR TDC synced\n");
 				wr_state = WR_LINK_SYNCED;
 			}
 			break;

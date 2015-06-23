@@ -16,6 +16,12 @@
 #define GPIO_DDR	0x8 /* Direction Data Register */
 #define GPIO_PSR	0xC /* Status Register */
 
+void rt_get_time(uint32_t *seconds, uint32_t *cycles)
+{
+	*seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
+	*cycles = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
+}
+
 static uint32_t out_seq = 0;
 
 /**
@@ -147,6 +153,9 @@ static void demo_debug_interface(void)
  */
 static void demo_handle_hmq_in(void)
 {
+#ifdef RTPERFORMANCE
+	uint32_t sec, cyc, sec_n, cyc_n;
+#endif
 	struct wrnc_msg in_buf;
 	uint32_t id, seq, p, val;
 
@@ -167,6 +176,9 @@ static void demo_handle_hmq_in(void)
 	pp_printf("Received message ID 0x%x SEQ 0x%x DATA[0] 0x%x.\n",
 		  id, seq, in_buf.data[2]);
 	/* According to the ID perform different actions */
+#ifdef RTPERFORMANCE
+	rt_get_time(&sec, &cyc);
+#endif
 	switch (id) {
 	/* Set LEDs */
 	case DEMO_ID_LED_SET:
@@ -223,6 +235,11 @@ static void demo_handle_hmq_in(void)
 		pp_printf("Unknown ID %d.\n", id);
 		break;
 	}
+#ifdef RTPERFORMANCE
+	rt_get_time(&sec_n, &cyc_n);
+	pp_printf("Action ID: %d | SEQ: | %d TIME: %dns\n",
+		  id, seq, (cyc_n - cyc) * 8);
+#endif
 
 	/* Drop the message once handled */
 	mq_discard(0, DEMO_HMQ_IN);

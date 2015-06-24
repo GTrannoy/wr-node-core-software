@@ -24,13 +24,22 @@
 
 #define SMEM __attribute__((section(".smem")))
 
+/**
+ * Perform an operation on a given pointer. Operation can be performed only
+ * on integer variables
+ */
+static inline void __smem_atomic_op(int *p, int x, unsigned int range)
+{
+	*(volatile int *)(p + (range >> 2)) = x;
+}
+
 
 /**
  * Add x to the value in the shared memory pointed by p
  */
 static inline void smem_atomic_add(int *p, int x)
 {
-	*(volatile int *)(p + (SMEM_RANGE_ADD >> 2)) = x;
+	__smem_atomic_op(p, x, SMEM_RANGE_ADD);
 }
 
 
@@ -39,7 +48,34 @@ static inline void smem_atomic_add(int *p, int x)
  */
 static inline void smem_atomic_sub(int *p, int x)
 {
-	*(volatile int *)(p + (SMEM_RANGE_SUB >> 2)) = x;
+	__smem_atomic_op(p, x, SMEM_RANGE_SUB);
+}
+
+
+/**
+ * Do "OR" between x and the value in the shared memory pointed by p
+ */
+static inline void smem_atomic_or(int *p, int x)
+{
+	__smem_atomic_op(p, x, SMEM_RANGE_SET);
+}
+
+
+/**
+ * Do "AND ~" between x and the value in the shared memory pointed by p
+ */
+static inline void smem_atomic_and_not(int *p, int x)
+{
+	__smem_atomic_op(p, x, SMEM_RANGE_CLEAR);
+}
+
+
+/**
+ * Do "XOR" between x and the value in the shared memory pointed by p
+ */
+static inline void smem_atomic_xor(int *p, int x)
+{
+	__smem_atomic_op(p, x, SMEM_RANGE_FLIP);
 }
 
 #endif

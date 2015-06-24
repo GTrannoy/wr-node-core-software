@@ -22,11 +22,12 @@
  */
 enum wrnc_smem_modifier {
 	WRNC_SMEM_DIRECT = 0, /**< direct read/write of the memory */
+	WRNC_SMEM_ADD, /**< on write, atomic ADD to memory content */
+	WRNC_SMEM_SUB, /**< on write, atomic SUB to memory content */
 	WRNC_SMEM_OR, /**< on write, atomic OR with memory content */
 	WRNC_SMEM_CLR_AND, /**< on write, atomic AND with complemented memory
 			      content */
 	WRNC_SMEM_XOR, /**< on write, atomic XOR with memory content */
-	WRNC_SMEM_ADD, /**< on write, atomic ADD to memory content */
 };
 
 /**

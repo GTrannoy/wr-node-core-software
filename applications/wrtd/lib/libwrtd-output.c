@@ -565,7 +565,7 @@ static int wrtd_out_rule_delay_set(struct wrtd_node *dev,
  * It sets the delay to apply for a given trigger
  * @param[in] dev pointer to open node device.
  * @param[in] handle trigger where act on
- * @param[in] delay_ps delay in pico-seconds
+ * @param[in] delay_ps delay in pico-seconds in range [0, 999999999000]
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_out_trig_delay_set(struct wrtd_node *dev,

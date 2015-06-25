@@ -62,9 +62,9 @@ enum wrtd_core {
  * Trigger token
  */
 struct wrtd_trigger_handle {
-	uint32_t ptr_cond;
-	uint32_t ptr_trig;
-	int channel;
+	uint32_t ptr_cond; /**< trigger condition pointer */
+	uint32_t ptr_trig; /**< trigger pointer */
+	int channel;  /**< channel assigned to the trigger */
 };
 
 

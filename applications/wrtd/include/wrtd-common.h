@@ -174,9 +174,11 @@ struct wr_timestamp {
  * Trigger identifier
  */
 struct wrtd_trig_id {
-	uint32_t system;
-	uint32_t source_port;
-	uint32_t trigger;
+	uint32_t system;  /**< Unique ID of the WRTD to identify a domain. */
+	uint32_t source_port;  /**< System-wide unique ID to intentify the
+				input port the trigger comes from. */
+	uint32_t trigger;  /**< System-wide unique ID of a particular trigger
+			      pulse*/
 };
 
 

@@ -45,36 +45,52 @@ static int wrtd_cmd_log_level(struct wrtd_node *wrtd, int input,
 				  int argc, char *argv[]);
 
 static struct wrtd_commands cmds[] = {
-	{ "state", "shows input state", wrtd_cmd_state },
-	{ "enable", "enable the input", wrtd_cmd_enable },
-	{ "disable", "disable the input", wrtd_cmd_disable },
-	{ "deadtime", "sets the dead time", wrtd_cmd_set_dead_time },
-	{ "delay", "sets the input delay", wrtd_cmd_set_delay },
-	{ "mode", "sets triggering mode", wrtd_cmd_set_mode },
-	{ "assign", "assigns a trigger", wrtd_cmd_assign },
-	{ "unassign", "un-assigns the currently assigned trigger", wrtd_cmd_unassign },
-	{ "arm", "arms the input", wrtd_cmd_arm },
-	{ "disarm", "disarms the input", wrtd_cmd_disarm },
-	{ "reset", "resets statistics counters", wrtd_cmd_reset },
-	{ "swtrig", "sends a software trigger", wrtd_cmd_sw_trigger },
-	{ "log_level", "set logging level", wrtd_cmd_log_level },
+	{ "state", "", "shows input state",
+	  wrtd_cmd_state },
+	{ "enable", "", "enable the input",
+	  wrtd_cmd_enable },
+	{ "disable", "", "disable the input",
+	  wrtd_cmd_disable },
+	{ "deadtime", "<number>", "sets the dead time in pico-seconds",
+	  wrtd_cmd_set_dead_time },
+	{ "delay", "<number>", "sets the input delay in pico-seconds",
+	  wrtd_cmd_set_delay },
+	{ "mode", "<mode>", "sets triggering mode (see Trigger Modes)",
+	  wrtd_cmd_set_mode },
+	{ "assign", "<trig-id>", "assigns a trigger (see Trigger ID)",
+	  wrtd_cmd_assign },
+	{ "unassign", "", "un-assigns the currently assigned trigger",
+	  wrtd_cmd_unassign },
+	{ "arm", "", "arms the input",
+	  wrtd_cmd_arm },
+	{ "disarm", "", "disarms the input",
+	  wrtd_cmd_disarm },
+	{ "reset", "", "resets statistics counters",
+	  wrtd_cmd_reset },
+	{ "swtrig", "", "sends a software trigger",
+	  wrtd_cmd_sw_trigger },
+	{ "log_level", "<level>", "set logging level (see Log Levels)",
+	  wrtd_cmd_log_level },
 	{ NULL }
 };
 
 static void help()
 {
-	int i;
-
-	fprintf(stderr, "wrtd-tdc-config -D 0x<hex-number> -C <string> -c <number> [cmd-options]\n");
-	fprintf(stderr, "It configures a channel of a TDC on a white-rabbit trigger distribution node\n");
-	fprintf(stderr, "-D device id\n");
-	fprintf(stderr, "-C command name\n");
-	fprintf(stderr, "-c channel to configure\n");
-	fprintf(stderr, "\n");
-	fprintf(stderr, "Available commands:\n");
-	for(i = 0; cmds[i].handler; i++) {
-		fprintf(stderr, "  %-16s %s\n", cmds[i].name, cmds[i].desc);
-	}
+	fprintf(stderr, "\n\n");
+	fprintf(stderr, "wrtd-in-config -D 0x<hex-number> -C <string> -c <number> [cmd-options]\n\n");
+	fprintf(stderr, "It configures an input channel on a White-Rabbit Trigger-Distribution node\n\n");
+	fprintf(stderr, "-D\tdevice id\n");
+	fprintf(stderr, "-C\tcommand name (see Available commands)\n");
+	fprintf(stderr, "-c\tchannel to configure [0, %d]\n",
+		TDC_NUM_CHANNELS - 1);
+	fprintf(stderr, "\n\n");
+	help_commands(cmds);
+	fprintf(stderr, "\n\n");
+	help_trig_id();
+	fprintf(stderr, "\n\n");
+	help_trig_mode();
+	fprintf(stderr, "\n\n");
+	help_log_level();
 	exit(1);
 }
 
@@ -82,7 +98,7 @@ void dump_input_state(struct wrtd_input_state *state)
 {
 	char tmp[1024], tmp2[1024];
 
-	if(!(state->flags & WRTD_ENABLED)) 
+	if(!(state->flags & WRTD_ENABLED))
 		printf("Channel %d: disabled\n", state->input );
 
 	decode_flags(tmp,state->flags);

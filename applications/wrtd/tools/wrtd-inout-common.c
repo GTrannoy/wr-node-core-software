@@ -16,6 +16,43 @@
 #include <wrtd-common.h>
 #include <wrtd-internal.h>
 
+void help_commands(struct wrtd_commands *cmds)
+{
+	int i;
+
+	fprintf(stderr, "Available commands:\n");
+	for(i = 0; cmds[i].handler; i++) {
+		fprintf(stderr, "  %s %s\n\t%s\n\n",
+			cmds[i].name, cmds[i].parm, cmds[i].desc);
+	}
+}
+
+void help_log_level()
+{
+	fprintf(stderr, "Log Levels\n");
+	fprintf(stderr, "You can set more than one log level. Here the list of valid log level strings:\n\n");
+	fprintf(stderr, "\toff, Raw, Sent, Promiscious, Executed, Missed.\n\n");
+	fprintf(stderr, "For details about their meaning refer, for example, to the library documentation.\n\n");
+}
+
+void help_trig_mode()
+{
+	fprintf(stderr, "Trigger Modes\n");
+	fprintf(stderr, "You can active only one trigger mode at time. Following the list of valid trigger mode strings:\n\n");
+	fprintf(stderr, "\tauto, single\n\n");
+	fprintf(stderr, "For details about their meaning refer, for example, to the library documentation.\n\n");
+}
+
+void help_trig_id()
+{
+	fprintf(stderr, "Trigger ID\n");
+	fprintf(stderr, "The trigger Id is made of 3 number separated by a colon\n\n");
+	fprintf(stderr, "\t<number>:<number>:<number>\n\n");
+	fprintf(stderr, "Looking at them from their semantic point of view:\n\n");
+	fprintf(stderr, "\t<system>:<port>:<trigger>\n\n");
+	fprintf(stderr, "For details about their meaning refer, for example, to the library documentation.\n\n");
+}
+
 void decode_flags(char *buf, uint32_t flags)
 {
     int l;

@@ -14,6 +14,7 @@
 
 struct wrtd_commands {
 	const char *name;
+	const char *parm;
 	const char *desc;
 	int (*handler)(struct wrtd_node *wrtd, int line,
 		       int argc, char **argv);
@@ -23,6 +24,10 @@ struct wrtd_commands {
 /**
  * @file wrtd-inout-common.c
  */
+extern void help_commands(struct wrtd_commands *cmds);
+extern void help_log_level();
+extern void help_trig_mode();
+extern void help_trig_id();
 extern void decode_flags(char *buf, uint32_t flags);
 extern void decode_mode(char *buf, int mode);
 extern void decode_log_level(char *buf, uint32_t flags);

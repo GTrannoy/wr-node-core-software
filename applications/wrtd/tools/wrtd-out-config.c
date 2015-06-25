@@ -59,27 +59,48 @@ static int wrtd_cmd_software_trigger(struct wrtd_node *wrtd, int output,
 static int wrtd_cmq_has_trig(struct wrtd_node *wrtd, int output,
 			     int argc, char *argv[]);
 static struct wrtd_commands cmds[] = {
-	{ "state", "shows output state", wrtd_cmd_state },
-	{ "assign", "assigns a trigger", wrtd_cmd_trig_assign },
-	{ "unassign", "un-assigns a given trigger", wrtd_cmd_trig_unassign },
-	{ "show", "shows assigned triggers", wrtd_cmd_show },
-	{ "enable", "enables an output", wrtd_cmd_enable },
-	{ "disable", "disables an output", wrtd_cmd_disable },
-	{ "arm", "arms an output", wrtd_cmd_arm },
-	{ "disarm", "disarm an output", wrtd_cmd_disarm },
-	{ "mode", "set output mode output", wrtd_cmd_mode },
-	{ "dead_time", "set output dead time", wrtd_cmd_dead_time },
-	{ "reset_counters", "reset statistic counters", wrtd_cmd_reset_counters },
-	{ "log_level", "set log level", wrtd_cmd_log_level },
-	{ "pulse_width", "sets the output pulse width", wrtd_cmd_pulse_width },
-	{ "sw_trig", "forces a software trigger", wrtd_cmd_software_trigger },
-	{ "has_trig", "return true it as a trigger assigned", wrtd_cmq_has_trig},
-	{ "trig_enable", "enables a particular trigger", wrtd_cmd_trig_enable },
-	{ "trig_disable", "disables a particular trigger", wrtd_cmd_trig_disable },
-	{ "trig_stats", "shows per-trigger statistics", wrtd_cmd_trig_stats },
-	{ "trig_delay", "sets the delay for a particular trigger", wrtd_cmd_trig_delay },
-	{ "trig_cond_delay", "sets the delay for a particular trigger condition", wrtd_cmd_trig_cond_delay },
-	{ "trig_find", "retrieves a trigger entry based on its ID", wrtd_cmd_trig_find },
+	{ "state", "", "shows output state",
+	  wrtd_cmd_state },
+	{ "assign", "<trig-id> [<trig-id>]", "assigns a trigger (see Trigger ID)",
+	  wrtd_cmd_trig_assign },
+	{ "unassign", "<trig-id>", "un-assigns a given trigger",
+	  wrtd_cmd_trig_unassign },
+	{ "show", "", "shows assigned triggers",
+	  wrtd_cmd_show },
+	{ "enable", "", "enables an output",
+	  wrtd_cmd_enable },
+	{ "disable", "", "disables an output",
+	  wrtd_cmd_disable },
+	{ "arm", "", "arms an output",
+	  wrtd_cmd_arm },
+	{ "disarm", "", "disarm an output",
+	  wrtd_cmd_disarm },
+	{ "mode", "<mode>", "set output mode output (see Trigger Modes)",
+	  wrtd_cmd_mode },
+	{ "dead_time", "<number>", "set output dead time in pico-seconds",
+	  wrtd_cmd_dead_time },
+	{ "reset_counters", "", "reset statistic counters",
+	  wrtd_cmd_reset_counters },
+	{ "log_level", "<level>", "set log level (see Log Levels)",
+	  wrtd_cmd_log_level },
+	{ "pulse_width", "<number>", "sets the output pulse width in pico-seconds",
+	  wrtd_cmd_pulse_width },
+	{ "sw_trig", "", "forces a software trigger",
+	  wrtd_cmd_software_trigger },
+	{ "has_trig", "", "return true it as a trigger assigned",
+	  wrtd_cmq_has_trig},
+	{ "trig_enable", "<trig-index>", "enables a particular trigger",
+	  wrtd_cmd_trig_enable },
+	{ "trig_disable", "<trig-index>", "disables a particular trigger",
+	  wrtd_cmd_trig_disable },
+	{ "trig_stats", "", "shows per-trigger statistics",
+	  wrtd_cmd_trig_stats },
+	{ "trig_delay", "<trig-index> <number>", "sets the delay in pico-seconds for a particular trigger ",
+	  wrtd_cmd_trig_delay },
+	{ "trig_cond_delay", "<trig-index> <number>", "sets the delay in pico-seconds for a particular trigger condition",
+	  wrtd_cmd_trig_cond_delay },
+	{ "trig_find", "<trig-id>", "retrieves a trigger entry based on its ID",
+	  wrtd_cmd_trig_find },
 	{ NULL }
 };
 
@@ -506,16 +527,23 @@ static void help()
 {
 	int i;
 
-	fprintf(stderr, "wrtd-out-config -D 0x<hex-number> -C <string> -c <number> [cmd-options]\n");
-	fprintf(stderr, "Test program for the outputs of a White Rabbit Trigger Distribution node\n");
-	fprintf(stderr, "-D device id\n");
-	fprintf(stderr, "-C command name\n");
-	fprintf(stderr, "-c channel to configure\n");
-	fprintf(stderr, "\n");
-	fprintf(stderr, "Available commands:\n");
-	for(i = 0; cmds[i].handler; i++) {
-		fprintf(stderr, "  %-16s %s\n", cmds[i].name, cmds[i].desc);
-	}
+	fprintf(stderr, "\n\n");
+	fprintf(stderr, "wrtd-out-config -D 0x<hex-number> -C <string> -c <number> [cmd-options]\n\n");
+	fprintf(stderr, "It configures an output channel on a White Rabbit Trigger-Distribution node\n\n");
+	fprintf(stderr, "-D\tdevice id\n");
+	fprintf(stderr, "-C\tcommand name (see Available commands)\n");
+	fprintf(stderr, "-c\tchannel to configure [0, %d]\n",
+		FD_NUM_CHANNELS - 1);
+	fprintf(stderr, "\n\n");
+	help_commands(cmds);
+	fprintf(stderr, "\n\n");
+	help_trig_id();
+	/* Comple*/
+	fprintf(stderr, "In order to ease the development of this tool sometimes we refer to a trigger with its index within the real time application. You can get the current trigger index from the 'trig_stats' command\n");
+	fprintf(stderr, "\n\n");
+	help_trig_mode();
+	fprintf(stderr, "\n\n");
+	help_log_level();
 	exit(1);
 }
 

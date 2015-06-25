@@ -796,10 +796,10 @@ int wrtd_out_check_triggered(struct wrtd_node *dev, unsigned int output)
 int wrtd_out_is_enabled(struct wrtd_node *dev, unsigned int output,
 			unsigned int *enable)
 {
-	struct wrtd_input_state state;
+	struct wrtd_output_state state;
 	int err;
 
-	err = wrtd_in_state_get(dev, output, &state);
+	err = wrtd_out_state_get(dev, output, &state);
 	if (err)
 		return -1;
 	*enable = !!(state.flags & WRTD_ENABLED);
@@ -876,7 +876,7 @@ int wrtd_out_has_trigger(struct wrtd_node *dev, unsigned int output,
 
 
 /**
- * It check if the input real-time application is alive
+ * It check if the output real-time application is alive
  * @param[in] dev device token
  * @return 0 on success, -1 on error and errno is set appropriately
  */

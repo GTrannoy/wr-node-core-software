@@ -428,8 +428,10 @@ void enqueue_trigger(int output, struct lrt_output_rule *rule,
 				out->pending_trig = rule->cond_ptr;
 				out->state = OUT_ST_CONDITION_HIT;
 				return;
-			} else if (out->mode == WRTD_TRIGGER_MODE_SINGLE)
+			} else if (out->mode == WRTD_TRIGGER_MODE_SINGLE) {
+				out->flags &= ~WRTD_ARMED;
 				out->state = OUT_ST_IDLE;
+			}
 			break;
 		case OUT_ST_TEST_PENDING:
 			return;
@@ -438,11 +440,12 @@ void enqueue_trigger(int output, struct lrt_output_rule *rule,
 			if (rule != out->pending_trig)
 				return;
 
-			if (out->mode == WRTD_TRIGGER_MODE_SINGLE)
+			if (out->mode == WRTD_TRIGGER_MODE_SINGLE) {
+				out->flags &= ~WRTD_ARMED;
 				out->state = OUT_ST_IDLE;
-			else
+			} else {
 				out->state = OUT_ST_ARMED;
-
+			}
 			break;
 		default:
 			break;
@@ -955,8 +958,10 @@ static inline void ctl_chan_set_mode (uint32_t seq, struct wrnc_msg *ibuf)
 	wrnc_msg_int32(ibuf, &st->mode);
 
 	st->flags &= ( WRTD_TRIGGERED | WRTD_LAST_VALID) ;
-	if( st->mode == WRTD_TRIGGER_MODE_SINGLE )
+	if( st->mode == WRTD_TRIGGER_MODE_SINGLE ) {
+		st->flags &= ~WRTD_ARMED;
 		st->state = OUT_ST_IDLE;
+	}
 
 
 	ctl_ack(seq);
@@ -984,11 +989,13 @@ static inline void ctl_chan_arm (uint32_t seq, struct wrnc_msg *ibuf)
 
 	st->flags &= ~WRTD_TRIGGERED;
 
-	if(armed)
+	if(armed) {
+		st->flags |= WRTD_ARMED;
 		st->state = OUT_ST_ARMED;
-	else
+	} else {
+		st->flags &= ~WRTD_ARMED;
 		st->state = OUT_ST_IDLE;
-
+	}
 	ctl_ack(seq);
 }
 

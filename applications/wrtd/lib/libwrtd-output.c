@@ -349,8 +349,10 @@ int wrtd_out_trig_assign(struct wrtd_node *dev, unsigned int output,
 		errno = EWRTD_INVALID_ANSWER_STATE;
 		return -1;
 	}
-	
-	if (msg.data[0] != WRTD_REP_TRIGGER_HANDLE) {
+
+	/* Parse the response */
+	wrnc_msg_header (&msg, &id, &seq);
+	if (id != WRTD_REP_TRIGGER_HANDLE) {
 		errno = EWRTD_INVALID_ANSWER_TRIG;
 		return -1;
 	}

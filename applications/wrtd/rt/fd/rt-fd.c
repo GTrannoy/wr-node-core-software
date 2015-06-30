@@ -719,30 +719,24 @@ void send_hash_entry (uint32_t seq, int ch, int valid, struct lrt_hash_entry *en
 	int is_conditional;
 	struct wrnc_msg obuf = ctl_claim_out_buf();
 	uint32_t id_hash_entry = WRTD_REP_HASH_ENTRY;
+        struct lrt_hash_entry *cond = NULL;
 
 	/* Create the response */
 	wrnc_msg_header(&obuf, &id_hash_entry, &seq);
-
-        struct lrt_hash_entry *cond = NULL;
-
 	wrnc_msg_int32(&obuf, &valid);
 
-	if(valid)
-		cond = (struct lrt_hash_entry *) ent->ocfg[ch]->cond_ptr;
-
-	is_conditional = (cond ? 1 : 0);
-
-	wrnc_msg_int32(&obuf, &is_conditional);
-
 	if(valid) {
+		cond = (struct lrt_hash_entry *) ent->ocfg[ch]->cond_ptr;
+		is_conditional = (cond ? 1 : 0);
+		wrnc_msg_int32(&obuf, &is_conditional);
+
 		wrnc_msg_uint32(&obuf, (uint32_t *) &ent);
 		wrnc_msg_uint32(&obuf, (uint32_t *) &cond);
 
-		if(cond)
-			bag_hash_entry(&cond->id, cond->ocfg[ch], &obuf);
-
-		//pp_printf("ch %d ocfg %p\n", ch, ent->ocfg[ch]);
-		bag_hash_entry (&ent->id, ent->ocfg[ch], &obuf);
+		/* Send triggers information*/
+		bag_hash_entry(&ent->id, ent->ocfg[ch], &obuf);
+		if (cond)
+			wrtd_msg_trig_id(&obuf, &cond->id);
 	}
 
 	hmq_msg_send (&obuf);

@@ -590,7 +590,9 @@ static inline void ctl_chan_enable (uint32_t seq, struct wrnc_msg *ibuf)
 
 static inline void ctl_trig_assign (uint32_t seq, struct wrnc_msg *ibuf)
 {
+	uint32_t id_trigger_handle = WRTD_REP_TRIGGER_HANDLE;
 	int ch, is_cond;
+	struct wrnc_msg obuf;
 	struct wrtd_trig_id id;
 	struct lrt_output_rule rule;
 	struct lrt_trigger_handle handle;
@@ -624,21 +626,8 @@ static inline void ctl_trig_assign (uint32_t seq, struct wrnc_msg *ibuf)
 	out = &outputs[ch];
 	out->flags |= WRTD_TRIGGER_ASSIGNED;
 
-	struct wrnc_msg obuf = ctl_claim_out_buf();
-	uint32_t id_trigger_handle = WRTD_REP_TRIGGER_HANDLE;
-
-
-	/* Create the response */
-	wrnc_msg_header(&obuf, &id_trigger_handle, &seq);
-
 	if(!is_cond) // unconditional trigger
-	{
-	    wrnc_msg_int32(&obuf, &handle.channel);
-	    wrnc_msg_uint32(&obuf, (uint32_t *) &handle.cond);
-	    wrnc_msg_uint32(&obuf, (uint32_t *) &handle.trig);
-	    hmq_msg_send (&obuf);
-	    return;
-	}
+		goto out;
 
 	/* Get the condition ID */
 	wrtd_msg_trig_id(ibuf, &id);
@@ -652,6 +641,10 @@ static inline void ctl_trig_assign (uint32_t seq, struct wrnc_msg *ibuf)
 
 	handle.cond = hash_add ( &id, ch, &rule );
 
+out:
+	/* Create the response */
+	obuf = ctl_claim_out_buf();
+	wrnc_msg_header(&obuf, &id_trigger_handle, &seq);
         wrnc_msg_int32(&obuf, &handle.channel);
         wrnc_msg_uint32(&obuf, (uint32_t *) &handle.cond);
         wrnc_msg_uint32(&obuf, (uint32_t *) &handle.trig);

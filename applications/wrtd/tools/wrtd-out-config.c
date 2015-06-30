@@ -444,7 +444,7 @@ static void wrtd_trigger_stats_print(struct wrtd_output_trigger_state *state,
 
 	format_ts(ts, state->delay_trig, 0);
 	format_id(id, state->trigger);
-	if (index > 0)
+	if (index >= 0)
 		printf(" %-3d: ID: %s, delay: %s, enabled: %d\n",
 		       index, id, ts, state->enabled );
 	else

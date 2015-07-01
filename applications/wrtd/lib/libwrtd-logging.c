@@ -75,7 +75,10 @@ static struct wrnc_hmq *wrtd_log_open(struct wrtd_node *dev,
 	}
 
 	if (channel > -1) {
-		err = wrtd_in_log_level_set(dev, channel, lvl);
+		if (core == WRTD_CORE_IN)
+			err = wrtd_in_log_level_set(dev, channel, lvl);
+		else
+			err = wrtd_out_log_level_set(dev, channel, lvl);
 		if (err)
 			return NULL;
 
@@ -91,7 +94,10 @@ static struct wrnc_hmq *wrtd_log_open(struct wrtd_node *dev,
 	} else {
 		/* Set the same logging level to all channels */
 		for (i = 0; i < n_chan; ++i) {
-			err = wrtd_in_log_level_set(dev, i, lvl);
+			if (core == WRTD_CORE_IN)
+				err = wrtd_in_log_level_set(dev, i, lvl);
+			else
+				err = wrtd_out_log_level_set(dev, i, lvl);
 			if (err)
 				return NULL;
 		}

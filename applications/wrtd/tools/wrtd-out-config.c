@@ -605,12 +605,9 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	if (err) {
+	if (err)
 		fprintf(stderr, "Error while executing command '%s': %s\n",
 			cmd, wrtd_strerror(errno));
-	} else {
-		fprintf(stdout, "Command executed!\n");
-	}
 
 	wrtd_close(wrtd);
 

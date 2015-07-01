@@ -163,28 +163,37 @@ struct lrt_hash_entry *hash_add ( struct wrtd_trig_id *id, int output, struct lr
 /* Removes an output rule from the hash. */
 int hash_remove ( struct lrt_hash_entry *ent, int output )
 {
-    int pos, i;
+	int bucket, i;
+	struct lrt_hash_entry *e;
 
-    /* release the rule */
-    blockpool_free(&rules_blockpool, ent->ocfg[output]);
-    ent->ocfg[output] = NULL;
-    
-    for(i = 0; i < FD_NUM_CHANNELS; i++)
-        if(ent->ocfg[i]) /* Same ID is assigned to another output? */
-            return 0;
+	/* release the rule */
+	blockpool_free(&rules_blockpool, ent->ocfg[output]);
+	ent->ocfg[output] = NULL;
 
-    /* The ID has no longer any output associated? Remove the whole hash entry */
-    if (ent == htab[pos])
-        htab[pos] = ent->next;
-    else {
-        struct lrt_hash_entry *tmp = htab[pos]->next;
-        htab[pos]->next = ent->next;
-        ent->next = tmp;
-    }
+	for(i = 0; i < FD_NUM_CHANNELS; i++)
+		if(ent->ocfg[i]) /* Same ID is assigned to another output? */
+			return 0;
 
-    blockpool_free(&hash_blockpool, ent);
+	/* Identify the bucket where the entity is supposed to be stored */
+	bucket = hash_func(&ent->id);
 
-    return 0;
+	/* Removing the given entity from the hash table */
+	e = htab[bucket];
+	if (e == ent)
+		goto out;
+	for (; e != NULL; e = e->next) {
+		if (e->next == ent)
+			goto out;
+	}
+
+	/* If we reach this point something is wrong in the htab */
+	pp_printf("%s: entity is not in the hash table\n");
+	return -1;
+
+out:
+	blockpool_free(&hash_blockpool, ent);
+	e->next = ent->next;
+	return 0;
 }
 
 /* Returns a pos-th hash entry in given hash bucket. */

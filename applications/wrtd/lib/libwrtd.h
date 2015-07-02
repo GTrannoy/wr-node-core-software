@@ -111,6 +111,7 @@ struct wrtd_output_trigger_state {
 	int latency_average_us; /**< Average latency in micro-seconds */
 	uint32_t executed_pulses; /**< Number of executed pulses */
 	uint32_t missed_pulses; /**< Number of missed pulses */
+	void *private_data; /**< private pointer used by the library */
 };
 
 /**

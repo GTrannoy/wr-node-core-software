@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2013-2014 CERN (www.cern.ch)
  * Author: Tomasz Wlostowski <tomasz.wlostowski@cern.ch>
+ * Author: Federico Vaga <federico.vaga@cern.ch>
  *
  * Released according to the GNU GPL, version 2 or any later version.
  */
@@ -21,7 +22,6 @@
 #include "hw/fd_channel_regs.h"
 #include "hw/fd_main_regs.h"
 
-#include "hash.h"
 #include "loop-queue.h"
 #include "wrtd-serializers.h"
 
@@ -29,6 +29,216 @@
 #define OUT_ST_ARMED 1
 #define OUT_ST_TEST_PENDING 2
 #define OUT_ST_CONDITION_HIT 3
+
+
+/**
+ * Rule defining the behaviour of a trigger output upon reception of a
+ * trigger message with matching ID
+ */
+struct lrt_output_rule {
+	uint32_t delay_cycles; /**< Delay to add to the timestamp enclosed
+				  within the trigger message */
+	uint16_t delay_frac;
+	uint16_t state; /**< State of the rule (empty, disabled,
+			   conditional action, condition, etc.) */
+	struct lrt_output_rule *cond_ptr; /**< Pointer to conditional action.
+					     Used for rules that define
+					     triggering conditions. */
+	uint32_t latency_worst; /**< Worst-case latency (in 8ns ticks)*/
+	uint32_t latency_avg_sum; /**< Average latency accumulator and
+				     number of samples */
+	uint32_t latency_avg_nsamples;
+	int hits; /**< Number of times the rule has successfully produced
+		     a pulse */
+	int misses; /**< Number of times the rule has missed a pulse
+		       (for any reason) */
+};
+
+#define ENTRY_FLAG_VALID (1 << 0)
+/**
+ * Trigger handled by this real-time application
+ */
+struct lrt_hash_entry {
+	unsigned int flags;
+	struct wrtd_trig_id id; /**< trigger identifier */
+	struct lrt_output_rule ocfg[FD_NUM_CHANNELS]; /**< specific rule
+							 for each channel*/
+};
+
+struct lrt_hash_entry raw_tlist[FD_HASH_ENTRIES];
+unsigned int tlist_count = 0; /**< number of valid trigger entry
+					in tlist */
+struct lrt_hash_entry *ord_tlist[FD_HASH_ENTRIES]; /**< list of triggers
+						      ordered by 'id' */
+
+#ifdef RTDEBUG
+void trigget_print_all()
+{
+	int i;
+	for (i = 0; i < tlist_count; i++) {
+		pp_printf("[%d] = %p  --> %d:%d:%d\n",
+			  i, ord_tlist[i], ord_tlist[i]->id.system,
+			  ord_tlist[i]->id.source_port, ord_tlist[i]->id.trigger);
+	}
+
+}
+#endif
+
+
+int trigger_search(struct lrt_hash_entry **tlist,
+		  struct wrtd_trig_id *id,
+		  unsigned int min, unsigned int max,
+		  unsigned int *mid)
+{
+	int cmp;
+#if 0
+	/* Binary search */
+	while (max > min)
+	{
+		*mid = min + (max - min) / 2;
+		cmp = memcmp(&tlist[*mid]->id, id, sizeof(struct wrtd_trig_id));
+		if(cmp == 0)
+			return 1;
+		else if (cmp < 0)
+			min = *mid + 1;
+		else
+			max = *mid - 1;
+	}
+
+	/* When we do not find our element, then mid + 1 is the ideal position
+	 for a the new entry */
+	*mid++;
+#else
+	for (*mid = min; *mid < max; (*mid)++) {
+		cmp = memcmp(&tlist[*mid]->id, id, sizeof(struct wrtd_trig_id));
+		if (cmp == 0)
+			return 1;
+		else if (cmp > 0)
+			break;
+	}
+#endif
+
+#ifdef RTDEBUG
+	pp_printf("%s:%d %d %d %d %d\n", __func__, __LINE__, cmp, min, *mid, max);
+#endif
+	return 0;
+}
+
+
+struct lrt_hash_entry *rtfd_trigger_entry_find(struct wrtd_trig_id *id)
+{
+	int index, ret;
+
+	ret = trigger_search(ord_tlist, id, 0, tlist_count, &index);
+
+	return ret ? ord_tlist[index] : NULL;
+}
+
+
+/**
+ * It updates a trigger entry. If it does not exist yet, it creates a new
+ * entry. Creating a new entry is not fast as a hash table but actually it
+ * is not important to be fast for this operation.
+ */
+struct lrt_hash_entry * rtfd_trigger_entry_update(struct wrtd_trig_id *id,
+						  int output,
+						  struct lrt_output_rule *rule)
+{
+	int i, k, cmp, index = 0, ret = 0;
+
+	ret = trigger_search(ord_tlist, id, 0, tlist_count, &index);
+
+#ifdef RTDEBUG
+	pp_printf("%s:%d %d %d\n", __func__, __LINE__, index, tlist_count);
+#endif
+
+	if (!ret) { /* entry does not exists, add it */
+		/* Look for an empty slot */
+		for (i = 0; i < FD_HASH_ENTRIES; ++i)
+			if (!(raw_tlist[i].flags & ENTRY_FLAG_VALID))
+				break;
+		if (i >= FD_HASH_ENTRIES)
+			return NULL; /* array is full */
+
+		/* Save new entry */
+		raw_tlist[i].flags |= ENTRY_FLAG_VALID;
+		raw_tlist[i].id = *id;
+		raw_tlist[i].ocfg[output] = *rule;
+
+		/* Order it! */
+		for (k = tlist_count - 1; k >= index; --k)
+			ord_tlist[k + 1] = ord_tlist[k];
+		ord_tlist[index] = &raw_tlist[i];
+
+		tlist_count++;
+	} else { /* entry exists, update its channel rule */
+		memcpy(&ord_tlist[index]->ocfg[output], rule,
+		       sizeof(struct lrt_output_rule));
+	}
+#ifdef RTDEBUG
+	trigget_print_all();
+#endif
+	return ord_tlist[index];
+}
+
+
+/**
+ * It removes an entry from the trigger list.
+ */
+void rtfd_trigger_entry_remove(struct lrt_hash_entry *ent, unsigned int output)
+{
+	int i, index = 0, ret;
+	struct lrt_hash_entry *tmp, *new;
+
+	ret = trigger_search(ord_tlist, &ent->id, 0, tlist_count, &index);
+	if (!ret) {
+#ifdef RTDEBUG
+		pp_printf("%s:%d %d:%d:%d not found\n", __func__, __LINE__,
+			  ent->id.system, ent->id.source_port, ent->id.trigger);
+#endif
+		return; /* entry not found */
+	}
+#ifdef RTDEBUG
+	pp_printf("%s:%d [%d] = %p %d:%d:%d\n", __func__, __LINE__,
+		  index, ord_tlist[index], ord_tlist[index]->id.system,
+		  ord_tlist[index]->id.source_port, ord_tlist[index]->id.trigger);
+#endif
+	/* Remove output rule for the given channel */
+	memset(&ord_tlist[index]->ocfg[output], 0,
+	       sizeof(struct lrt_output_rule));
+
+	/* Remove the entire entry when we don't have rule */
+	for (i = 0; i < FD_NUM_CHANNELS; i++)
+		if (ord_tlist[index]->ocfg[output].state != HASH_ENT_EMPTY)
+			break;
+	if (i < FD_NUM_CHANNELS)
+		return;
+	memset(ord_tlist[index], 0, sizeof(struct lrt_hash_entry));
+
+	/* Move all trigger back */
+	for (i = index; i < tlist_count - 1; i++)
+		ord_tlist[i] = ord_tlist[i + 1];
+	ord_tlist[i] = NULL;
+	tlist_count--;
+
+#ifdef RTDEBUG
+	trigget_print_all();
+#endif
+}
+
+
+int rtfd_trigger_entry_rules_count(unsigned int ch)
+{
+	int i, count = 0;
+
+	for (i = 0; i < tlist_count; ++i) {
+		if (ord_tlist[i]->ocfg[ch].state != HASH_ENT_EMPTY)
+			count++;
+	}
+
+	return count;
+}
+
 
 /* Structure describing a single pulse in the Fine Delay software output queue */
 struct pulse_queue_entry {
@@ -479,7 +689,7 @@ void enqueue_trigger(int output, struct lrt_output_rule *rule,
 
 static void filter_trigger(struct wrtd_trigger_entry *trig)
 {
-	struct lrt_hash_entry *ent = hash_search (&trig->id, NULL);
+	struct lrt_hash_entry *ent = rtfd_trigger_entry_find(&trig->id);
 	int j;
 
 	last_received = *trig;
@@ -490,8 +700,8 @@ static void filter_trigger(struct wrtd_trigger_entry *trig)
 		struct wrtd_trig_id id = trig->id;
 		int seq = trig->seq;
 		for(j = 0; j < FD_NUM_CHANNELS; j++)
-			if(ent->ocfg[j])
-				enqueue_trigger (j, ent->ocfg[j], &id, &ts, seq);
+			if(ent->ocfg[j].state != HASH_ENT_EMPTY)
+				enqueue_trigger (j, &ent->ocfg[j], &id, &ts, seq);
 	}
 }
 
@@ -607,7 +817,7 @@ static inline void ctl_trig_assign (uint32_t seq, struct wrnc_msg *ibuf)
 	int n_req = is_cond ? 2 : 1;
 
 	/* We need at least one or two hash entries */
-	if (hash_free_count() < n_req) {
+	if (tlist_count + n_req >= FD_HASH_ENTRIES) {
 		ctl_nack(seq, -1);
 		return;
 	}
@@ -619,7 +829,7 @@ static inline void ctl_trig_assign (uint32_t seq, struct wrnc_msg *ibuf)
 
 	handle.channel = ch;
 	handle.cond = NULL;
-	handle.trig = hash_add ( &id, ch, &rule );
+	handle.trig = rtfd_trigger_entry_update( &id, ch, &rule );
 
 	/* Notify that there is at least one trigger
 	   assigned to the current channel */
@@ -639,7 +849,7 @@ static inline void ctl_trig_assign (uint32_t seq, struct wrnc_msg *ibuf)
 	rule.state = HASH_ENT_CONDITION | HASH_ENT_DISABLED;
 	rule.cond_ptr = (struct lrt_output_rule *) handle.trig;
 
-	handle.cond = hash_add ( &id, ch, &rule );
+	handle.cond = rtfd_trigger_entry_update( &id, ch, &rule );
 
 out:
 	/* Create the response */
@@ -670,13 +880,13 @@ static inline void ctl_trig_remove (uint32_t seq, struct wrnc_msg *ibuf)
 			out->state = OUT_ST_ARMED;
 		}
 
-		hash_remove(handle.cond, handle.channel);
+		rtfd_trigger_entry_remove(handle.cond, handle.channel);
 
 	}
-	hash_remove(handle.trig, handle.channel);
+	rtfd_trigger_entry_remove(handle.trig, handle.channel);
 
 	/* Remove assigned flag when no trigger is assigned to a channel */
-	if (hash_count_rules(handle.channel) == 0)
+	if (rtfd_trigger_entry_rules_count(handle.channel) == 0)
 		out->flags &= ~WRTD_TRIGGER_ASSIGNED;
 
 	ctl_ack(seq);
@@ -691,7 +901,7 @@ static inline void ctl_chan_enable_trigger (uint32_t seq, struct wrnc_msg *ibuf)
 	wrnc_msg_int32(ibuf, &enable);
 	wrnc_msg_uint32(ibuf, (uint32_t *) &ent);
 
-	struct lrt_output_rule *rule = ent->ocfg[ch];
+	struct lrt_output_rule *rule = &ent->ocfg[ch];
 	if(enable)
 		rule->state &= ~HASH_ENT_DISABLED;
 	else
@@ -716,9 +926,9 @@ static void bag_hash_entry ( struct wrtd_trig_id *id, struct lrt_output_rule *ru
 
 void send_hash_entry (uint32_t seq, int ch, int valid, struct lrt_hash_entry *ent)
 {
-	int is_conditional;
+	int is_conditional, i;
 	struct wrnc_msg obuf = ctl_claim_out_buf();
-	uint32_t id_hash_entry = WRTD_REP_HASH_ENTRY;
+	uint32_t id_hash_entry = WRTD_REP_HASH_ENTRY, next;
         struct lrt_hash_entry *cond = NULL;
 
 	/* Create the response */
@@ -726,7 +936,7 @@ void send_hash_entry (uint32_t seq, int ch, int valid, struct lrt_hash_entry *en
 	wrnc_msg_int32(&obuf, &valid);
 
 	if(valid) {
-		cond = (struct lrt_hash_entry *) ent->ocfg[ch]->cond_ptr;
+		cond = (struct lrt_hash_entry *) ent->ocfg[ch].cond_ptr;
 		is_conditional = (cond ? 1 : 0);
 		wrnc_msg_int32(&obuf, &is_conditional);
 
@@ -734,9 +944,20 @@ void send_hash_entry (uint32_t seq, int ch, int valid, struct lrt_hash_entry *en
 		wrnc_msg_uint32(&obuf, (uint32_t *) &cond);
 
 		/* Send triggers information*/
-		bag_hash_entry(&ent->id, ent->ocfg[ch], &obuf);
+		bag_hash_entry(&ent->id, &ent->ocfg[ch], &obuf);
 		if (cond)
 			wrtd_msg_trig_id(&obuf, &cond->id);
+
+		/* Look for the next trigger declared (this is only used
+		   to get the full list of triggers ) */
+		for (i = 0; i < tlist_count; ++i)
+			if (ord_tlist[i] == ent)
+				break;
+		if (i >= FD_HASH_ENTRIES)
+			next = 0;
+		else
+			next = ord_tlist[i + 1];
+		wrnc_msg_uint32(&obuf, (uint32_t *) &next);
 	}
 
 	hmq_msg_send (&obuf);
@@ -744,18 +965,17 @@ void send_hash_entry (uint32_t seq, int ch, int valid, struct lrt_hash_entry *en
 
 static inline void ctl_read_hash (uint32_t seq, struct wrnc_msg *ibuf )
 {
-	int ch, bucket, pos, is_conditional = 0;
-	uint32_t state_tmp;
+	int ch, entry_ok;
+	uint32_t ptr;
+	struct lrt_hash_entry *ent;
 
-	wrnc_msg_int32(ibuf, &bucket);
-	wrnc_msg_int32(ibuf, &pos);
 	wrnc_msg_int32(ibuf, &ch);
+	wrnc_msg_uint32(ibuf, &ptr);
 
-	struct lrt_hash_entry *ent = hash_get_entry (bucket, pos);
-	int entry_ok = ent && ent->ocfg[ch];
+	ent = !ptr ? ord_tlist[0] : (void *) ptr; /* Get the first one if not specified */
+	entry_ok = ent && ent->ocfg[ch].state != HASH_ENT_EMPTY;
 
 	send_hash_entry (seq, ch, entry_ok, ent);
-
 }
 
 static inline void ctl_chan_get_trigger_by_id (uint32_t seq, struct wrnc_msg *ibuf )
@@ -766,7 +986,7 @@ static inline void ctl_chan_get_trigger_by_id (uint32_t seq, struct wrnc_msg *ib
 	wrnc_msg_int32(ibuf, &ch);
 	wrtd_msg_trig_id(ibuf, &id);
 
-	struct lrt_hash_entry *ent = hash_search (&id, NULL);
+	struct lrt_hash_entry *ent = rtfd_trigger_entry_find(&id);
 
 	send_hash_entry (seq, ch, ent ? 1 : 0, ent);
 }
@@ -821,10 +1041,10 @@ static inline void ctl_chan_set_delay (uint32_t seq, struct wrnc_msg *ibuf)
 	wrnc_msg_int32(ibuf, &ch);
 	wrnc_msg_uint32(ibuf, (uint32_t*) &ent);
 
-	if(ent->ocfg[ch])
+	if(ent->ocfg[ch].state != HASH_ENT_EMPTY)
 	{
-		wrnc_msg_uint32(ibuf, &ent->ocfg[ch]->delay_cycles);
-		wrnc_msg_uint16(ibuf, &ent->ocfg[ch]->delay_frac);
+		wrnc_msg_uint32(ibuf, &ent->ocfg[ch].delay_cycles);
+		wrnc_msg_uint16(ibuf, &ent->ocfg[ch].delay_frac);
 	}
 
 	ctl_ack(seq);
@@ -1137,11 +1357,16 @@ int wr_is_timing_ok()
 
 void init()
 {
+	int i;
+
 	wr_state = WR_LINK_OFFLINE;
 	wr_enable_lock(0);
 
-	hash_init();
 	init_outputs();
+	for (i = 0; i < FD_HASH_ENTRIES; i++) {
+		memset(&raw_tlist[i], 0, sizeof(struct lrt_hash_entry));
+		ord_tlist[i] = NULL;
+	}
 
 	pp_printf("rt-fd firmware initialized.\n");
 }

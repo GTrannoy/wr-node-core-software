@@ -417,16 +417,20 @@ static int wrtd_cmd_trig_unassign(struct wrtd_node *wrtd, int output,
 				  int argc, char *argv[])
 {
 	struct wrtd_output_trigger_state trig;
-	int index, err;
+	struct wrtd_trig_id tid;
+	int err;
 
 	if (argc != 1 || argv[0] == NULL) {
-		fprintf(stderr, "Missing arguments: unassign <trigger index>\n");
+		fprintf(stderr, "Missing arguments: unassign <trigger ID>\n");
 		return -1;
 	}
-	index = atoi(argv[0]);
+
+	err = parse_trigger_id(argv[0], &tid);
+	if (err)
+		return err;
 
 	/* Get a trigger */
-	err = wrtd_out_trig_state_get_by_index(wrtd, index, output, &trig);
+	err = wrtd_out_trig_state_get_by_id(wrtd, &tid, &trig);
 	if (err)
 		return err;
 
@@ -525,8 +529,6 @@ static int wrtd_cmd_trig_find(struct wrtd_node *wrtd, int output,
 
 static void help()
 {
-	int i;
-
 	fprintf(stderr, "\n\n");
 	fprintf(stderr, "wrtd-out-config -D 0x<hex-number> -C <string> -c <number> [cmd-options]\n\n");
 	fprintf(stderr, "It configures an output channel on a White Rabbit Trigger-Distribution node\n\n");

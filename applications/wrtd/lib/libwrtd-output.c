@@ -63,7 +63,7 @@ static int __wrtd_out_trig_get(struct wrtd_desc *wrtd, uint32_t output,
 			       struct wrnc_msg *msg,
 			       struct wrtd_output_trigger_state *trigger)
 {
-	uint32_t id = 0, seq = 0, is_conditional, entry_ok, state;
+	uint32_t id = 0, seq = 0, entry_ok, state, next_trig;
 	uint32_t latency_worst, latency_avg_nsamples, latency_avg_sum;
 	int err;
 
@@ -82,13 +82,12 @@ static int __wrtd_out_trig_get(struct wrtd_desc *wrtd, uint32_t output,
 	}
 
 	wrnc_msg_uint32(msg, &entry_ok);
-	wrnc_msg_uint32(msg, &trigger->is_conditional);
-
 	if (!entry_ok) {
 		errno = EWRTD_INVALID_ANSWER_HASH;
 		return -1;
 	}
 
+	wrnc_msg_int32(msg, &trigger->is_conditional);
 	trigger->handle.channel = output;
 	wrnc_msg_uint32(msg, (uint32_t *) &trigger->handle.ptr_trig);
 	wrnc_msg_uint32(msg, (uint32_t *) &trigger->handle.ptr_cond);
@@ -103,6 +102,10 @@ static int __wrtd_out_trig_get(struct wrtd_desc *wrtd, uint32_t output,
 	wrnc_msg_uint32(msg, &trigger->missed_pulses);
 	if (trigger->is_conditional)
 		wrtd_msg_trig_id(msg, &trigger->condition);
+
+	/* Get pointer to the next trigger declared in the RT application */
+	wrnc_msg_uint32(msg, &next_trig);
+	trigger->private_data = (void *) next_trig;
 
 	if (latency_avg_nsamples == 0)
 		trigger->latency_average_us = 0;
@@ -120,49 +123,6 @@ static int __wrtd_out_trig_get(struct wrtd_desc *wrtd, uint32_t output,
 	}
 
 	return 0;
-}
-
-
-/**
- * Retreives a trigger entry specified by a position in the hash table 
- * (bucket/index number) or by its handle (if handle parameter is not null)
- * @param[in] dev device token
- * @param[in] output index (0-based) of output channel
- * @param[in] bucket bucket in the hash table to read
- * @param[in] index specifies which entry in the selected bucket will be read
- * @param[in] handle handle of the trigger to read (if null, takes bucket/index)
- * @param[out] trigger retrieved trigger entry
- */
-
-static int wrtd_out_trig_get(struct wrtd_node *dev, unsigned int output,
-			     unsigned int bucket, unsigned int index,
-			     struct wrtd_trigger_handle *handle,
-			     struct wrtd_output_trigger_state *trigger)
-{
-	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg = wrnc_msg_init (16);
-	uint32_t seq = 0, id ;
-	uint32_t ptr = 0;
-
-	if (output > FD_NUM_CHANNELS) {
-		errno = EWRTD_INVALID_CHANNEL;
-		return -1;
-	}
-
-	/* Build the message */
-	id = WRTD_CMD_FD_READ_HASH;
-	wrnc_msg_header (&msg, &id, &seq);
-	wrnc_msg_uint32 (&msg, &bucket);
-	wrnc_msg_uint32 (&msg, &index);
-	wrnc_msg_uint32 (&msg, &output);
-
-	if(handle)
-		ptr = handle->ptr_cond ? handle->ptr_cond : handle->ptr_trig;
-
-	wrnc_msg_uint32 (&msg, &ptr);
-
-	/* Send the message and get answer */
-	return  __wrtd_out_trig_get(wrtd, output, &msg, trigger);
 }
 
 
@@ -403,30 +363,26 @@ int wrtd_out_trig_get_all(struct wrtd_node *dev, unsigned int output,
 			  struct wrtd_output_trigger_state *triggers,
 			  int max_count)
 {
-	int err, bucket, count = 0, index;
+	int err, count = 0;
+	struct wrtd_trigger_handle handle = {0, 0, output};
 
 	if (output > FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
 
-#define WRTD_HASH_ENTRY_OK 0
-#define WRTD_HASH_ENTRY_CONDITIONAL 1
-#define WRTD_HASH_ENTRY_LAST 2
+	do {
+		triggers[count].private_data = NULL;
+		err = wrtd_out_trig_state_get_by_handle(dev, &handle,
+							&triggers[count]);
+		/* Save pointer to the next trigger in the output application */
+		handle.ptr_trig = (uint32_t) triggers[count].private_data;
+		count++;
+	} while(!err && handle.ptr_trig && count < max_count);
 
-	for (bucket = 0; bucket < FD_HASH_ENTRIES; bucket++) {
-		index = 0;
-		while (count < max_count) {
-			err = wrtd_out_trig_get(dev, output, bucket, index,
-						NULL, &triggers[count]);
-			if (err && errno == EWRTD_INVALID_ANSWER_HASH)
-				break;
-			else if (err)
-				return -1;
-			count++;
-			index++;
-		}
-	}
+	/* Do not count trigger with error */
+	if (err)
+		count--;
 
 	return count;
 }
@@ -436,20 +392,22 @@ int wrtd_out_trig_get_all(struct wrtd_node *dev, unsigned int output,
  * It returns a trigger state from a given handle.
  * @param[in] dev pointer to open node device.
  * @param[in] handle trigger where act on
- * @param[out] state trigger status
+ * @param[out] trigger trigger status
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_out_trig_state_get_by_handle(struct wrtd_node *dev,
 				      struct wrtd_trigger_handle *handle,
-				      struct wrtd_output_trigger_state *state)
+				      struct wrtd_output_trigger_state *trigger)
 {
-	int err;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrnc_msg msg = wrnc_msg_init(6);
+	uint32_t seq = 0, id = WRTD_CMD_FD_READ_HASH;
 
-	err = wrtd_out_trig_get(dev, handle->channel, 0, 0, handle, state);
-	if (err)
-		return -1;
+	wrnc_msg_header(&msg, &id, &seq);
+	wrnc_msg_int32(&msg, &handle->channel);
+	wrnc_msg_uint32(&msg, &handle->ptr_trig);
 
-	return 0;
+	return __wrtd_out_trig_get(wrtd, handle->channel, &msg, trigger);
 }
 
 
@@ -477,7 +435,7 @@ int wrtd_out_trig_state_get_by_id(struct wrtd_node *dev,
 		wrtd_msg_trig_id(&msg, tid);
 
 		ret = __wrtd_out_trig_get(wrtd, i, &msg, trigger);
-		if (ret == WRTD_HASH_ENTRY_OK)
+		if (!ret)
 			return 0;
 	}
 
@@ -689,7 +647,7 @@ int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
 			      enum wrtd_trigger_mode mode)
 {
 	struct wrnc_msg msg  = wrnc_msg_init(4);
-	uint32_t seq = 0, id;
+	uint32_t seq = 0, id, m = mode;
 
 	if (output > FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
@@ -700,7 +658,7 @@ int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
 	id = WRTD_CMD_FD_CHAN_SET_MODE;
 	wrnc_msg_header(&msg, &id, &seq);
 	wrnc_msg_uint32(&msg, &output);
-	wrnc_msg_uint32(&msg, &mode);
+	wrnc_msg_uint32(&msg, &m);
 
 	return wrtd_out_trivial_request (dev, &msg);
 }

@@ -22,8 +22,6 @@ static void help()
 	fprintf(stderr, "-D device id\n");
 	fprintf(stderr, "-n number of messages to read (0 means infinite)\n");
 	fprintf(stderr, "-s share the logging device with other processes\n");
-	fprintf(stderr, "-c <ch> channel to listen\n");
-	fprintf(stderr, "-l");
 	exit(1);
 }
 
@@ -40,8 +38,11 @@ static int print_message(struct wrnc_hmq *hmq)
 	fprintf(stdout, "Channel     %d\n", log.channel);
 	fprintf(stdout, "Miss reason %x\n", log.miss_reason);
 	fprintf(stdout, "Seq         %d\n", log.seq);
-	fprintf(stdout, "Identifier  %04x:%04x:%04x\n",
-		log.id.system, log.id.source_port, log.id.trigger);
+	if (log.type != WRTD_LOG_RAW)
+		fprintf(stdout, "Identifier  ----:----:----\n");
+	else
+		fprintf(stdout, "Identifier  %04x:%04x:%04x\n",
+			log.id.system, log.id.source_port, log.id.trigger);
 	fprintf(stdout, "Timestamp   %"PRIu64"s  %"PRIu32"tick %"PRIu32"frac\n",
 		log.ts.seconds, log.ts.ticks, log.ts.frac);
 	fprintf(stdout, "----\n");
@@ -59,7 +60,7 @@ int main(int argc, char *argv[])
 	uint32_t dev_id = 0;
 	char c;
 
-	while ((c = getopt (argc, argv, "hD:n:sc:")) != -1) {
+	while ((c = getopt (argc, argv, "hD:n:s")) != -1) {
 		switch (c) {
 		default:
 			help();
@@ -72,9 +73,6 @@ int main(int argc, char *argv[])
 			break;
 		case 's':
 			share = 1;
-			break;
-		case 'c':
-			sscanf(optarg, "%d", &chan);
 			break;
 		}
 	}

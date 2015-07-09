@@ -37,7 +37,7 @@ static int print_message(struct wrnc_hmq *hmq)
 	fprintf(stdout, "Channel     %d\n", log.channel);
 	fprintf(stdout, "Miss reason %x\n", log.miss_reason);
 	fprintf(stdout, "Seq         %d\n", log.seq);
-	if (log.type != WRTD_LOG_RAW)
+	if (log.type == WRTD_LOG_RAW)
 		fprintf(stdout, "Identifier  ----:----:----\n");
 	else
 		fprintf(stdout, "Identifier  %04x:%04x:%04x\n",

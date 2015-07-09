@@ -242,41 +242,6 @@ int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
 
 
 /**
- * It sets the logging interface shared mode. When the logging interface
- * is shared all users will receive the same messages.
- * Rembember that the logging interface is not "per-channel" but "per-core".
- * Even if it is possible to fake a per-channel behaviour
- * for wrtd_in_log_open(); there is no way to set the shared mode for
- * single channel
- * @param[in] dev device token
- * @param[in] shared 1 share, 0 not share
- * @return 0 on success, -1 on error and errno is set appropriately
- */
-int wrtd_out_log_share_set(struct wrtd_node *dev, unsigned int shared)
-{
-	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-
-	return wrnc_hmq_share_set(wrtd->wrnc, WRNC_HMQ_OUTCOMING,
-				  WRTD_OUT_FD_LOGGING, shared);
-}
-
-
-/**
- * It gets the current shared mode status for the logging interface
- * @param[in] dev device token
- * @param[out] shared 1 share, 0 not share
- * @return 0 on success, -1 on error and errno is set appropriately
- */
-int wrtd_out_log_share_get(struct wrtd_node *dev, unsigned int *shared)
-{
-	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-
-	return wrnc_hmq_share_get(wrtd->wrnc, WRNC_HMQ_OUTCOMING,
-				  WRTD_OUT_FD_LOGGING, shared);
-}
-
-
-/**
  * It opens the logging interface for device a given divice. The  default
  * logging level will be applied to all device channels. You can change it
  * later using wrtd_in_log_level_set()
@@ -305,39 +270,4 @@ int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
 			  uint32_t log_level)
 {
 	return wrtd_log_level_set(dev, input, log_level, WRTD_CORE_IN);
-}
-
-
-/**
- * It sets the logging interface shared mode. When the logging interface
- * is shared all users will receive the same messages.
- * Rembember that the logging interface is not "per-channel" but "per-core".
- * Even if it is possible to fake a per-channel behaviour
- * for wrtd_in_log_open(); there is no way to set the shared mode for
- * single channel
- * @param[in] dev device token
- * @param[in] shared 1 share, 0 not share
- * @return 0 on success, -1 on error and errno is set appropriately
- */
-int wrtd_in_log_share_set(struct wrtd_node *dev, unsigned int shared)
-{
-	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-
-	return wrnc_hmq_share_set(wrtd->wrnc, WRNC_HMQ_OUTCOMING,
-				  WRTD_OUT_TDC_LOGGING, shared);
-}
-
-
-/**
- * It gets the current shared mode status for the logging interface
- * @param[in] dev device token
- * @param[out] shared 1 share, 0 not share
- * @return 0 on success, -1 on error and errno is set appropriately
- */
-int wrtd_in_log_share_get(struct wrtd_node *dev, unsigned int *shared)
-{
-	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-
-	return wrnc_hmq_share_get(wrtd->wrnc, WRNC_HMQ_OUTCOMING,
-				  WRTD_OUT_TDC_LOGGING, shared);
 }

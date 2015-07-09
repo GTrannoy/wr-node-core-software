@@ -83,6 +83,49 @@ void wrtd_exit()
 
 
 /**
+ * It opens and initialize the configuration for the given device
+ * @param[in] device_id device identifier
+ * @param[in] is_lun 1 if device_id is a LUN
+ * @return It returns an anonymous wrtd_node structure on success.
+ *         On error, NULL is returned, and errno is set appropriately.
+ */
+static struct wrtd_node *wrtd_open(uint32_t device_id, unsigned int is_lun)
+{
+	struct wrtd_desc *wrtd;
+	int err;
+
+	wrtd = malloc(sizeof(struct wrtd_desc));
+	if (!wrtd)
+		return NULL;
+
+	if (is_lun)
+		wrtd->wrnc = wrnc_open_by_lun(device_id);
+	else
+		wrtd->wrnc = wrnc_open_by_fmc(device_id);
+	if (!wrtd->wrnc)
+		goto out;
+
+	wrtd->dev_id = device_id;
+
+	/* Logging interface is always in share mode */
+	err = wrnc_hmq_share_set(wrtd->wrnc, WRNC_HMQ_OUTCOMING,
+				 WRTD_OUT_FD_LOGGING, 1);
+	if (err)
+		goto out;
+
+	err = wrnc_hmq_share_set(wrtd->wrnc, WRNC_HMQ_OUTCOMING,
+				 WRTD_OUT_TDC_LOGGING, 1);
+	if (err)
+		goto out;
+
+	return (struct wrtd_node *)wrtd;
+
+out:
+	free(wrtd);
+	return NULL;
+}
+
+/**
  * Open a WRTD node device using FMC ID
  * @param[in] device_id FMC device identificator
  * @return It returns an anonymous wrtd_node structure on success.
@@ -90,22 +133,7 @@ void wrtd_exit()
  */
 struct wrtd_node *wrtd_open_by_fmc(uint32_t device_id)
 {
-	struct wrtd_desc *wrtd;
-
-	wrtd = malloc(sizeof(struct wrtd_desc));
-	if (!wrtd)
-		return NULL;
-
-	wrtd->wrnc = wrnc_open_by_fmc(device_id);
-	if (!wrtd->wrnc)
-		goto out;
-
-	wrtd->dev_id = device_id;
-	return (struct wrtd_node *)wrtd;
-
-out:
-	free(wrtd);
-	return NULL;
+	return wrtd_open(device_id, 0);
 }
 
 
@@ -118,23 +146,7 @@ out:
  */
 struct wrtd_node *wrtd_open_by_lun(int lun)
 {
-	struct wrtd_desc *wrtd;
-
-	wrtd = malloc(sizeof(struct wrtd_desc));
-	if (!wrtd)
-		return NULL;
-
-	wrtd->wrnc = wrnc_open_by_lun(lun);
-	if (!wrtd->wrnc)
-		goto out;
-
-	wrtd->dev_id = lun;
-
-	return (struct wrtd_node *)wrtd;
-
-out:
-	free(wrtd);
-	return NULL;
+	return wrtd_open(lun, 1);
 }
 
 

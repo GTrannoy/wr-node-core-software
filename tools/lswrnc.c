@@ -51,6 +51,8 @@ int main(int argc, char *argv[])
 	}
 
 	list = wrnc_list();
+	if (!list)
+		goto out;
 	for (i = 0; list[i]; ++i) {
 		fprintf(stdout, "%s\n" , list[i]);
 		wrnc = wrnc_open(list[i]);
@@ -68,6 +70,6 @@ int main(int argc, char *argv[])
 		wrnc_close(wrnc);
 	}
 	wrnc_list_free(list);
-
+out:
         exit(0);
 }

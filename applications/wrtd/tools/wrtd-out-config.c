@@ -155,6 +155,8 @@ static void dump_output_state(struct wrtd_output_state *state)
 	printf(" - Total RX messages:             %-10d\n", state->received_messages);
 	printf(" - Total loopback messages:       %-10d\n", state->received_loopback);
 
+	wrtd_strlogging_full(tmp, state->log_level);
+	printf(" - Log level:             %s\n", tmp);
 }
 
 static int wrtd_cmq_has_trig(struct wrtd_node *wrtd, int output,

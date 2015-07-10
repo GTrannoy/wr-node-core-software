@@ -133,7 +133,7 @@ void dump_input_state(struct wrtd_input_state *state)
 	printf(" - Dead time:             %" PRIu64 " ns\n",
 	       ts_to_picos( state->dead_time ) / 1000 );
 
-	decode_log_level(tmp,state->log_level);
+	wrtd_strlogging_full(tmp, state->log_level);
 	printf(" - Log level:             %s\n", tmp);
 
 }

@@ -93,26 +93,6 @@ void decode_mode(char *buf, int mode)
     }
 }
 
-void decode_log_level(char *buf, uint32_t flags)
-{
-    strcpy(buf,"");
-    if(flags == 0)
-        strcpy(buf, "off");
-    if (flags & WRTD_LOG_RAW)
-        strcat(buf, "Raw ");
-    if (flags & WRTD_LOG_SENT)
-        strcat(buf, "Sent ");
-    if (flags & WRTD_LOG_PROMISC)
-        strcat(buf, "Promiscious ");
-    if (flags & WRTD_LOG_FILTERED)
-        strcat(buf, "Filtered ");
-    if (flags & WRTD_LOG_EXECUTED)
-        strcat(buf, "Exceuted ");
-    if (flags & WRTD_LOG_MISSED)
-        strcat(buf, "Missed ");
-}
-
-
 void format_ts(char *buf, struct wr_timestamp ts, int with_seconds)
 {
     uint64_t picoseconds = (uint64_t) ts.ticks * 8000 + (uint64_t)ts.frac * 8000ULL / 4096ULL;
@@ -198,35 +178,23 @@ int parse_trigger_id(const char *str, struct wrtd_trig_id *id)
 
 int parse_log_level (char *list[], int count, int *log_level)
 {
-    int l = 0;
+	uint32_t l = 0, tmp;
 
     while(count--)
     {
         if(!list[0])
             return -1;
 
+	tmp = wrtd_strlogging_to_level(list[0]);
+	if (tmp == WRTD_LOG_ALL || tmp == WRTD_LOG_NOTHING) {
+		l = tmp;
+		break;
+	}
+	l |= tmp;
         if(!strcmp(list[0], "all")) {
             l = WRTD_LOG_ALL;
             break;
         }
-        else if(!strcmp(list[0], "off")) {
-            l = 0;
-            break;
-        } else if(!strcmp(list[0], "promisc"))
-            l |= WRTD_LOG_PROMISC;
-        else if(!strcmp(list[0], "raw"))
-            l |= WRTD_LOG_RAW;
-        else if(!strcmp(list[0], "executed"))
-            l |= WRTD_LOG_EXECUTED;
-        else if( !strcmp(list[0], "missed"))
-            l |= WRTD_LOG_MISSED;
-        else if( !strcmp(list[0], "sent"))
-            l |= WRTD_LOG_SENT;
-        else if( !strcmp(list[0], "filtered"))
-            l |= WRTD_LOG_FILTERED;
-        else
-            return -1;
-
         list++;
     }
 

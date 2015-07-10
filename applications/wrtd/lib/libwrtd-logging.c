@@ -293,6 +293,28 @@ int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
 
 
 /**
+ * It gets the logging level for an output channel
+ * @param[in] dev device token
+ * @param[in] output index (0-based) of output channel
+ * @param[out] log_level current log level used by the Real-Time application
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_out_log_level_get(struct wrtd_node *dev, unsigned int input,
+			   uint32_t *log_level)
+{
+	struct wrtd_output_state state;
+	int err;
+
+	err = wrtd_out_state_get(dev, input, &state);
+	if (err)
+		return err;
+
+	*log_level = state.log_level;
+
+	return 0;
+}
+
+/**
  * It opens the logging interface for device a given divice. The  default
  * logging level will be applied to all device channels. You can change it
  * later using wrtd_in_log_level_set()
@@ -321,4 +343,26 @@ int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
 			  uint32_t log_level)
 {
 	return wrtd_log_level_set(dev, input, log_level, WRTD_CORE_IN);
+}
+
+
+/**
+ * It gets the logging level for an input channel
+ * @param[in] dev device token
+ * @param[in] input index (0-based) of input channel
+ * @param[out] log_level current log level used by the Real-Time application
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_in_log_level_get(struct wrtd_node *dev, unsigned int input,
+			  uint32_t *log_level)
+{
+	struct wrtd_input_state state;
+	int err;
+
+	err = wrtd_in_state_get(dev, input, &state);
+	if (err)
+		return err;
+
+	*log_level = state.log_level;
+	return 0;
 }

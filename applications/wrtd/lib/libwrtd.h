@@ -199,8 +199,12 @@ extern struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev,
 					 int input);
 extern int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
 				 uint32_t log_level);
+extern int wrtd_in_log_level_get(struct wrtd_node *dev, unsigned int input,
+				 uint32_t *log_level);
 extern int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
 				  uint32_t log_level);
+extern int wrtd_out_log_level_get(struct wrtd_node *dev, unsigned int input,
+				  uint32_t *log_level);
 extern struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev,
 					  uint32_t lvl,
 					  int output);

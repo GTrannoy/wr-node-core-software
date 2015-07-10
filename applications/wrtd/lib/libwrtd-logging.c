@@ -20,19 +20,19 @@ const char *wrtd_strlogging(enum wrtd_log_level lvl)
 {
 	switch (lvl) {
 	case WRTD_LOG_NOTHING:
-		return "No logging";
+		return "off";
 	case WRTD_LOG_RAW:
-		return "incoming pulse";
+		return "raw";
 	case WRTD_LOG_SENT:
-		return "trigger message sent";
+		return "sent";
 	case WRTD_LOG_PROMISC:
-		return "received trigger message";
+		return "promiscious";
 	case WRTD_LOG_FILTERED:
-		return "trigger message assigned";
+		return "filtered";
 	case WRTD_LOG_EXECUTED:
-		return "pulse generated";
+		return "executed";
 	case WRTD_LOG_MISSED:
-		return "pulse missed";
+		return "missed";
 	case WRTD_LOG_ALL:
 		return "all";
 	}

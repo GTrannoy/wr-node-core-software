@@ -21,6 +21,7 @@ static void help()
 	fprintf(stderr, "It shows logging information coming from Real-Time applications\n");
 	fprintf(stderr, "-D device id\n");
 	fprintf(stderr, "-n number of messages to read (0 means infinite)\n");
+	fprintf(stderr, "-s show current logging level for all channels\n");
 	exit(1);
 }
 
@@ -49,12 +50,34 @@ static int print_message(struct wrnc_hmq *hmq)
 	return 0;
 }
 
+static void show_logging_level(struct wrtd_node *dev, enum wrtd_core core)
+{
+	uint32_t log_level;
+	char log_level_str[128];
+	int i, err, max = core ? FD_NUM_CHANNELS : TDC_NUM_CHANNELS;
+
+	fprintf(stdout, "%s log levels\n", core ? "Output" : "Input");
+	for (i = 0; i < max; i++) {
+		if (core)
+			err = wrtd_out_log_level_get(dev, i, &log_level);
+		else
+			err = wrtd_in_log_level_get(dev, i, &log_level);
+		if (err) {
+			fprintf(stdout, "\tchannel %d: --- ERROR ---\n", i);
+		} else {
+			wrtd_strlogging_full(log_level_str, log_level);
+			fprintf(stdout, "\tchannel %d: %s\n", i, log_level_str);
+		}
+	}
+}
+
+
 #define N_LOG 2
 int main(int argc, char *argv[])
 {
 	struct wrnc_hmq *log[N_LOG];
 	struct pollfd p[N_LOG];  /* each node has 2 logging channels (in, out) */
-	int n = 0, i = 0, ret, k, err, chan = -1;
+	int n = 0, i = 0, ret, k, err, chan = -1, show_log = 0;
 	struct wrtd_node *wrtd;
 	uint32_t dev_id = 0;
 	char c;
@@ -69,6 +92,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'n':
 			sscanf(optarg, "0x%x", &n);
+			break;
+		case 's':
+			show_log = 1;
 			break;
 		}
 	}
@@ -88,6 +114,12 @@ int main(int argc, char *argv[])
 	if (!wrtd) {
 		fprintf(stderr, "Cannot open WRNC: %s\n", wrtd_strerror(errno));
 		exit(1);
+	}
+
+	if (show_log) {
+		show_logging_level(wrtd, WRTD_CORE_IN);
+		show_logging_level(wrtd, WRTD_CORE_OUT);
+		exit(0);
 	}
 
 	/* Open logging interfaces */

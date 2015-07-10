@@ -189,6 +189,8 @@ extern void wrtd_sec_pico_to_ts(uint64_t sec, uint64_t pico,
  * @{
  */
 extern const char *wrtd_strlogging(enum wrtd_log_level lvl);
+enum wrtd_log_level wrtd_strlogging_to_level(char *log);
+extern void wrtd_strlogging_full(char *buf, uint32_t log_level);
 extern int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
 			 int count);
 extern void wrtd_log_close(struct wrnc_hmq *hmq);

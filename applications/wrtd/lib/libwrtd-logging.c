@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
+#include <string.h>
 #include <libwrnc.h>
 #include <libwrtd-internal.h>
 #include <wrtd-serializers.h>
@@ -38,6 +39,56 @@ const char *wrtd_strlogging(enum wrtd_log_level lvl)
 	}
 
 	return "n/a";
+}
+
+
+/**
+ * It returns the full string describing the log_level in use
+ * @param[out] buf where write the string
+ * @param[in] log_level the log level to describe
+ */
+void wrtd_strlogging_full(char *buf, uint32_t log_level)
+{
+	enum wrtd_log_level lvl;
+
+	if (!log_level) { /* No log level */
+		strcpy(buf, wrtd_strlogging(log_level));
+		return;
+	}
+
+	strcpy(buf,"");
+	for (lvl = 0x1; lvl <= WRTD_LOG_MISSED; lvl <<= 1) {
+		if (lvl & log_level) {
+			strcat(buf, wrtd_strlogging(lvl));
+			strcat(buf, " ");
+		}
+	}
+}
+
+
+/**
+ * It converts a given logging string into a log_level
+ * @param[in] log string log level
+ * @return the correspondent log level enum
+ */
+enum wrtd_log_level wrtd_strlogging_to_level(char *log)
+{
+	if(!strcmp(log, "all"))
+		return WRTD_LOG_ALL;
+        if(!strcmp(log, "promiscious"))
+		return WRTD_LOG_PROMISC;
+        if(!strcmp(log, "raw"))
+		return WRTD_LOG_RAW;
+        if(!strcmp(log, "executed"))
+		return WRTD_LOG_EXECUTED;
+        if(!strcmp(log, "missed"))
+		return WRTD_LOG_MISSED;
+        if(!strcmp(log, "sent"))
+		return WRTD_LOG_SENT;
+        if(!strcmp(log, "filtered"))
+		return WRTD_LOG_FILTERED;
+
+	return WRTD_LOG_NOTHING;
 }
 
 

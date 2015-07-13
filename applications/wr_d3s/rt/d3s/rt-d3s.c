@@ -71,6 +71,7 @@ void* gqueue_front(struct generic_queue *p)
 {
     if (!p->count)
        return NULL;
+
     return p->buf + p->tail * p->entry_size;
 }
 
@@ -211,15 +212,18 @@ struct dds_loop_stats {
 
 
 struct dds_tune_entry {
-    int target_sample;
-    int target_tai;
+    int sample;
+    int tai;
     int tune;
 };
+
+#define SLAVE_WAIT_FIXUP 0
+#define SLAVE_RUN 1
+#define SLAVE_APPLY_FIXUP 2
 
 #define TUNE_QUEUE_ENTRIES 8
 
 static uint32_t _tune_queue_buf[ TUNE_QUEUE_ENTRIES * sizeof(struct dds_tune_entry) / 4];
-
 
 struct dds_loop_state {
     int master; // non-zero: master mode
@@ -231,12 +235,17 @@ struct dds_loop_state {
     int lock_samples;
     int delock_samples;
     int lock_threshold;
-    int64_t fixup_tune;
+    int64_t fixup_phase;
     int64_t base_tune;
+    int64_t fixup_sum;
+    
     int fixup_tune_valid;
     int sample_count;
+    int samples_per_second;
     int stream_id;
     int sampling_divider;
+    int slave_delay;
+    int slave_state;
     struct dds_loop_stats stats;
     struct generic_queue tune_queue;
 };
@@ -259,6 +268,7 @@ int dds_pi_update(struct dds_loop_state *state, int phase_error)
             state->lock_counter++;
             if(state->lock_counter == state->lock_samples)
             {
+		pp_printf("[master] RF lock acquired\n");
                 state->locked = 1;
                 state->lock_counter = 0;
             }
@@ -269,6 +279,7 @@ int dds_pi_update(struct dds_loop_state *state, int phase_error)
             state->lock_counter++;
             if(state->lock_counter == state->delock_samples)
             {
+		pp_printf("[master] RF lock lost\n");
                 state->locked = 0;
                 state->lock_counter = 0;
             }
@@ -308,6 +319,7 @@ static inline void dds_send_phase_fixup( struct dds_loop_state *state, int64_t f
 
     msg->phase_fixup.tai = ts->seconds;
     msg->phase_fixup.fixup_value = fixup_phase;
+    msg->phase_fixup.base_tune = state->base_tune;
 
 //  pp_printf("fixup-phase %x %x\n", ((uint32_t) fixup_phase ) >> 32, (uint32_t)fixup_phase & 0xffffffff);
 
@@ -331,14 +343,27 @@ static inline void dds_send_tune_update( struct dds_loop_state *state, int sampl
     state->stats.sent_tunes++;
 }
 
+static inline int dds_poll_next_sample(uint32_t *pd_data)
+{
+	uint32_t v;
+        v = dp_readl(DDS_REG_PD_DATA);
+        if (!( v & DDS_PD_DATA_VALID))
+            return 0;
+        
+        *pd_data = v;
+
+        dp_writel(0, DDS_REG_PD_DATA);
+
+        return 1;
+}
+
 static inline void dds_master_update(struct dds_loop_state *state)
 {
-        uint32_t pd_data;
-
-        pd_data = dp_readl(DDS_REG_PD_DATA);
-        if (!( pd_data & DDS_PD_DATA_VALID))
-            return;
-
+	uint32_t pd_data;
+	
+	if(!dds_poll_next_sample(&pd_data))
+    	    return;
+	
         // produce timestamp of the current tune sample
         int sample_idx = dp_readl(DDS_REG_SAMPLE_IDX);
         struct wr_timestamp ts;
@@ -347,13 +372,11 @@ static inline void dds_master_update(struct dds_loop_state *state)
         ts.ticks = sample_idx * state->sampling_divider * 125;
         
         /* clear valid flag */
-        dp_writel(0, DDS_REG_PD_DATA);
-
         int y = dds_pi_update(state, pd_data & 0xffff);
 
         dp_writel(y, DDS_REG_TUNE_VAL);
 
-        if(!state->locked)
+        if(!state->locked || !wr_is_timing_ok())
             return;
 
         if(sample_idx == 0)
@@ -361,7 +384,7 @@ static inline void dds_master_update(struct dds_loop_state *state)
             uint32_t snap_lo = dp_readl ( DDS_REG_ACC_SNAP_LO );
             uint32_t snap_hi = dp_readl ( DDS_REG_ACC_SNAP_HI );
 
-            pp_printf("Snap: %x %x pkts %d\n", snap_lo, snap_hi, state->stats.sent_packets);
+//            pp_printf("Snap: %x %x pkts %d\n", snap_lo, snap_hi, state->stats.sent_packets);
 
             int64_t acc_snap = snap_lo;
             acc_snap |= ((int64_t) snap_hi ) << 32;
@@ -369,32 +392,155 @@ static inline void dds_master_update(struct dds_loop_state *state)
             dds_send_phase_fixup(state, acc_snap, &ts );
         }
  
-        dds_send_tune_update(state, sample_idx, y, &ts);
- }
+        dds_send_tune_update(state, sample_idx, y, &ts);    
+}
 
 
+void dds_slave_got_fixup(struct dds_loop_state *state, struct wr_d3s_remote_message *msg)
+{
+    if ( state->slave_state == SLAVE_WAIT_FIXUP )
+    {
 
-void do_rx()
+	if( state->stream_id != msg->stream_id)
+        	return; // not a stream we're interested in
+
+	state->base_tune = msg->phase_fixup.base_tune;
+	state->sampling_divider = msg->sampling_divider;
+	state->slave_delay = 2; // 1 sample -> 100 us (with sampling divider = 100)
+	state->samples_per_second = 1000000 / state->sampling_divider;
+	state->fixup_phase = msg->phase_fixup.fixup_value;
+	
+        uint32_t tune_hi = (state->base_tune >> 32) & 0xffffffff;
+	uint32_t tune_lo = (state->base_tune >> 0) & 0xffffffff;
+
+        pp_printf("BaseHI=0x%x\n", tune_hi);
+        pp_printf("BaseO=0x%x\n", tune_lo);
+        pp_printf("Delay %d samples, div %d, Fsamp %d\n\n", state->slave_delay, state->sampling_divider, state->samples_per_second);
+
+        /* set DDS center frequency */
+        dp_writel(state->base_tune >> 32, DDS_REG_FREQ_HI);
+        dp_writel(state->base_tune & 0xffffffff, DDS_REG_FREQ_LO);
+
+        dp_writel(DDS_CR_SAMP_EN | DDS_CR_SAMP_DIV_W(state->sampling_divider - 1), DDS_REG_CR);
+
+	gqueue_init(&state->tune_queue, TUNE_QUEUE_ENTRIES, sizeof(struct dds_tune_entry), _tune_queue_buf);
+
+	state->fixup_sum = 0;
+	state->slave_state = SLAVE_RUN;//APPLY_FIXUP;
+    }
+}
+
+void dds_slave_got_tune_update(struct dds_loop_state *state, struct wr_d3s_remote_message *msg)
+{
+    switch ( state->slave_state )
+    {
+	case SLAVE_RUN:
+	case SLAVE_APPLY_FIXUP:
+	{	
+	    if( state->stream_id != msg->stream_id)
+        	return; // not a stream we're interested in
+
+    	    struct dds_tune_entry *ent = gqueue_push( &state->tune_queue );
+	    if(!ent)
+		return; // queue full
+
+	    ent->sample = msg->tune_update.sample_id;
+	    ent->tai = msg->tune_update.tai;
+	    ent->tune  = msg->tune_update.tune;
+
+		ent->sample += state->slave_delay;
+
+		if(ent->sample >= state->samples_per_second)
+		{
+		    ent->sample -= state->samples_per_second;
+		    ent->tai++;
+//		    pp_printf("Overflow %d %d\n", ent->sample, sample_idx);
+		}
+
+	}
+    	default:
+	    break;
+    }
+}
+
+void do_rx(struct dds_loop_state *state)
 {
     if (rmq_poll( WR_D3S_REMOTE_IN_STREAM )) {
         struct wr_d3s_remote_message *msg = mq_map_in_buffer (1, WR_D3S_REMOTE_IN_STREAM) - sizeof(struct rmq_message_addr);
 
-        pp_printf("Git Packet!\n");
         switch(msg->type) 
         {
             case D3S_MSG_PHASE_FIXUP:
-                pp_printf("Got Phase fixup: stream %d tai %d\n", msg->stream_id, (uint32_t) msg->phase_fixup.tai);
-                break;
+            	    dds_slave_got_fixup(state, msg);
+            	    break;
+            case D3S_MSG_TUNE_UPDATE:
+            	    dds_slave_got_tune_update(state, msg);
+                    break;
         }
 
         mq_discard (1, WR_D3S_REMOTE_IN_STREAM);
     }
-
 }
 
 void dds_slave_update(struct dds_loop_state *state)
 {
+    uint32_t pd_data;
 
+    switch ( state->slave_state )
+    {
+	case SLAVE_APPLY_FIXUP:	
+	case SLAVE_RUN:
+	{
+	
+	    if(!dds_poll_next_sample(&pd_data))
+    		return;
+	
+        // produce timestamp of the current tune sample
+	    int sample_idx = dp_readl(DDS_REG_SAMPLE_IDX);
+	    uint32_t tai = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
+
+	    sample_idx++;
+
+	    if(sample_idx >= state->samples_per_second)
+	    {
+		sample_idx -= state->samples_per_second;
+		tai++;
+	    }
+
+	    if( gqueue_empty ( &state->tune_queue ) )
+		return;
+		
+	    struct dds_tune_entry *ent = gqueue_front ( &state->tune_queue );
+	    
+	    if( ent->tai > tai || (ent->tai == tai && ent->sample > sample_idx ) )
+	    {
+//		pp_printf("Overflow!\n");
+		return;
+	    }
+	    
+	    while( !gqueue_empty ( &state->tune_queue ) )
+	    {
+		struct dds_tune_entry *ent = gqueue_front ( &state->tune_queue );
+		
+//		if(sample_idx == 0)
+//		{
+//		    pp_printf("ETai %d tai %d Esample %d s %d\n", ent->tai, tai, ent->sample, sample_idx);
+//		}
+	
+		if(ent->tai == tai && ent->sample == sample_idx)
+		{
+		    dp_writel(ent->tune, DDS_REG_TUNE_VAL);
+		}
+
+		gqueue_pop ( &state->tune_queue );
+	    }
+	break;
+	}
+	
+	default:
+	    break;
+	
+    }
 }
 
 void dds_loop_update(struct dds_loop_state *state)
@@ -413,8 +559,8 @@ void dds_loop_update(struct dds_loop_state *state)
 void dds_loop_start(struct dds_loop_state *state)
 {
     state->integ = 0;
-    state->kp = 10000;
-    state->ki = 10;
+    state->kp = 3000;
+    state->ki = 3;
     state->locked = 0;
     state->lock_samples = 6000;
     state->delock_samples = 6000;
@@ -434,14 +580,17 @@ void dds_loop_start(struct dds_loop_state *state)
         /* set DDS center frequency */
         dp_writel(state->base_tune >> 32, DDS_REG_FREQ_HI);
         dp_writel(state->base_tune & 0xffffffff, DDS_REG_FREQ_LO);
+
+        dp_writel(DDS_CR_SAMP_EN | DDS_CR_SAMP_DIV_W(state->sampling_divider - 1), DDS_REG_CR);
+	delay(100);
         
+    } else {
+	state->slave_state = SLAVE_WAIT_FIXUP;
     }
 
     /* Tuning gain = 1 */
     dp_writel(1<<12, DDS_REG_GAIN);
 
-    dp_writel(DDS_CR_SAMP_EN | DDS_CR_SAMP_DIV_W(state->sampling_divider - 1), DDS_REG_CR);
-    delay(100);
 
 }
 
@@ -648,7 +797,7 @@ void main_loop()
 
     for(;;)
     {
-        do_rx();
+        do_rx(&dds_loop);
         dds_loop_update (&dds_loop);
         rf_counter_update (&rf_cnt);
         wr_update_link();

@@ -4,5 +4,6 @@ def calc_tune(freq,sample_rate):
     print("HI=0x%x" % ((tune >> 32) & 0xffffffff))
     print("LO=0x%x" % ((tune >> 0) & 0xffffffff))
 
-calc_tune(44e6, 500e6) 
+calc_tune(10e3, 500e6) 
+
 

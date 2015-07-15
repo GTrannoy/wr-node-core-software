@@ -202,7 +202,7 @@ int demo_lemo_set(struct demo_node *dev, uint32_t value)
 
 
 /**
- * Convert the given LEDs value wiht color codification
+ * Convert the given LEDs value with color codification
  */
 static uint32_t demo_apply_color(uint32_t value, enum demo_color color)
 {

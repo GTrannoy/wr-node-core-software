@@ -902,10 +902,10 @@ static inline void ctl_chan_enable_trigger (uint32_t seq, struct wrnc_msg *ibuf)
 	wrnc_msg_uint32(ibuf, (uint32_t *) &ent);
 
 	struct lrt_output_rule *rule = &ent->ocfg[ch];
-	if(enable)
+	if (enable)
 		rule->state &= ~HASH_ENT_DISABLED;
 	else
-		rule->state |= ~HASH_ENT_DISABLED;
+		rule->state |= HASH_ENT_DISABLED;
 
 	// fixme: purge pending pulses conditional pulses from the queue
 	ctl_ack(seq);

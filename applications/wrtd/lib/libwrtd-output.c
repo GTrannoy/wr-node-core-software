@@ -115,7 +115,7 @@ static int __wrtd_out_trig_get(struct wrtd_desc *wrtd, uint32_t output,
 
 	trigger->latency_worst_us = (latency_worst + 124) / 125;
 
-	trigger->enabled = (state & HASH_ENT_DISABLED) ? 0 : 1;
+	trigger->enabled = !(state & HASH_ENT_DISABLED);
 
 	if (wrnc_msg_check_error(msg)) {
 		errno = EWRTD_INVALID_ANSWER_STATE;
@@ -365,6 +365,7 @@ int wrtd_out_trig_get_all(struct wrtd_node *dev, unsigned int output,
 {
 	int err, count = 0;
 	struct wrtd_trigger_handle handle = {0, 0, output};
+	/* Set ptr to 0 so that we get the first available  */
 
 	if (output > FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;

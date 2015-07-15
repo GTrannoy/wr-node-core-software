@@ -112,7 +112,7 @@ static void dump_output_state(struct wrtd_output_state *state)
 		printf("Channel %d: disabled\n", state->output);
 
 	decode_flags(tmp, state->flags);
-	printf("Output %d state:\n", state->output);
+	printf("Output channel %d state:\n", state->output);
 	printf(" - Flags:                         %s\n", tmp);
 	decode_mode(tmp, state->mode);
 	printf(" - Mode:                          %s\n", tmp);
@@ -151,12 +151,12 @@ static void dump_output_state(struct wrtd_output_state *state)
 	format_id(tmp2, state->last_lost.id);
 	printf(" - Last missed/lost trigger:      %s, ID: %s, SeqNo %d\n",
 		       tmp, tmp2, state->last_lost.seq);
-
-	printf(" - Total RX messages:             %-10d\n", state->received_messages);
-	printf(" - Total loopback messages:       %-10d\n", state->received_loopback);
-
 	wrtd_strlogging_full(tmp, state->log_level);
 	printf(" - Log level:             %s\n", tmp);
+
+	printf("Global Output information:\n");
+	printf(" - Total RX messages:             %-10d\n", state->received_messages);
+	printf(" - Total loopback messages:       %-10d\n", state->received_loopback);
 }
 
 static int wrtd_cmq_has_trig(struct wrtd_node *wrtd, int output,

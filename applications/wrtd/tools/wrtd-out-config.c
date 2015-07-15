@@ -89,15 +89,15 @@ static struct wrtd_commands cmds[] = {
 	  wrtd_cmd_software_trigger },
 	{ "has_trig", "", "return true it as a trigger assigned",
 	  wrtd_cmq_has_trig},
-	{ "trig_enable", "<trig-index>", "enables a particular trigger",
+	{ "trig_enable", "<trig-id>", "enables a particular trigger",
 	  wrtd_cmd_trig_enable },
-	{ "trig_disable", "<trig-index>", "disables a particular trigger",
+	{ "trig_disable", "<trig-id>", "disables a particular trigger",
 	  wrtd_cmd_trig_disable },
 	{ "trig_stats", "", "shows per-trigger statistics",
 	  wrtd_cmd_trig_stats },
-	{ "trig_delay", "<trig-index> <number>", "sets the delay in pico-seconds for a particular trigger ",
+	{ "trig_delay", "<trig-id> <number>", "sets the delay in pico-seconds for a particular trigger ",
 	  wrtd_cmd_trig_delay },
-	{ "trig_cond_delay", "<trig-index> <number>", "sets the delay in pico-seconds for a particular trigger condition",
+	{ "trig_cond_delay", "<trig-id> <number>", "sets the delay in pico-seconds for a particular trigger condition",
 	  wrtd_cmd_trig_cond_delay },
 	{ "trig_find", "<trig-id>", "retrieves a trigger entry based on its ID",
 	  wrtd_cmd_trig_find },
@@ -191,18 +191,21 @@ static int wrtd_cmq_has_trig(struct wrtd_node *wrtd, int output,
 static int trig_enable(struct wrtd_node *wrtd, int output,
 			   int argc, char *argv[], int enable)
 {
-	int index, err;
+	int err;
 	struct wrtd_output_trigger_state trig;
+	struct wrtd_trig_id tid;
 
 	if (argc != 1 || argv[0] == NULL) {
 		fprintf(stderr,
-			"Missing arguments: trig_%s <trig-index>\n", enable ? "enable" : "disable");
+			"Missing arguments: trig_%s <trig-id>\n", enable ? "enable" : "disable");
 		return -1;
 	}
-	index = atoi(argv[0]);
+	err = parse_trigger_id(argv[0], &tid);
+	if (err)
+		return err;
 
 	/* Get a trigger */
-	err = wrtd_out_trig_state_get_by_index(wrtd, index, output, &trig);
+	err = wrtd_out_trig_state_get_by_id(wrtd, &tid, &trig);
 	if (err)
 		return err;
 
@@ -265,18 +268,22 @@ static int wrtd_cmd_trig_delay(struct wrtd_node *wrtd, int output,
 				  int argc, char *argv[])
 {
 	struct wrtd_output_trigger_state trig;
+	struct wrtd_trig_id tid;
 	uint64_t dtime = 0;
-	int index, err;
+	int err;
 
 	if (argc != 2 || argv[0] == NULL || argv[1] == NULL) {
 		fprintf(stderr,
-			"Missing arguments: trig_delay <trig-index> <delay>\n");
+			"Missing arguments: trig_delay <trig-id> <delay>\n");
 		return -1;
 	}
-	index = atoi(argv[0]);
+
+	err = parse_trigger_id(argv[0], &tid);
+	if (err)
+		return err;
 
 	/* Get a trigger */
-	err = wrtd_out_trig_state_get_by_index(wrtd, index, output, &trig);
+	err = wrtd_out_trig_state_get_by_id(wrtd, &tid, &trig);
 	if (err)
 		return err;
 
@@ -289,18 +296,22 @@ static int wrtd_cmd_trig_cond_delay(struct wrtd_node *wrtd, int output,
 				  int argc, char *argv[])
 {
 	struct wrtd_output_trigger_state trig;
+	struct wrtd_trig_id tid;
 	uint64_t dtime = 0;
-	int index, err;
+	int err;
 
 	if (argc != 2 || argv[0] == NULL || argv[1] == NULL) {
 		fprintf(stderr,
-			"Missing arguments: trig_cond_delay <trig-index> <delay>\n");
+			"Missing arguments: trig_cond_delay <trig-id> <delay>\n");
 		return -1;
 	}
-	index = atoi(argv[0]);
+
+	err = parse_trigger_id(argv[0], &tid);
+	if (err)
+		return err;
 
 	/* Get a trigger */
-	err = wrtd_out_trig_state_get_by_index(wrtd, index, output, &trig);
+	err = wrtd_out_trig_state_get_by_id(wrtd, &tid, &trig);
 	if (err)
 		return err;
 

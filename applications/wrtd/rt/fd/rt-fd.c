@@ -821,11 +821,10 @@ static inline void ctl_trig_assign (uint32_t seq, struct wrnc_msg *ibuf)
 		ctl_nack(seq, -1);
 		return;
 	}
-	/* Create an empty rule with default delay of 100 us */
+	/* Create an empty rule with default edelay of 100 us */
+	memset(&rule, 0, sizeof(struct lrt_output_rule));
 	rule.delay_cycles = 100000000 / 8000;
-	rule.delay_frac = 0;
 	rule.state = (is_cond ? HASH_ENT_CONDITIONAL : HASH_ENT_DIRECT) | HASH_ENT_DISABLED;
-	rule.cond_ptr = NULL;
 
 	handle.channel = ch;
 	handle.cond = NULL;

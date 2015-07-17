@@ -279,6 +279,7 @@ extern int wrtd_out_trig_state_get_by_index(struct wrtd_node *dev,
 					    unsigned int output,
 					    struct wrtd_output_trigger_state *trigger);
 extern int wrtd_out_trig_state_get_by_id(struct wrtd_node *dev,
+					 unsigned int output,
 					 struct wrtd_trig_id *id,
 					 struct wrtd_output_trigger_state *trigger);
 extern int wrtd_out_trig_state_get_by_handle(struct wrtd_node *dev,

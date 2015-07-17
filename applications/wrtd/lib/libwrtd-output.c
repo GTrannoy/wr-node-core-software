@@ -416,33 +416,33 @@ int wrtd_out_trig_state_get_by_handle(struct wrtd_node *dev,
  * It returns a trigget from a given identifier.
  * Whenever is possible you should prefer wrtd_out_trig_state_get_by_handle()
  * @param[in] dev device token
+ * @param[in] output index (0-based) of output channel
  * @param[in] id identifier of the trigger to retrieve
  * @param[out] trigger trigger status
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_out_trig_state_get_by_id(struct wrtd_node *dev,
+				  unsigned int output,
 				  struct wrtd_trig_id *tid,
 				  struct wrtd_output_trigger_state *trigger)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	uint32_t seq = 0, id;
-	int ret, i;
+	int ret;
+	struct wrnc_msg msg = wrnc_msg_init(6);
 
-	for (i = 0; i < FD_NUM_CHANNELS; ++i) {
-		struct wrnc_msg msg = wrnc_msg_init(6);
-		id = WRTD_CMD_FD_TRIG_GET_BY_ID;
-		wrnc_msg_header(&msg, &id, &seq);
-		wrnc_msg_int32(&msg, &i);
-		wrtd_msg_trig_id(&msg, tid);
+	id = WRTD_CMD_FD_TRIG_GET_BY_ID;
+	wrnc_msg_header(&msg, &id, &seq);
+	wrnc_msg_int32(&msg, &output);
+	wrtd_msg_trig_id(&msg, tid);
 
-		ret = __wrtd_out_trig_get(wrtd, i, &msg, trigger);
-		if (!ret)
-			return 0;
+	ret = __wrtd_out_trig_get(wrtd, output, &msg, trigger);
+	if (ret) {
+		errno = EWRTD_NOFOUND_TRIGGER;
+		return -1;
 	}
 
-
-	errno = EWRTD_NOFOUND_TRIGGER;
-	return -1;
+	return 0;
 }
 
 

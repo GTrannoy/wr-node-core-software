@@ -205,7 +205,7 @@ static int trig_enable(struct wrtd_node *wrtd, int output,
 		return err;
 
 	/* Get a trigger */
-	err = wrtd_out_trig_state_get_by_id(wrtd, &tid, &trig);
+	err = wrtd_out_trig_state_get_by_id(wrtd, output, &tid, &trig);
 	if (err)
 		return err;
 
@@ -283,7 +283,7 @@ static int wrtd_cmd_trig_delay(struct wrtd_node *wrtd, int output,
 		return err;
 
 	/* Get a trigger */
-	err = wrtd_out_trig_state_get_by_id(wrtd, &tid, &trig);
+	err = wrtd_out_trig_state_get_by_id(wrtd, output, &tid, &trig);
 	if (err)
 		return err;
 
@@ -311,7 +311,7 @@ static int wrtd_cmd_trig_cond_delay(struct wrtd_node *wrtd, int output,
 		return err;
 
 	/* Get a trigger */
-	err = wrtd_out_trig_state_get_by_id(wrtd, &tid, &trig);
+	err = wrtd_out_trig_state_get_by_id(wrtd, output, &tid, &trig);
 	if (err)
 		return err;
 
@@ -443,7 +443,7 @@ static int wrtd_cmd_trig_unassign(struct wrtd_node *wrtd, int output,
 		return err;
 
 	/* Get a trigger */
-	err = wrtd_out_trig_state_get_by_id(wrtd, &tid, &trig);
+	err = wrtd_out_trig_state_get_by_id(wrtd, output, &tid, &trig);
 	if (err)
 		return err;
 
@@ -531,7 +531,7 @@ static int wrtd_cmd_trig_find(struct wrtd_node *wrtd, int output,
 	if (ret)
 		return -1;
 
-	ret = wrtd_out_trig_state_get_by_id(wrtd, &id, &state);
+	ret = wrtd_out_trig_state_get_by_id(wrtd, output, &id, &state);
 	if (ret)
 		return -1;
 

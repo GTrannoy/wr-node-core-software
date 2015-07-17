@@ -71,19 +71,6 @@ unsigned int tlist_count = 0; /**< number of valid trigger entry
 struct lrt_hash_entry *ord_tlist[FD_HASH_ENTRIES]; /**< list of triggers
 						      ordered by 'id' */
 
-#ifdef RTDEBUG
-void trigget_print_all()
-{
-	int i;
-	for (i = 0; i < tlist_count; i++) {
-		pp_printf("[%d] = %p  --> %d:%d:%d\n",
-			  i, ord_tlist[i], ord_tlist[i]->id.system,
-			  ord_tlist[i]->id.source_port, ord_tlist[i]->id.trigger);
-	}
-
-}
-#endif
-
 
 int trigger_search(struct lrt_hash_entry **tlist,
 		  struct wrtd_trig_id *id,
@@ -164,6 +151,10 @@ struct lrt_hash_entry * rtfd_trigger_entry_update(struct wrtd_trig_id *id,
 		raw_tlist[i].flags |= ENTRY_FLAG_VALID;
 		raw_tlist[i].id = *id;
 		raw_tlist[i].ocfg[output] = *rule;
+#ifdef RTDEBUG
+		pp_printf("%s:%d %p - rule %p\n", __func__, __LINE__,
+			  &raw_tlist[i], &raw_tlist[i].ocfg[output]);
+#endif
 
 		/* Order it! */
 		for (k = tlist_count - 1; k >= index; --k)
@@ -175,9 +166,13 @@ struct lrt_hash_entry * rtfd_trigger_entry_update(struct wrtd_trig_id *id,
 		memcpy(&ord_tlist[index]->ocfg[output], rule,
 		       sizeof(struct lrt_output_rule));
 	}
+
 #ifdef RTDEBUG
-	trigget_print_all();
+	pp_printf("%s:%d [%d] = %p %d:%d:%d\n", __func__, __LINE__,
+		  index, ord_tlist[index], ord_tlist[index]->id.system,
+		  ord_tlist[index]->id.source_port, ord_tlist[index]->id.trigger);
 #endif
+
 	return ord_tlist[index];
 }
 
@@ -222,7 +217,9 @@ void rtfd_trigger_entry_remove(struct lrt_hash_entry *ent, unsigned int output)
 	tlist_count--;
 
 #ifdef RTDEBUG
-	trigget_print_all();
+	pp_printf("[%d] = %p  --> %d:%d:%d\n",
+		  index, ord_tlist[i], ord_tlist[i]->id.system,
+		  ord_tlist[i]->id.source_port, ord_tlist[i]->id.trigger);
 #endif
 }
 
@@ -901,6 +898,12 @@ static inline void ctl_chan_enable_trigger (uint32_t seq, struct wrnc_msg *ibuf)
 	wrnc_msg_uint32(ibuf, (uint32_t *) &ent);
 
 	struct lrt_output_rule *rule = &ent->ocfg[ch];
+
+#ifdef RTDEBUG
+	pp_printf("%s:%d %p %d - %p %d\n", __func__, __LINE__,
+		  ent, ch, rule, enable);
+#endif
+
 	if (enable)
 		rule->state &= ~HASH_ENT_DISABLED;
 	else
@@ -930,6 +933,12 @@ void send_hash_entry (uint32_t seq, int ch, int valid, struct lrt_hash_entry *en
 	uint32_t id_hash_entry = WRTD_REP_HASH_ENTRY, next;
         struct lrt_hash_entry *cond = NULL;
 
+#ifdef RTDEBUG
+	pp_printf("%s:%d %p %d\n", __func__, __LINE__, ent, ch);
+	if (ent)
+		pp_printf("%s:%d     %d:%d:%d\n", __func__, __LINE__,
+			  ent->id.system, ent->id.source_port, ent->id.trigger);
+#endif
 	/* Create the response */
 	wrnc_msg_header(&obuf, &id_hash_entry, &seq);
 	wrnc_msg_int32(&obuf, &valid);

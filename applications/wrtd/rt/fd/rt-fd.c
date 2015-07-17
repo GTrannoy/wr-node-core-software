@@ -926,6 +926,20 @@ static void bag_hash_entry ( struct wrtd_trig_id *id, struct lrt_output_rule *ru
 	wrnc_msg_int32 (obuf, &rule->misses);
 }
 
+static struct lrt_hash_entry *rtfd_trigger_get_first(unsigned int start,
+						     unsigned int ch)
+{
+	int i;
+
+	for (i = start; i < tlist_count; i++) {
+		if ((ord_tlist[i]->flags & ENTRY_FLAG_VALID) &&
+		    ord_tlist[i]->ocfg[ch].state != HASH_ENT_EMPTY)
+			return ord_tlist[i];
+
+	}
+
+	return NULL;
+}
 void send_hash_entry (uint32_t seq, int ch, int valid, struct lrt_hash_entry *ent)
 {
 	int is_conditional, i;
@@ -961,10 +975,7 @@ void send_hash_entry (uint32_t seq, int ch, int valid, struct lrt_hash_entry *en
 		for (i = 0; i < tlist_count; ++i)
 			if (ord_tlist[i] == ent)
 				break;
-		if (i >= FD_HASH_ENTRIES)
-			next = 0;
-		else
-			next = ord_tlist[i + 1];
+		next = (uint32_t) rtfd_trigger_get_first(i + 1, ch);
 		wrnc_msg_uint32(&obuf, (uint32_t *) &next);
 	}
 
@@ -980,7 +991,8 @@ static inline void ctl_read_hash (uint32_t seq, struct wrnc_msg *ibuf )
 	wrnc_msg_int32(ibuf, &ch);
 	wrnc_msg_uint32(ibuf, &ptr);
 
-	ent = !ptr ? ord_tlist[0] : (void *) ptr; /* Get the first one if not specified */
+	/* Get the first one if not specified */
+	ent = !ptr ? rtfd_trigger_get_first(0, ch) : (void *) ptr;
 	entry_ok = ent && ent->ocfg[ch].state != HASH_ENT_EMPTY;
 
 	send_hash_entry (seq, ch, entry_ok, ent);

@@ -133,20 +133,22 @@ static inline void wrnc_msg_seek ( struct wrnc_msg *buf, int pos )
 
 static inline int wrtd_msg_timestamp ( struct wrnc_msg *buf, struct wr_timestamp *ts )
 {
-    if (_wrnc_msg_check_buffer ( buf, 3 ) < 0)
+    if (_wrnc_msg_check_buffer ( buf, 4 ) < 0)
 	return -1;
 
     if (buf->direction == WRNC_MSG_DIR_SEND)
     {
-        buf->data[buf->datalen + 0] = 	ts->seconds;
-        buf->data[buf->datalen + 1] = 	ts->ticks;
-        buf->data[buf->datalen + 2] = 	ts->frac;
-	buf->datalen += 3;
+        buf->data[buf->datalen + 0] =	(ts->seconds >> 32) & 0xFFFFFFFF;
+	buf->data[buf->datalen + 1] =	ts->seconds & 0xFFFFFFFF;
+        buf->data[buf->datalen + 2] = 	ts->ticks;
+        buf->data[buf->datalen + 3] = 	ts->frac;
+	buf->datalen += 4;
     } else {
-	ts->seconds = 	buf->data[buf->offset + 0];
-	ts->ticks = 	buf->data[buf->offset + 1];
-        ts->frac = 	buf->data[buf->offset + 2];
-	buf->offset += 3;
+       ts->seconds = 	buf->data[buf->offset + 0] << 32;
+       ts->seconds |=	buf->data[buf->offset + 1];
+	ts->ticks = 	buf->data[buf->offset + 2];
+        ts->frac = 	buf->data[buf->offset + 3];
+	buf->offset += 4;
     }
 
     return 0;

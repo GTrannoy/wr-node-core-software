@@ -57,7 +57,7 @@ int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 		      struct wrtd_input_state *state)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg = wrnc_msg_init(16);
+	struct wrnc_msg msg = wrnc_msg_init(19);
 	int err;
 	uint32_t id, seq = 0;
 	uint32_t dead_time_cycles;
@@ -392,13 +392,14 @@ int wrtd_in_delay_set(struct wrtd_node *dev, unsigned int input,
         wrtd_pico_to_ts(&delay_ps, &t);
 
 	/* Build the message */
-	msg.datalen = 6;
+	msg.datalen = 7;
 	msg.data[0] = WRTD_CMD_TDC_CHAN_SET_DELAY;
 	msg.data[1] = 0;
 	msg.data[2] = input;
-	msg.data[3] = t.seconds;
-	msg.data[4] = t.ticks;
-	msg.data[5] = t.frac;
+	msg.data[3] = t.seconds >> 32;
+	msg.data[4] = t.seconds & 0xFFFFFFFF;
+	msg.data[5] = t.ticks;
+	msg.data[6] = t.frac;
 
 	/* Send the message and get answer */
 	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
@@ -436,13 +437,14 @@ int wrtd_in_timebase_offset_set(struct wrtd_node *dev, unsigned int input,
 	wrtd_pico_to_ts(&offset, &t);
 
 	/* Build the message */
-	msg.datalen = 6;
+	msg.datalen = 7;
 	msg.data[0] = WRTD_CMD_TDC_CHAN_SET_TIMEBASE_OFFSET;
 	msg.data[1] = 0;
 	msg.data[2] = input;
-	msg.data[3] = t.seconds;
-	msg.data[4] = t.ticks;
-	msg.data[5] = t.frac;
+	msg.data[3] = t.seconds >> 32;
+	msg.data[4] = t.seconds & 0xFFFFFFFF;
+	msg.data[5] = t.ticks;
+	msg.data[6] = t.frac;
 
 	/* Send the message and get answer */
 	err = wrtd_in_send_and_receive_sync(wrtd, &msg);

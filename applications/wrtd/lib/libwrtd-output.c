@@ -141,7 +141,7 @@ int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 			 struct wrtd_output_state *state)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg = wrnc_msg_init (16);
+	struct wrnc_msg msg = wrnc_msg_init(20);
 	int err, dummy = 0;
 	uint32_t seq = 0, id;
 	uint32_t dead_time_ticks, pulse_width_ticks;

@@ -16,11 +16,11 @@
 #ifndef __WRNODE_SMEM_H
 #define __WRNODE_SMEM_H
 
-#define SMEM_RANGE_ADD 0x2000
-#define SMEM_RANGE_SUB 0x4000
-#define SMEM_RANGE_SET 0x6000
-#define SMEM_RANGE_CLEAR 0x8000
-#define SMEM_RANGE_FLIP 0xa000
+#define SMEM_RANGE_ADD		0x10000
+#define SMEM_RANGE_SUB		0x20000
+#define SMEM_RANGE_SET		0x30000
+#define SMEM_RANGE_CLEAR	0x40000
+#define SMEM_RANGE_FLIP		0x50000
 
 #define SMEM __attribute__((section(".smem")))
 

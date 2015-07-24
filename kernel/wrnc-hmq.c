@@ -261,7 +261,8 @@ static ssize_t wrnc_store_share(struct device *dev,
 DEVICE_ATTR(full, S_IRUGO, wrnc_show_full, NULL);
 DEVICE_ATTR(empty, S_IRUGO, wrnc_show_empty, NULL);
 DEVICE_ATTR(count, S_IRUGO, wrnc_show_count, NULL);
-DEVICE_ATTR(shared_by_users, (S_IRUGO | S_IWUSR), wrnc_show_share, wrnc_store_share);
+DEVICE_ATTR(shared_by_users, (S_IRUGO | S_IWUSR | S_IWGRP |  S_IWOTH),
+	    wrnc_show_share, wrnc_store_share);
 
 static struct attribute *wrnc_hmq_attr[] = {
 	&dev_attr_full.attr,

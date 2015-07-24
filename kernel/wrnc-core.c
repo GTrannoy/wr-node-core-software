@@ -301,9 +301,9 @@ static long wrnc_ioctl_io(struct wrnc_dev *wrnc, void __user *uarg)
 		/* read */
 		addr = wrnc->base_smem + io.addr;
 	} else {
+		fmc_writel(fmc, io.mod, wrnc->base_csr + WRN_CPU_CSR_REG_SMEM_OP);
 		/* write */
-		addr = wrnc->base_smem + (io.mod * WRNC_SMEM_MAX_SIZE)
-			+ io.addr;
+		addr = wrnc->base_smem + io.addr;
 		fmc_writel(fmc, io.value, addr);
 	}
 
@@ -529,8 +529,8 @@ int wrnc_probe(struct fmc_device *fmc)
 	}
 	wrnc->base_core = fmc_find_sdb_device(fmc->sdb, 0xce42, 0x90de, NULL);
 	/* FIXME use SDB - <base> + <CSR offset> */
-	wrnc->base_csr  = wrnc->base_core + 0x10000;
-	wrnc->base_smem = wrnc->base_core + 0x18000;
+	wrnc->base_csr  = wrnc->base_core + 0xC000;
+	wrnc->base_smem = wrnc->base_core + 0x10000;
 	wrnc->base_hmq  = wrnc->base_core + BASE_HMQ;
 	wrnc->base_gcr  = wrnc->base_hmq + MQUEUE_BASE_GCR;
 

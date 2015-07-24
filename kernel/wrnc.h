@@ -15,9 +15,7 @@
 #define WRNC_MAX_HMQ_MINORS (WRNC_MAX_HMQ_SLOT * WRNC_MAX_CARRIER)
 #define WRNC_MAX_MINORS (WRNC_MAX_CARRIER + WRNC_MAX_CPU_MINORS + WRNC_MAX_HMQ_MINORS)
 
-#define WRNC_CPU_MEM_SIZE_WORD 8192
-#define WRNC_CPU_MEM_SIZE_BYTE (WRNC_CPU_MEM_SIZE_WORD * 4)
-#define WRNC_SMEM_MAX_SIZE 8192
+#define WRNC_SMEM_MAX_SIZE 65536
 
 #define to_wrnc_cpu(_dev) (container_of(_dev, struct wrnc_cpu, dev))
 #define to_wrnc_dev(_dev) (container_of(_dev, struct wrnc_dev, dev))

@@ -212,7 +212,9 @@ static int wrnc_cpu_firmware_load(struct wrnc_cpu *cpu, void *fw_buf,
 		word_rb = fmc_readl(fmc,
 				    wrnc->base_csr + WRN_CPU_CSR_REG_UDATA);
 		if (word != word_rb) {
-			dev_err(&cpu->dev, "failed to load firmware\n");
+			dev_err(&cpu->dev,
+				"failed to load firmware (byte %d | 0x%x != 0x%x)\n",
+				i, word, word_rb);
 			return -EFAULT;
 		}
 	}

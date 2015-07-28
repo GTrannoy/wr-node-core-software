@@ -102,11 +102,16 @@ int trigger_search(struct lrt_hash_entry **tlist,
 			return 1;
 		else if (cmp > 0)
 			break;
+
 	}
 #endif
 
 #ifdef RTDEBUG
-	pp_printf("%s:%d %d %d %d %d\n", __func__, __LINE__, cmp, min, *mid, max);
+	pp_printf("%s:%d %d %d %d %d - trig ID %d:%d:%d == %d:%d:%d ?\n",
+		  __func__, __LINE__,
+		  cmp, min, *mid, max,
+		  tlist[*mid]->id.system, tlist[*mid]->id.source_port, tlist[*mid]->id.trigger,
+		  id->system, id->source_port, id->trigger);
 #endif
 	return 0;
 }
@@ -131,13 +136,9 @@ struct lrt_hash_entry * rtfd_trigger_entry_update(struct wrtd_trig_id *id,
 						  int output,
 						  struct lrt_output_rule *rule)
 {
-	int i, k, cmp, index = 0, ret = 0;
+	int i = -1, k, cmp, index = 0, ret = 0;
 
 	ret = trigger_search(ord_tlist, id, 0, tlist_count, &index);
-
-#ifdef RTDEBUG
-	pp_printf("%s:%d %d %d\n", __func__, __LINE__, index, tlist_count);
-#endif
 
 	if (!ret) { /* entry does not exists, add it */
 		/* Look for an empty slot */
@@ -151,10 +152,6 @@ struct lrt_hash_entry * rtfd_trigger_entry_update(struct wrtd_trig_id *id,
 		raw_tlist[i].flags |= ENTRY_FLAG_VALID;
 		raw_tlist[i].id = *id;
 		raw_tlist[i].ocfg[output] = *rule;
-#ifdef RTDEBUG
-		pp_printf("%s:%d %p - rule %p\n", __func__, __LINE__,
-			  &raw_tlist[i], &raw_tlist[i].ocfg[output]);
-#endif
 
 		/* Order it! */
 		for (k = tlist_count - 1; k >= index; --k)
@@ -168,8 +165,8 @@ struct lrt_hash_entry * rtfd_trigger_entry_update(struct wrtd_trig_id *id,
 	}
 
 #ifdef RTDEBUG
-	pp_printf("%s:%d [%d] = %p %d:%d:%d\n", __func__, __LINE__,
-		  index, ord_tlist[index], ord_tlist[index]->id.system,
+	pp_printf("%s:%d (%d)[%d] = %p %d:%d:%d\n", __func__, __LINE__,
+		  i, index, ord_tlist[index], ord_tlist[index]->id.system,
 		  ord_tlist[index]->id.source_port, ord_tlist[index]->id.trigger);
 #endif
 
@@ -602,6 +599,9 @@ void enqueue_trigger(int output, struct lrt_output_rule *rule,
 	struct wr_timestamp adjusted = *ts;
 	struct pulse_queue_entry *pq_ent;
 
+#ifdef RTDEBUG
+	pp_printf("%s:%d ch %d 0x%x\n", __func__, __LINE__, output, rule->state);
+#endif
 	if(rule->state & HASH_ENT_DISABLED)
 		return;
 
@@ -690,7 +690,11 @@ static void filter_trigger(struct wrtd_trigger_entry *trig)
 	int j;
 
 	last_received = *trig;
-
+#ifdef RTDEBUG
+	pp_printf("%s:%d Trigger %d:%d:%d - entry %p\n",
+		  __func__, __LINE__,
+		  trig->id.system, trig->id.source_port, trig->id.trigger, ent);
+#endif
 	if(ent)
 	{
 		struct wr_timestamp ts = trig->ts;
@@ -900,8 +904,8 @@ static inline void ctl_chan_enable_trigger (uint32_t seq, struct wrnc_msg *ibuf)
 	struct lrt_output_rule *rule = &ent->ocfg[ch];
 
 #ifdef RTDEBUG
-	pp_printf("%s:%d %p %d - %p %d\n", __func__, __LINE__,
-		  ent, ch, rule, enable);
+	pp_printf("%s:%d ch:%d en:%d ptr:%p rule:%p\n", __func__, __LINE__,
+		  ch, enable, ent, rule);
 #endif
 
 	if (enable)
@@ -951,7 +955,7 @@ void send_hash_entry (uint32_t seq, int ch, int valid, struct lrt_hash_entry *en
 	pp_printf("%s:%d %p %d\n", __func__, __LINE__, ent, ch);
 	if (ent)
 		pp_printf("%s:%d     %d:%d:%d\n", __func__, __LINE__,
-			  ent->id.system, ent->id.source_port, ent->id.trigger);
+		ent->id.system, ent->id.source_port, ent->id.trigger);
 #endif
 	/* Create the response */
 	wrnc_msg_header(&obuf, &id_hash_entry, &seq);

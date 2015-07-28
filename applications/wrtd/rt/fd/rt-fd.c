@@ -804,16 +804,18 @@ static inline void ctl_trig_assign (uint32_t seq, struct wrnc_msg *ibuf)
 	uint32_t id_trigger_handle = WRTD_REP_TRIGGER_HANDLE;
 	int ch, is_cond;
 	struct wrnc_msg obuf;
-	struct wrtd_trig_id id;
+	struct wrtd_trig_id id, cond;
 	struct lrt_output_rule rule;
-	struct lrt_trigger_handle handle;
+	struct lrt_trigger_handle handle = {NULL, NULL, 0, 0};
 	struct lrt_output *out;
 
 	wrnc_msg_int32(ibuf, &ch);
+	handle.channel = ch;
 
 	/* Get the trigger ID (direct) */
 	wrtd_msg_trig_id(ibuf, &id);
 	wrnc_msg_int32(ibuf, &is_cond);
+	wrtd_msg_trig_id(ibuf, &cond);
 
 	int n_req = is_cond ? 2 : 1;
 
@@ -822,13 +824,26 @@ static inline void ctl_trig_assign (uint32_t seq, struct wrnc_msg *ibuf)
 		ctl_nack(seq, -1);
 		return;
 	}
+
+	/* Set condition trigger */
+	if (is_cond) {
+		memset(&rule, 0, sizeof(struct lrt_output_rule));
+		rule.delay_cycles = 100000000 / 8000;
+		rule.state = HASH_ENT_CONDITION | HASH_ENT_DISABLED;
+		handle.cond = rtfd_trigger_entry_update(&cond, ch, &rule);
+	}
+
 	/* Create an empty rule with default edelay of 100 us */
 	memset(&rule, 0, sizeof(struct lrt_output_rule));
 	rule.delay_cycles = 100000000 / 8000;
-	rule.state = (is_cond ? HASH_ENT_CONDITIONAL : HASH_ENT_DIRECT) | HASH_ENT_DISABLED;
-
-	handle.channel = ch;
-	handle.cond = NULL;
+	rule.state |= HASH_ENT_DISABLED;
+	if (is_cond) {
+		rule.state |= HASH_ENT_CONDITIONAL;
+		rule.cond_ptr = &handle.cond->ocfg[ch];
+	} else {
+		rule.state |= HASH_ENT_DIRECT;
+		rule.cond_ptr = NULL;
+	}
 	handle.trig = rtfd_trigger_entry_update( &id, ch, &rule );
 
 	/* Notify that there is at least one trigger
@@ -836,22 +851,6 @@ static inline void ctl_trig_assign (uint32_t seq, struct wrnc_msg *ibuf)
 	out = &outputs[ch];
 	out->flags |= WRTD_TRIGGER_ASSIGNED;
 
-	if(!is_cond) // unconditional trigger
-		goto out;
-
-	/* Get the condition ID */
-	wrtd_msg_trig_id(ibuf, &id);
-
-	/* Create default conditional rule */
-
-	rule.delay_cycles = 100000000 / 8000;
-	rule.delay_frac = 0;
-	rule.state = HASH_ENT_CONDITION | HASH_ENT_DISABLED;
-	rule.cond_ptr = (struct lrt_output_rule *) handle.trig;
-
-	handle.cond = rtfd_trigger_entry_update( &id, ch, &rule );
-
-out:
 	/* Create the response */
 	obuf = ctl_claim_out_buf();
 	wrnc_msg_header(&obuf, &id_trigger_handle, &seq);

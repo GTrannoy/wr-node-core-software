@@ -30,6 +30,7 @@
 #define WR_D3S_REP_ACK_ID    0x3
 #define WR_D3S_CMD_PING    0x4
 #define WR_D3S_CMD_STREAM_CONFIG 0x5
+#define WR_D3S_CMD_TEST_SIGNAL 0x6
 
 #define D3S_STREAM_MASTER 0x1
 #define D3S_STREAM_SLAVE 0x2
@@ -52,6 +53,7 @@ struct wr_d3s_remote_message {
     int type;
     int stream_id;
     int sampling_divider;
+    int lock_id;
     uint32_t transmit_seconds;
     uint32_t transmit_cycles;
   
@@ -59,6 +61,7 @@ struct wr_d3s_remote_message {
         struct {
             uint32_t tai;
             int64_t fixup_value;
+            int64_t base_tune;
         } phase_fixup;
         struct {
             uint32_t tai;

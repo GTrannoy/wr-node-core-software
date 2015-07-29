@@ -19,104 +19,17 @@
 #include "wr-d3s-common.h"
 #include "wrtd-serializers.h"
 
+#include "gqueue.h"
 #include "rt-d3s.h"
 
-
-
-
-
-/* Pulse FIFO for a single Fine Delay output */
-struct generic_queue
-{
-    void *buf;
-    int head, tail, count, size, entry_size;
-};
-
-void gqueue_init(struct generic_queue *p, int n, int entry_size, void *buf)
-{
-    p->head = 0;
-    p->tail = 0;
-    p->count = 0;
-    p->size = n;
-    p->entry_size = entry_size;
-    p->buf = buf;
-}
-
-/* Requests a new entry in a pulse queue. Returns pointer to the ne
-   entry or NULL if the queue is full. */
-void *gqueue_push(struct generic_queue *p)
-{
-    if (p->count == p->size)
-        return NULL;
-
-    void *ent = p->buf + p->head * p->entry_size;
-
-    p->count++;
-    p->head++;
-
-    if (p->head == p->size)
-        p->head = 0;
-
-    return ent;
-}
-
-/* Returns non-0 if pulse queue p contains any pulses. */
-int gqueue_empty(struct generic_queue *p)
-{
-    return (p->count == 0);
-}
-
-/* Returns the oldest entry in the pulse queue (or NULL if empty). */
-void* gqueue_front(struct generic_queue *p)
-{
-    if (!p->count)
-       return NULL;
-
-    return p->buf + p->tail * p->entry_size;
-}
-
-/* Returns the newest entry in the pulse queue (or NULL if empty). */
-void* gqueue_back(struct generic_queue *p)
-{
-    if (!p->count)
-       return NULL;
-    return &p->buf + p->head * p->entry_size;
-}
-
-/* Releases the oldest entry from the pulse queue. */
-void gqueue_pop(struct generic_queue *p)
-{
-    p->tail++;
-
-    if(p->tail == p->size)
-        p->tail = 0;
-    p->count--;
-}
-
-
-
-/* Forces a software reset of the DDS core. May be only run
-   AFTER the AD9516 has been programmed and locked */
-void d3s_reset()
-{
-
-/* First, reset the DDS DAC serdes PLL */
-    dp_writel(DDS_RSTR_PLL_RST, DDS_REG_RSTR);
-    delay(1000);
-    dp_writel(0, DDS_REG_RSTR);
-    delay(1000);
-    while(! gpior_get(DDS_GPIOR_SERDES_PLL_LOCKED) );
-
-    dp_writel(DDS_RSTR_SW_RST, DDS_REG_RSTR); // trigger a software reset
-    delay(1000);
-    dp_writel(0, DDS_REG_RSTR);
-    delay(1000);
-
-    delay(1000000);
-    
-}
-
 #define RESP_LOG_BUF_SIZE 64
+
+#define DDS_SNAP_LAG_SAMPLES 3
+#define DDS_ACC_BITS 43
+#define DDS_ACC_MASK ((1ULL << (DDS_ACC_BITS) ) - 1)
+
+
+
 
 struct resp_log_state
 {
@@ -130,7 +43,75 @@ struct resp_log_state
     uint32_t buf[RESP_LOG_BUF_SIZE];
 };
 
+struct dds_loop_stats {
+    int sent_packets;
+    int sent_fixups;
+    int sent_tunes;
+};
+
+
+struct dds_tune_entry {
+    int sample;
+    int tai;
+    int tune;
+};
+
+#define SLAVE_WAIT_FIXUP 0
+#define SLAVE_RUN 1
+#define SLAVE_APPLY_FIXUP 2
+#define SLAVE_WAIT_CONFIG 3
+
+#define TUNE_QUEUE_ENTRIES 8
+#define MAX_SLAVE_DELAY 8
+
+static uint32_t _tune_queue_buf[ TUNE_QUEUE_ENTRIES * sizeof(struct dds_tune_entry) / 4];
+
+struct dds_loop_state {
+    int master; // non-zero: master mode
+    int locked; // lock detect
+    int integ; 
+    int kp, ki;
+    int enabled;
+    int lock_counter;
+    int lock_samples;
+    int lock_id;
+    int delock_samples;
+    int lock_threshold;
+    int last_tune;
+    int64_t fixup_phase;
+    int fixup_count;
+    int64_t base_tune;
+    int fixup_tai;
+    int fixup_tune_valid;
+    int sample_count;
+    int samples_per_second;
+    int stream_id;
+    int sampling_divider;
+    int slave_delay;
+    int slave_state;
+    int tune_delay[MAX_SLAVE_DELAY];
+    int tune_delay_pos;
+    int current_sample_idx;
+    
+    struct dds_loop_stats stats;
+    struct generic_queue tune_queue;
+};
+
+#define RF_COUNTER_WAIT_LOCK 0
+#define RF_COUNTER_MASTER_WAIT_SNAPSHOT 1
+#define RF_COUNTER_MASTER_WAIT_NEXT_SAMPLE 2
+#define RF_COUNTER_GOT_FIXUP 4
+
+
+struct rf_counter_state {
+    int state;
+    uint32_t period;    
+    struct dds_loop_state *dds;
+};
+
 struct resp_log_state rsplog;
+struct dds_loop_state dds_loop;
+struct rf_counter_state rf_cnt;
 
 void resp_log_init(struct resp_log_state *state)
 {
@@ -184,78 +165,55 @@ void resp_log_start( struct resp_log_state *state, int seq, int n_samples )
     state->active = 1;
 }
 
+
+/* Forces a software reset of the DDS core. May be only run
+   AFTER the AD9516 has been programmed and locked */
+void d3s_reset()
+{
+
+/* First, reset the DDS DAC serdes PLL */
+    dp_writel(DDS_RSTR_PLL_RST, DDS_REG_RSTR);
+    delay(1000);
+    dp_writel(0, DDS_REG_RSTR);
+    delay(1000);
+    while(! gpior_get(DDS_GPIOR_SERDES_PLL_LOCKED) );
+
+    dp_writel(DDS_RSTR_SW_RST, DDS_REG_RSTR); // trigger a software reset
+    delay(1000);
+    dp_writel(0, DDS_REG_RSTR);
+    delay(1000);
+
+    delay(1000000);
+    
+}
+
+
 void init() 
 {
-	ad9516_init();
+    ad9516_init();
 
-	/* Setup for 352 MHz RF reference: divider = 8 (44 MHz internal/DDS frequency) */
+    /* Setup for 352 MHz RF reference: divider = 8 (44 MHz internal/DDS frequency) */
 
-	ad9510_init();
+    ad9510_init();
 
 
-	d3s_reset();
+    d3s_reset();
 
 	/* Set up the phase detector to work at ~15 MHz (44 MHz / 3) */
     adf4002_configure(2,2,4);
 
     resp_log_init(&rsplog);
 
-	pp_printf("RT_D3S firmware initialized.\n");
+    /* all SVEC GPIOs->outputs */
+    gpio_set(24);
+    gpio_set(25);
+    gpio_set(26);
 
+    /* Set RF counter safe load phase (chosen experimentally) */
+    dp_writel( DDS_RF_RST_PHASE_LO_W(220) | DDS_RF_RST_PHASE_HI_W(30), DDS_REG_RF_RST_PHASE );
+
+    pp_printf("RT_D3S firmware initialized.\n");
 }
-
-struct dds_loop_stats {
-    int sent_packets;
-    int sent_fixups;
-    int sent_tunes;
-};
-
-
-struct dds_tune_entry {
-    int sample;
-    int tai;
-    int tune;
-};
-
-#define SLAVE_WAIT_FIXUP 0
-#define SLAVE_RUN 1
-#define SLAVE_APPLY_FIXUP 2
-#define SLAVE_WAIT_CONFIG 3
-
-#define TUNE_QUEUE_ENTRIES 8
-#define MAX_SLAVE_DELAY 8
-
-static uint32_t _tune_queue_buf[ TUNE_QUEUE_ENTRIES * sizeof(struct dds_tune_entry) / 4];
-
-struct dds_loop_state {
-    int master; // non-zero: master mode
-    int locked; // lock detect
-    int integ; 
-    int kp, ki;
-    int enabled;
-    int lock_counter;
-    int lock_samples;
-    int delock_samples;
-    int lock_threshold;
-    int last_tune;
-    int64_t fixup_phase;
-    int fixup_count;
-    int64_t base_tune;
-    int fixup_tai;
-    int fixup_tune_valid;
-    int sample_count;
-    int samples_per_second;
-    int stream_id;
-    int sampling_divider;
-    int slave_delay;
-    int slave_state;
-    int tune_delay[MAX_SLAVE_DELAY];
-    int tune_delay_pos;
-    int current_sample_idx;
-    
-    struct dds_loop_stats stats;
-    struct generic_queue tune_queue;
-};
 
 
 int dds_pi_update(struct dds_loop_state *state, int phase_error)
@@ -277,6 +235,7 @@ int dds_pi_update(struct dds_loop_state *state, int phase_error)
             {
 		pp_printf("[master] RF lock acquired\n");
                 state->locked = 1;
+                state->lock_id++;
                 state->lock_counter = 0;
             }
         }
@@ -298,7 +257,6 @@ int dds_pi_update(struct dds_loop_state *state, int phase_error)
     return y;
 }
 
-struct dds_loop_state dds_loop;
 
 static inline volatile struct wr_d3s_remote_message* dds_prepare_message(struct dds_loop_state *state, int type )
 {
@@ -316,6 +274,7 @@ static inline volatile struct wr_d3s_remote_message* dds_prepare_message(struct 
     msg->type = type;
     msg->stream_id = state->stream_id;
     msg->sampling_divider = state->sampling_divider;
+    msg->lock_id = state->lock_id;
 
     return msg;
 }
@@ -364,9 +323,6 @@ static inline int dds_poll_next_sample(uint32_t *pd_data)
         return 1;
 }
 
-#define DDS_SNAP_LAG_SAMPLES 3
-#define DDS_ACC_BITS 43
-#define DDS_ACC_MASK ((1ULL << (DDS_ACC_BITS) ) - 1)
 
 static uint64_t dds_get_phase_snapshot(struct dds_loop_state *state)
 {
@@ -390,11 +346,11 @@ static inline void dds_master_update(struct dds_loop_state *state)
     	    return;
 	
         // produce timestamp of the current tune sample
-        int sample_idx = dp_readl(DDS_REG_SAMPLE_IDX);
+        state->current_sample_idx = dp_readl(DDS_REG_SAMPLE_IDX);
         struct wr_timestamp ts;
 
         ts.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
-        ts.ticks = sample_idx * state->sampling_divider * 125;
+        ts.ticks = state->current_sample_idx * state->sampling_divider * 125;
         
         /* clear valid flag */
         int y = dds_pi_update(state, pd_data & 0xffff);
@@ -406,21 +362,29 @@ static inline void dds_master_update(struct dds_loop_state *state)
         if(!state->locked || !wr_is_timing_ok())
             return;
 
-        if(sample_idx == 0)
+        if(state->current_sample_idx == 0)
         {
 	    uint64_t acc_snap = dds_get_phase_snapshot(state);
             dds_send_phase_fixup(state, acc_snap, &ts );
         }
  
-        dds_send_tune_update(state, sample_idx, y, &ts);    
+        dds_send_tune_update(state, state->current_sample_idx, y, &ts);    
 }
 
 int pf_cnt = 0;
 
 void dds_slave_got_fixup(struct dds_loop_state *state, struct wr_d3s_remote_message *msg)
 {
+    
     if( state->stream_id != msg->stream_id)
     	return; // not a stream we're interested in
+
+    if(state->lock_id != msg->lock_id)
+    {
+	pp_printf("Master has relocked. Restarting loop.\n");
+	state->lock_id = msg->lock_id;
+	state->slave_state = SLAVE_WAIT_CONFIG;
+    }
 
     if ( state->slave_state == SLAVE_WAIT_CONFIG )
     {
@@ -589,9 +553,8 @@ void dds_slave_update(struct dds_loop_state *state)
 			dp_writel(fixup_corrected >> 0, DDS_REG_ACC_LOAD_LO);
 			dp_writel(ent->tune | DDS_TUNE_VAL_LOAD_ACC, DDS_REG_TUNE_VAL);
 			
-			int cs = dp_readl(DDS_REG_SAMPLE_IDX);
-			pp_printf("Sidx-p %d %d ltune %d\n", state->current_sample_idx, cs, state->last_tune  );
-
+//			int cs = dp_readl(DDS_REG_SAMPLE_IDX);
+//			pp_printf("Sidx-p %d %d ltune %d\n", state->current_sample_idx, cs, state->last_tune  );
 			state->slave_state = SLAVE_RUN;
 		    }
 		    else
@@ -636,6 +599,7 @@ void dds_loop_start(struct dds_loop_state *state)
     state->delock_samples = 1000;
     state->lock_threshold = 1000;
     state->sampling_divider = 100;
+    state->lock_id = 0;
 
     dp_writel(0, DDS_REG_CR);
 
@@ -644,7 +608,6 @@ void dds_loop_start(struct dds_loop_state *state)
 
     if(state->master)
     {
-
         /* set DDS center frequency */
         dp_writel(state->base_tune >> 32, DDS_REG_FREQ_HI);
         dp_writel(state->base_tune & 0xffffffff, DDS_REG_FREQ_LO);
@@ -717,13 +680,11 @@ static inline void ctl_d3s_stream_config (uint32_t seq, struct wrnc_msg *ibuf)
     uint32_t tune_hi = (dds_loop.base_tune >> 32) & 0xffffffff;
     uint32_t tune_lo = (dds_loop.base_tune >> 0) & 0xffffffff;
 
-//    pp_printf("HI=0x%x\n", tune_hi);
-//    pp_printf("LO=0x%x\n", tune_lo);
-
     dds_loop.enabled = (mode != D3S_STREAM_OFF ) ? 1 : 0;
     dds_loop.master = (mode == D3S_STREAM_MASTER ) ? 1 : 0;
 
     dds_loop_start(&dds_loop);
+    rf_counter_init(&rf_cnt, &dds_loop);
 
     ctl_ack (seq);
 }
@@ -786,32 +747,46 @@ static inline void do_control()
     mq_discard(0, WR_D3S_IN_CONTROL);
 }
 
-#define RF_COUNTER_WAIT_PLL_LOCK 0
-#define RF_COUNTER_WAIT_TRIGGER 1
-#define RF_COUNTER_WAIT_SYNC 2
-#define RF_COUNTER_SYNCED 3
 
-struct rf_counter_state {
-    int state;
 
-};
 
-struct rf_counter_state rf_cnt;
+void rf_counter_init(struct rf_counter_state *state, struct dds_loop_state *loop)
+{
+    state->state = RF_COUNTER_WAIT_LOCK;
+    state->period = 44 * 1000 * 100; // roughly 100 ms @ RF = 352 MHz, make configurable
+    state->dds = loop;
+    
+    dp_writel(state->period - 1, DDS_REG_RF_CNT_PERIOD);
+}
 
 void rf_counter_update(struct rf_counter_state *state)
 {
-    uint32_t trig_csr = dp_readl(DDS_REG_TRIG_IN_CSR);
-    
-    if(trig_csr & DDS_TRIG_IN_CSR_DONE)
+    switch(state->state)
     {
-        uint32_t trig_snap;
-        trig_snap = dp_readl( DDS_REG_TRIG_IN_SNAPSHOT );
-        dp_writel(DDS_TRIG_IN_CSR_ARM, DDS_REG_TRIG_IN_CSR);
-
-        //pp__printf("Trigger Snapshot : %d en %d master %d locked %d, fxu %d\n", trig_snap, dds_loop.enabled, dds_loop.master, dds_loop.locked, dp_readl(DDS_REG_SAMPLE_IDX) );
-
+	case RF_COUNTER_WAIT_LOCK:
+	    if(state->dds->master && state->dds->locked)
+		state->state = RF_COUNTER_MASTER_WAIT_NEXT_SAMPLE;
+	    
+		break;
+	
+	case RF_COUNTER_MASTER_WAIT_NEXT_SAMPLE:
+	    if(state->dds->current_sample_idx != 0)
+	    {
+		state->state = RF_COUNTER_MASTER_WAIT_SNAPSHOT;
+	    }
+	    break;
+	    
+	
+	case RF_COUNTER_MASTER_WAIT_SNAPSHOT:
+	    if(state->dds->current_sample_idx == 0)
+	    {
+		pp_printf("Snapshot!\n");
+		state->state = RF_COUNTER_MASTER_WAIT_NEXT_SAMPLE;
+	    }
+	    
+	    
+	    break;
     }
-
 }
 
 // WR aux clock disciplining
@@ -922,26 +897,6 @@ int main()
 	init();
 
 	main_loop();
-
-
-
-#if 0
-        dp_writel(1000000, DDS_REG_FREQ_MEAS_GATE);
-
-    
-
-	for(;;)
-	{
-	    int locked = dp_readl(DDS_REG_GPIOR) & DDS_GPIOR_SERDES_PLL_LOCKED ? 1 : 0;
-	    int ref_freq = dp_readl(DDS_REG_FREQ_MEAS_VCXO_REF);
-	    pp_printf("l: %d  f:%d [%x]\n", locked,ref_freq,ad95xx_read_reg(0,0x1f));
-
-    	    delay_us(500000);
-    	    delay_us(500000);
-	    adf4002_configure(3,3,4);
-	}
-
-#endif
 
 	
 	return 0;

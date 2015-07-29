@@ -900,6 +900,8 @@ static inline void ctl_chan_enable_trigger (uint32_t seq, struct wrnc_msg *ibuf)
 	wrnc_msg_int32(ibuf, &enable);
 	wrnc_msg_uint32(ibuf, (uint32_t *) &ent);
 
+	if (!ent)
+		ctl_nack(seq, -1);
 	struct lrt_output_rule *rule = &ent->ocfg[ch];
 
 #ifdef RTDEBUG

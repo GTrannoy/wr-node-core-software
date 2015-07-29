@@ -112,7 +112,6 @@ void dump_input_state(struct wrtd_input_state *state)
 	printf(" - Delay:                 %s\n", tmp    );
 	printf(" - Tagged pulses:         %-10d\n", state->tagged_pulses );
 	printf(" - Sent triggers:         %-10d\n", state->sent_triggers );
-	printf(" - Sent packets:          %-10d\n", state->sent_packets );
 
 	format_id(tmp, state->assigned_id);
 	printf(" - Assigned ID:           %s\n",
@@ -136,6 +135,8 @@ void dump_input_state(struct wrtd_input_state *state)
 	wrtd_strlogging_full(tmp, state->log_level);
 	printf(" - Log level:             %s\n", tmp);
 
+	printf("Global Input information:\n");
+	printf(" - Sent packets:          %-10d\n", state->sent_packets );
 }
 
 static int wrtd_cmd_state(struct wrtd_node *wrtd, int input,

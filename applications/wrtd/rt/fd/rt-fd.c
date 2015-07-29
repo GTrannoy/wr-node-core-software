@@ -201,7 +201,7 @@ void rtfd_trigger_entry_remove(struct lrt_hash_entry *ent, unsigned int output)
 
 	/* Remove the entire entry when we don't have rule */
 	for (i = 0; i < FD_NUM_CHANNELS; i++)
-		if (ord_tlist[index]->ocfg[output].state != HASH_ENT_EMPTY)
+		if (ord_tlist[index]->ocfg[i].state != HASH_ENT_EMPTY)
 			break;
 	if (i < FD_NUM_CHANNELS)
 		return;

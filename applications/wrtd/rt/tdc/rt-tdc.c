@@ -390,6 +390,10 @@ static inline void ctl_software_trigger (uint32_t seq, struct wrnc_msg *ibuf)
     struct wrtd_trigger_entry ent;
     wrtd_msg_trigger_entry(ibuf, &ent);
 
+    ent.ts.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
+    ent.ts.ticks = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
+    ent.ts.frac = 0;
+
     msg->triggers[0] = ent;
 
     mq_send(1, WRTD_REMOTE_OUT_TDC, sizeof(struct wrtd_trigger_message) / 4); // fixme

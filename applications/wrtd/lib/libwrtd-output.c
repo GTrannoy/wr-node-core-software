@@ -146,7 +146,7 @@ int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 	uint32_t seq = 0, id;
 	uint32_t dead_time_ticks, pulse_width_ticks;
 
-	if (output > FD_NUM_CHANNELS) {
+	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -232,7 +232,7 @@ int wrtd_out_enable(struct wrtd_node *dev, unsigned int output,
 	struct wrnc_msg msg;
 	int err;
 
-	if (output > FD_NUM_CHANNELS) {
+	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -273,7 +273,7 @@ int wrtd_out_trig_assign(struct wrtd_node *dev, unsigned int output,
 	uint32_t seq = 0, id;
 	struct wrtd_trigger_handle tmp_handle;
 
-	if (output > FD_NUM_CHANNELS) {
+	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -367,7 +367,7 @@ int wrtd_out_trig_get_all(struct wrtd_node *dev, unsigned int output,
 	struct wrtd_trigger_handle handle = {0, 0, output};
 	/* Set ptr to 0 so that we get the first available  */
 
-	if (output > FD_NUM_CHANNELS) {
+	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -482,7 +482,7 @@ static int wrtd_out_rule_delay_set(struct wrtd_node *dev,
 	struct wrnc_msg msg = wrnc_msg_init (16);
 	uint32_t id, seq = 0;
 
-	if (output > FD_NUM_CHANNELS) {
+	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -536,7 +536,7 @@ int wrtd_out_pulse_width_set(struct wrtd_node *dev, unsigned int output,
 	int err, tmp = 0;
 	uint32_t seq = 0, id;
 
-	if (output > FD_NUM_CHANNELS) {
+	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -650,7 +650,7 @@ int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
 	struct wrnc_msg msg  = wrnc_msg_init(4);
 	uint32_t seq = 0, id, m = mode;
 
-	if (output > FD_NUM_CHANNELS) {
+	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
@@ -701,7 +701,7 @@ int wrtd_out_counters_reset(struct wrtd_node *dev, unsigned int output)
 	struct wrnc_msg msg = wrnc_msg_init(3);
 	uint32_t seq = 0, id = WRTD_CMD_FD_CHAN_RESET_COUNTERS;
 
-	if (output > FD_NUM_CHANNELS) {
+	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}

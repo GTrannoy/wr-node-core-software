@@ -393,7 +393,7 @@ static inline void ctl_software_trigger (uint32_t seq, struct wrnc_msg *ibuf)
     msg->triggers[0] = ent;
 
     mq_send(1, WRTD_REMOTE_OUT_TDC, sizeof(struct wrtd_trigger_message) / 4); // fixme
-
+    sent_packets++;
     ctl_ack(seq);
 }
 

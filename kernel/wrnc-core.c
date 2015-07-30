@@ -301,9 +301,9 @@ static long wrnc_ioctl_io(struct wrnc_dev *wrnc, void __user *uarg)
 		/* read */
 		addr = wrnc->base_smem + io.addr;
 	} else {
+		fmc_writel(fmc, io.mod, wrnc->base_csr + WRN_CPU_CSR_REG_SMEM_OP);
 		/* write */
-		addr = wrnc->base_smem + (io.mod * WRNC_SMEM_MAX_SIZE)
-			+ io.addr;
+		addr = wrnc->base_smem + io.addr;
 		fmc_writel(fmc, io.value, addr);
 	}
 

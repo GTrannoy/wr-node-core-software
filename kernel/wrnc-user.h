@@ -57,7 +57,7 @@ struct wrnc_msg {
  * Message descriptor used to send synchronous messages
  */
 struct wrnc_msg_sync {
-	struct wrnc_msg msg; /**< the message to send. It will be overwritten by
+	struct wrnc_msg *msg; /**< the message to send. It will be overwritten by
 				the synchronous answer */
 	uint16_t index_in; /**< where write the message */
 	uint16_t index_out; /**< where we expect the synchronous answer */

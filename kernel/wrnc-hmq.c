@@ -539,7 +539,7 @@ static struct wrnc_msg *wrnc_message_pop(struct wrnc_hmq *hmq)
 static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 {
 	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
-	struct wrnc_msg msg_ans;
+	struct wrnc_msg msg_ans, msg_req;
 	struct wrnc_msg_sync msg;
 	struct wrnc_hmq *hmq_out;
 	unsigned long flags;
@@ -548,6 +548,9 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 
 	/* Copy the message from user space*/
 	err = copy_from_user(&msg, uarg, sizeof(struct wrnc_msg_sync));
+	if (err)
+		return err;
+	err = copy_from_user(&msg_req, msg.msg, sizeof(struct wrnc_msg));
 	if (err)
 		return err;
 
@@ -569,7 +572,7 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 
 	/* Send the message */
 	spin_lock_irqsave(&hmq->lock, flags);
-	seq = wrnc_message_push(hmq, &msg.msg);
+	seq = wrnc_message_push(hmq, &msg_req);
 	spin_unlock_irqrestore(&hmq->lock, flags);
 
 	/* Set message sequance to wait */
@@ -594,15 +597,10 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 		if (to == 0)
 			dev_err(&hmq->dev,
 				 "The real time application is taking too much time to answer. Something is broken\n");
-		memset(&msg.msg, 0, sizeof(struct wrnc_msg));
-		goto out_sync;
+		memset(&msg_ans, 0, sizeof(struct wrnc_msg));
 	}
 
-	/* Copy the answer message back to user space */
-	memcpy(&msg.msg, &msg_ans, sizeof(struct wrnc_msg));
-
-out_sync:
-	return copy_to_user(uarg, &msg, sizeof(struct wrnc_msg_sync));
+	return copy_to_user(msg.msg, &msg_ans, sizeof(struct wrnc_msg));
 }
 
 
@@ -692,7 +690,7 @@ static long wrnc_hmq_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 		wrnc_ioctl_msg_filter_clean(user, uarg);
 		break;
 	default:
-		pr_warn("ual: invalid ioctl command %d\n", cmd);
+		pr_warn("wrnc: invalid ioctl command %d\n", cmd);
 		return -EINVAL;
 	}
 

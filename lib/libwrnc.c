@@ -735,15 +735,12 @@ int wrnc_hmq_send_and_receive_sync(struct wrnc_hmq *hmq,
 	smsg.index_in = hmq->index;
 	smsg.index_out = index_out;
 	smsg.timeout_ms = timeout_ms;
-	memcpy(&smsg.msg, msg, sizeof(struct wrnc_msg));
+	smsg.msg = msg;
 
 	/* Send the message */
 	err = ioctl(hmq->fd, WRNC_IOCTL_MSG_SYNC, &smsg);
 	if (err)
 		return -1;
-
-	/* Copy the answer */
-	memcpy(msg, &smsg.msg, sizeof(struct wrnc_msg));
 
 	msg->error = 0;
 	msg->offset = 0;

@@ -96,14 +96,22 @@ int trigger_search(struct lrt_hash_entry **tlist,
 	 for a the new entry */
 	*mid++;
 #else
-	for (*mid = min; *mid < max; (*mid)++) {
-		cmp = memcmp(&tlist[*mid]->id, id, sizeof(struct wrtd_trig_id));
-		if (cmp == 0)
-			return 1;
-		else if (cmp > 0)
-			break;
 
-	}
+	  /* FIXME Temporary HACK to be able to use memcmp
+	     (smem not byte addressable - VHDL problem) */
+	  volatile struct wrtd_trig_id tmp;
+	  tmp.system = id->system;
+	  tmp.source_port = id->source_port;
+	  tmp.trigger = id->trigger;
+
+	  for (*mid = min; *mid < max; (*mid)++) {
+		  cmp = memcmp(&tlist[*mid]->id, &tmp, sizeof(struct wrtd_trig_id));
+		  if (cmp == 0)
+			  return 1;
+		  else if (cmp > 0)
+			  break;
+	  }
+
 #endif
 
 #ifdef RTDEBUG

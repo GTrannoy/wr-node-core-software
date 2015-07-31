@@ -28,6 +28,8 @@
 #define BASE_DP_TDC_REGS    0x2000
 #define BASE_DP_TDC_DIRECT  0x8000
 
+static const uint32_t version = GIT_VERSION;
+
 /* Structure describing state of each TDC channel*/
 struct tdc_channel_state {
 /* Currently assigned trigger ID */
@@ -332,6 +334,16 @@ static inline void ctl_base_time (uint32_t seq, struct wrnc_msg *ibuf)
 	hmq_msg_send (&buf);
 }
 
+static inline void ctl_version(uint32_t seq, struct wrnc_msg *ibuf)
+{
+	struct wrnc_msg buf = ctl_claim_out_buf();
+	uint32_t id_ack = WRTD_REP_VERSION;
+
+	wrnc_msg_header(&buf, &id_ack, &seq);
+	wrnc_msg_uint32(&buf, &version);
+	hmq_msg_send(&buf);
+}
+
 static inline void ctl_chan_set_delay (uint32_t seq, struct wrnc_msg *ibuf)
 {
     int channel;
@@ -556,6 +568,7 @@ static inline void do_control()
 	_CMD(WRTD_CMD_TDC_CHAN_RESET_COUNTERS,        ctl_chan_reset_counters)
 	_CMD(WRTD_CMD_TDC_PING,                       ctl_ping)
 	_CMD(WRTD_CMD_TDC_BASE_TIME,                  ctl_base_time)
+	_CMD(WRTD_CMD_TDC_VERSION,                    ctl_version)
 	default:
 		  break;
 	}
@@ -692,6 +705,7 @@ void init()
 
 main()
 {
+	pp_printf("Running %s from commit 0x%x.\n", __FILE__, version);
     init();
 
     for(;;)

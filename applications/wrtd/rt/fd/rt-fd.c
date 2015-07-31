@@ -30,6 +30,7 @@
 #define OUT_ST_TEST_PENDING 2
 #define OUT_ST_CONDITION_HIT 3
 
+static const uint32_t version = GIT_VERSION;
 
 /**
  * Rule defining the behaviour of a trigger output upon reception of a
@@ -1082,6 +1083,16 @@ static inline void ctl_base_time (uint32_t seq, struct wrnc_msg *ibuf)
 	hmq_msg_send (&buf);
 }
 
+static inline void ctl_version(uint32_t seq, struct wrnc_msg *ibuf)
+{
+	struct wrnc_msg buf = ctl_claim_out_buf();
+	uint32_t id_ack = WRTD_REP_VERSION;
+
+	wrnc_msg_header(&buf, &id_ack, &seq);
+	wrnc_msg_uint32(&buf, &version);
+	hmq_msg_send(&buf);
+}
+
 static inline void ctl_chan_set_delay (uint32_t seq, struct wrnc_msg *ibuf)
 {
 	int ch;
@@ -1308,6 +1319,7 @@ static inline void do_control()
 	_CMD(WRTD_CMD_FD_BASE_TIME,                     ctl_base_time)
 	_CMD(WRTD_CMD_FD_PING,                          ctl_ping)
 	_CMD(WRTD_CMD_FD_CHAN_DEAD_TIME,                ctl_chan_set_dead_time)
+	_CMD(WRTD_CMD_FD_VERSION,                       ctl_version)
 	default:
 	break;
 	}
@@ -1424,6 +1436,7 @@ void init()
 
 int main()
 {
+	pp_printf("Running %s from commit 0x%x.\n", __FILE__, version);
 	init();
 
 	for(;;) {

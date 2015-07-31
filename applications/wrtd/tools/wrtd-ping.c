@@ -21,18 +21,19 @@ void help()
 	fprintf(stderr, "  -n <num>       number of ping to perform\n");
 	fprintf(stderr, "  -p <num>       ping period in micro-seconds\n");
 	fprintf(stderr, "  -t             show device base time\n");
+	fprintf(stderr, "  -v             show device version\n");
 }
 
 int main(int argc, char *argv[])
 {
 	struct wrtd_node *wrtd;
-	uint32_t dev_id = 0, n = 1;
+	uint32_t dev_id = 0, n = 1, vi, vo;
 	uint64_t period = 0;
 	struct wr_timestamp tsi, tso;
-	int err, time = 0;
+	int err, time = 0, version = 0;
 	char c;
 
-	while ((c = getopt (argc, argv, "hD:n:p:t")) != -1) {
+	while ((c = getopt (argc, argv, "hD:n:p:tv")) != -1) {
 		switch (c) {
 		case 'h':
 		case '?':
@@ -50,6 +51,9 @@ int main(int argc, char *argv[])
 			break;
 		case 't':
 			time = 1;
+			break;
+		case 'v':
+			version = 1;
 			break;
 		}
 	}
@@ -81,31 +85,45 @@ int main(int argc, char *argv[])
 			wrtd_in_base_time(wrtd, &tsi);
 			wrtd_out_base_time(wrtd, &tso);
 		}
+		if (version) {
+			wrtd_in_version(wrtd, &vi);
+			wrtd_out_version(wrtd, &vo);
+		}
 
 		/* Check input */
 		err = wrtd_in_ping(wrtd);
 		if (err) {
 			fprintf(stderr, "Cannot ping input source: %s\n",
 				wrtd_strerror(errno));
-		} else {
-			fprintf(stdout, "input  : it is running!\n");
-			if (time)
-				fprintf(stdout,
-					"\tbase time\ts:%"PRIu64" t:%d f:%d\n",
-					tsi.seconds, tsi.ticks, tsi.frac);
+			goto skip_input;
 		}
+
+		fprintf(stdout, "input  : it is running!\n");
+		if (time)
+			fprintf(stdout,
+				"\tbase time\ts:%"PRIu64" t:%d f:%d\n",
+				tsi.seconds, tsi.ticks, tsi.frac);
+		if (version)
+			fprintf(stdout,
+				"\tversion\t\t%x\n", vi);
+	skip_input:
 		/* check output */
 		err = wrtd_out_ping(wrtd);
 		if (err) {
 			fprintf(stderr, "Cannot ping output source: %s\n",
 				wrtd_strerror(errno));
-		} else {
-			fprintf(stdout, "output : it is running!\n");
-			if (time)
-				fprintf(stdout,
-					"\tbase time\ts:%"PRIu64" t:%d f:%d\n",
-					tso.seconds, tso.ticks, tso.frac);
+			goto skip_output;
 		}
+
+		fprintf(stdout, "output : it is running!\n");
+		if (time)
+			fprintf(stdout,
+				"\tbase time\ts:%"PRIu64" t:%d f:%d\n",
+				tso.seconds, tso.ticks, tso.frac);
+		if (version)
+			fprintf(stdout,
+				"\tversion\t\t%x\n", vo);
+	skip_output:
 		fprintf(stdout, "\n");
 		usleep(period);
 	}

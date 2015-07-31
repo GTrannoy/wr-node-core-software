@@ -10,10 +10,13 @@ OBJDUMP =	$(CROSS_COMPILE_TARGET)objdump
 OBJCOPY =	$(CROSS_COMPILE_TARGET)objcopy
 SIZE =		$(CROSS_COMPILE_TARGET)size
 
+RT_GIT_VERSION = 0x$(shell cd ../../..; git rev-parse --short=8 HEAD)
+
 CFLAGS += -DWRNODE_RT -g -O3 -mmultiply-enabled -mbarrel-shift-enabled
 CFLAGS += -I.
 CFLAGS += -I$(PATH_COMMON)/rt
 CFLAGS += -I$(PATH_COMMON)/include
+CFLAGS += -DGIT_VERSION=$(RT_GIT_VERSION)
 CFLAGS += $(EXTRA_CFLAGS)
 
 

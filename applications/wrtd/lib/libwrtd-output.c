@@ -900,3 +900,41 @@ int wrtd_out_base_time(struct wrtd_node *dev, struct wr_timestamp *ts)
 
 	return 0;
 }
+
+
+/**
+ * It gets the output version
+ * @param[in] dev device token
+ * @param[out] ts output device base time
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_out_version(struct wrtd_node *dev, uint32_t *gitsha1)
+{
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrnc_msg msg = wrnc_msg_init(6); /* FIXME cannot use 2 */
+	uint32_t id, seq = 0;
+	int err;
+
+	id = WRTD_CMD_FD_VERSION;
+	wrnc_msg_header(&msg, &id, &seq);
+
+	/* Send the message and get answer */
+	err = wrtd_out_send_and_receive_sync(wrtd, &msg);
+        if (err) {
+		errno = EWRTD_INVALID_ANSWER_STATE;
+		return -1;
+	}
+
+	/* Deserialize and check the answer */
+	wrnc_msg_header(&msg, &id, &seq);
+
+	if(id != WRTD_REP_VERSION)
+	{
+		errno = EWRTD_INVALID_ANSWER_STATE;
+		return -1;
+	}
+
+	wrnc_msg_uint32(&msg, gitsha1);
+
+	return 0;
+}

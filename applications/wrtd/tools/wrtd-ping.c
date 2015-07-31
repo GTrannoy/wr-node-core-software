@@ -20,6 +20,7 @@ void help()
 	fprintf(stderr, "  -D 0x<dev_id>  device id to ping\n");
 	fprintf(stderr, "  -n <num>       number of ping to perform\n");
 	fprintf(stderr, "  -p <num>       ping period in micro-seconds\n");
+	fprintf(stderr, "  -t             show device base time\n");
 }
 
 int main(int argc, char *argv[])
@@ -27,10 +28,11 @@ int main(int argc, char *argv[])
 	struct wrtd_node *wrtd;
 	uint32_t dev_id = 0, n = 1;
 	uint64_t period = 0;
-	int err;
+	struct wr_timestamp tsi, tso;
+	int err, time = 0;
 	char c;
 
-	while ((c = getopt (argc, argv, "hD:n:p:")) != -1) {
+	while ((c = getopt (argc, argv, "hD:n:p:t")) != -1) {
 		switch (c) {
 		case 'h':
 		case '?':
@@ -45,6 +47,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'p':
 			sscanf(optarg, "%"SCNu64, &period);
+			break;
+		case 't':
+			time = 1;
 			break;
 		}
 	}
@@ -70,21 +75,37 @@ int main(int argc, char *argv[])
 	}
 
 	while (n--) {
+		/* Get base time here to reduce the delay between the
+		   two requests */
+		if (time) {
+			wrtd_in_base_time(wrtd, &tsi);
+			wrtd_in_base_time(wrtd, &tso);
+		}
+
 		/* Check input */
 		err = wrtd_in_ping(wrtd);
-		if (err)
+		if (err) {
 			fprintf(stderr, "Cannot ping input source: %s\n",
 				wrtd_strerror(errno));
-		else
+		} else {
 			fprintf(stdout, "input  : it is running!\n");
-
+			if (time)
+				fprintf(stdout,
+					"\tbase time\ts:%d t:%d f:%d\n",
+					tsi.seconds, tsi.ticks, tsi.frac);
+		}
 		/* check output */
 		err = wrtd_out_ping(wrtd);
-		if (err)
+		if (err) {
 			fprintf(stderr, "Cannot ping output source: %s\n",
 				wrtd_strerror(errno));
-		else
+		} else {
 			fprintf(stdout, "output : it is running!\n");
+			if (time)
+				fprintf(stdout,
+					"\tbase time\ts:%d t:%d f:%d\n",
+					tso.seconds, tso.ticks, tso.frac);
+		}
 		fprintf(stdout, "\n");
 		usleep(period);
 	}

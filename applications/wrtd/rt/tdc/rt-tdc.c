@@ -318,6 +318,20 @@ static inline void ctl_ping (uint32_t seq, struct wrnc_msg *ibuf)
     ctl_ack(seq);
 }
 
+static inline void ctl_base_time (uint32_t seq, struct wrnc_msg *ibuf)
+{
+	struct wrnc_msg buf = ctl_claim_out_buf();
+	uint32_t id_ack = WRTD_REP_BASE_TIME_ID, seconds, ticks;
+	struct wr_timestamp ts;
+
+	ts.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
+	ts.ticks = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
+	ts.frac = 0;
+	wrnc_msg_header (&buf, &id_ack, &seq);
+	wrtd_msg_timestamp(&buf, &ts);
+	hmq_msg_send (&buf);
+}
+
 static inline void ctl_chan_set_delay (uint32_t seq, struct wrnc_msg *ibuf)
 {
     int channel;
@@ -541,6 +555,7 @@ static inline void do_control()
 	_CMD(WRTD_CMD_TDC_CHAN_SET_LOG_LEVEL,         ctl_chan_set_log_level)
 	_CMD(WRTD_CMD_TDC_CHAN_RESET_COUNTERS,        ctl_chan_reset_counters)
 	_CMD(WRTD_CMD_TDC_PING,                       ctl_ping)
+	_CMD(WRTD_CMD_TDC_BASE_TIME,                  ctl_base_time)
 	default:
 		  break;
 	}

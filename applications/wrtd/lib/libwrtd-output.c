@@ -845,3 +845,40 @@ int wrtd_out_ping(struct wrtd_node *dev)
 
 	return wrtd_validate_acknowledge(&msg);
 }
+
+/**
+ * It gets the output base time
+ * @param[in] dev device token
+ * @param[out] ts output device base time
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_out_base_time(struct wrtd_node *dev, struct wr_timestamp *ts)
+{
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrnc_msg msg = wrnc_msg_init(6); /* FIXME cannot use 2 */
+	uint32_t id, seq = 0;
+	int err;
+
+	id = WRTD_CMD_FD_BASE_TIME;
+	wrnc_msg_header(&msg, &id, &seq);
+
+	/* Send the message and get answer */
+	err = wrtd_out_send_and_receive_sync(wrtd, &msg);
+        if (err) {
+		errno = EWRTD_INVALID_ANSWER_STATE;
+		return -1;
+	}
+
+	/* Deserialize and check the answer */
+	wrnc_msg_header(&msg, &id, &seq);
+
+	if(id != WRTD_REP_BASE_TIME_ID)
+	{
+		errno = EWRTD_INVALID_ANSWER_STATE;
+		return -1;
+	}
+
+	wrtd_msg_timestamp(&msg, ts);
+
+	return 0;
+}

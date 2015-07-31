@@ -48,6 +48,7 @@
 #define WRTD_CMD_TDC_SOFTWARE_TRIGGER         0xd
 #define WRTD_CMD_TDC_CHAN_SET_LOG_LEVEL       0xe
 #define WRTD_CMD_TDC_CHAN_RESET_COUNTERS      0xf
+#define WRTD_CMD_TDC_BASE_TIME                0x10
 
 
 #define WRTD_CMD_FD_TRIG_ENABLE          0x10
@@ -70,6 +71,7 @@
 #define WRTD_CMD_FD_CHAN_RESET_COUNTERS       0x9
 
 #define WRTD_CMD_FD_PING                     0xa
+#define WRTD_CMD_FD_BASE_TIME                0xb
 
 
 #define WRTD_REP_ACK_ID			0x100
@@ -79,6 +81,7 @@
 #define WRTD_REP_HASH_ENTRY		0x104
 #define WRTD_REP_TIMESTAMP		0x105
 #define WRTD_REP_LOG_MESSAGE    0x106
+#define WRTD_REP_BASE_TIME_ID           0x107
 
 
 

@@ -247,6 +247,7 @@ extern int wrtd_in_is_armed(struct wrtd_node *dev, unsigned int input,
 extern int wrtd_in_has_trigger(struct wrtd_node *dev, unsigned int input,
 			       unsigned int *assigned);
 extern int wrtd_in_ping(struct wrtd_node *dev);
+extern int wrtd_in_base_time(struct wrtd_node *dev, struct wr_timestamp *ts);
 extern int wrtd_in_dead_time_get(struct wrtd_node *dev, unsigned int input,
 				 uint64_t *dead_time_ps);
 extern int wrtd_in_delay_get(struct wrtd_node *dev, unsigned int input,
@@ -295,6 +296,7 @@ extern int wrtd_out_pulse_width_set(struct wrtd_node *dev, unsigned int output,
 extern int wrtd_out_trig_enable(struct wrtd_node *dev,
 				struct wrtd_trigger_handle *handle, int enable);
 extern int wrtd_out_ping(struct wrtd_node *dev);
+extern int wrtd_out_base_time(struct wrtd_node *dev, struct wr_timestamp *ts);
 extern int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
 				     unsigned int output,
 				     enum wrtd_trigger_mode mode);

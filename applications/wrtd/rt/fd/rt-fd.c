@@ -1307,6 +1307,7 @@ static inline void do_control()
 	_CMD(WRTD_CMD_FD_READ_HASH,			ctl_read_hash)
 	_CMD(WRTD_CMD_FD_BASE_TIME,                     ctl_base_time)
 	_CMD(WRTD_CMD_FD_PING,                          ctl_ping)
+	_CMD(WRTD_CMD_FD_CHAN_DEAD_TIME,                ctl_chan_set_dead_time)
 	default:
 	break;
 	}

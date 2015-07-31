@@ -372,7 +372,7 @@ static int wrtd_cmd_dead_time(struct wrtd_node *wrtd, int output,
 		return -1;
 	}
 
-	/* Get a trigger */
+	/* Get the dead time */
 	parse_delay(argv[0], &dtime);
 
 	return wrtd_out_dead_time_set(wrtd, output, dtime);

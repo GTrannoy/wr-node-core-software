@@ -72,6 +72,7 @@
 
 #define WRTD_CMD_FD_PING                     0xa
 #define WRTD_CMD_FD_BASE_TIME                0xb
+#define WRTD_CMD_FD_CHAN_DEAD_TIME           0xc
 
 
 #define WRTD_REP_ACK_ID			0x100

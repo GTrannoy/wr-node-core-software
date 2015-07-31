@@ -419,9 +419,6 @@ void pulse_queue_pop(struct lrt_pulse_queue *p)
    by comparing it with the last processed pulse timestamp. */
 static int check_dead_time( struct lrt_output *out, struct wr_timestamp *ts )
 {
-	if(out->idle)
-		return 1;
-
 	int delta_s = ts->seconds - out->prev_pulse.seconds;
 	int delta_c = ts->ticks - out->prev_pulse.ticks;
 

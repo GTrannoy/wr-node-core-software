@@ -295,6 +295,8 @@ struct lrt_output {
 	struct lrt_output_rule *pending_trig;
 /* Output pulse queue */
 	struct lrt_pulse_queue queue;
+/* Last enqueued trigger + delay (for dead time checking). */
+	struct wr_timestamp prev_pulse;
 };
 
 /* A pointer/handle to a trigger rule in the hash table. Used by the host to
@@ -420,8 +422,8 @@ static int check_dead_time( struct lrt_output *out, struct wr_timestamp *ts )
 	if(out->idle)
 		return 1;
 
-	int delta_s = ts->seconds - out->last_enqueued.ts.seconds;
-	int delta_c = ts->ticks - out->last_enqueued.ts.ticks;
+	int delta_s = ts->seconds - out->prev_pulse.seconds;
+	int delta_c = ts->ticks - out->prev_pulse.ticks;
 
 	if(delta_c < 0) {
 		delta_c += 125 * 1000 * 1000;
@@ -621,12 +623,14 @@ void enqueue_trigger(int output, struct lrt_output_rule *rule,
 	ent.seq = seq;
 
 	if (!check_dead_time(out, &adjusted)) {
+		rule->misses ++;
 		out->miss_deadtime ++;
 		log_trigger (WRTD_LOG_MISSED, WRTD_MISS_DEAD_TIME, out, &ent);
 		return;
 	}
 
 	if (!wr_is_timing_ok()) {
+		rule->misses ++;
 		out->miss_no_timing ++;
 		log_trigger (WRTD_LOG_MISSED, WRTD_MISS_NO_WR, out, &ent);
 		return;
@@ -687,6 +691,8 @@ void enqueue_trigger(int output, struct lrt_output_rule *rule,
 	out->last_enqueued.ts = *ts;
 	out->last_enqueued.id = *id;
 	out->last_enqueued.seq = seq;
+
+	out->prev_pulse = adjusted;
 
 	log_trigger (WRTD_LOG_FILTERED, 0, out, &out->last_enqueued);
 

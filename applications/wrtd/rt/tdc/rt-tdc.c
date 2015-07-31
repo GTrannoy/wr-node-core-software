@@ -654,6 +654,8 @@ void init()
 {
     int i;
 
+    loop_queue_init();
+
     wr_state = WR_LINK_OFFLINE;
     wr_enable_lock(0);
 

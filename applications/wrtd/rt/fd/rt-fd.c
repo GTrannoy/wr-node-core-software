@@ -727,7 +727,6 @@ void do_rx()
 		rx_ebone++;
 	}
 
-
 	struct wrtd_trigger_entry *ent = loop_queue_pop();
 
 	if (ent) {

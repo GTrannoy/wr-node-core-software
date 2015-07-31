@@ -41,7 +41,7 @@ void loop_queue_push(struct wrtd_trig_id *id, uint32_t seq, struct wr_timestamp 
 	if (head == LOOP_QUEUE_SIZE)
 		head = 0;
 
-	count++;
+	smem_atomic_add(&count, 1);
 }
 
 struct wrtd_trigger_entry *loop_queue_pop()
@@ -55,7 +55,8 @@ struct wrtd_trigger_entry *loop_queue_pop()
 
 	if(tail == LOOP_QUEUE_SIZE)
 		tail = 0;
-	count--;
+	
+	smem_atomic_sub(&count, 1);
 
 	return rv;
 }

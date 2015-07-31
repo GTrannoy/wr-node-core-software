@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
 		   two requests */
 		if (time) {
 			wrtd_in_base_time(wrtd, &tsi);
-			wrtd_in_base_time(wrtd, &tso);
+			wrtd_out_base_time(wrtd, &tso);
 		}
 
 		/* Check input */

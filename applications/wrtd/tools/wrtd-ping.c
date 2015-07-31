@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
 			fprintf(stdout, "input  : it is running!\n");
 			if (time)
 				fprintf(stdout,
-					"\tbase time\ts:%d t:%d f:%d\n",
+					"\tbase time\ts:%"PRIu64" t:%d f:%d\n",
 					tsi.seconds, tsi.ticks, tsi.frac);
 		}
 		/* check output */
@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
 			fprintf(stdout, "output : it is running!\n");
 			if (time)
 				fprintf(stdout,
-					"\tbase time\ts:%d t:%d f:%d\n",
+					"\tbase time\ts:%"PRIu64" t:%d f:%d\n",
 					tso.seconds, tso.ticks, tso.frac);
 		}
 		fprintf(stdout, "\n");

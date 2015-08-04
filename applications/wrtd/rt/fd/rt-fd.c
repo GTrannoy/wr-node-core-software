@@ -31,6 +31,7 @@
 #define OUT_ST_CONDITION_HIT 3
 
 static const uint32_t version = GIT_VERSION;
+static uint32_t promiscuous_mode = 0;
 
 /**
  * Rule defining the behaviour of a trigger output upon reception of a
@@ -343,15 +344,18 @@ static void log_trigger(int type, int miss_reason, struct lrt_output *out, struc
 {
     	uint32_t id = WRTD_REP_LOG_MESSAGE;
     	uint32_t seq = 0;
+	int chan;
 
-    	if ( !(out->log_level & type))
-    		return;
+	if (!out && (type != WRTD_LOG_PROMISC || !promiscuous_mode ))
+		return;
+	if (out && !(out->log_level & type))
+		return;
 
 	struct wrnc_msg buf = hmq_msg_claim_out (WRTD_OUT_FD_LOGGING, 16);
-
+	chan = out ? out->index : -1;
 	wrnc_msg_header (&buf, &id, &seq);
 	wrnc_msg_int32 (&buf, &type);
-	wrnc_msg_int32 (&buf, &out->index);
+	wrnc_msg_int32 (&buf, &chan);
 	wrnc_msg_int32 (&buf, &miss_reason);
 	wrtd_msg_trigger_entry (&buf, ent);
 
@@ -704,6 +708,7 @@ static void filter_trigger(struct wrtd_trigger_entry *trig)
 	struct lrt_hash_entry *ent = rtfd_trigger_entry_find(&trig->id);
 	int j;
 
+	log_trigger(WRTD_LOG_PROMISC, 0, NULL, trig);
 	last_received = *trig;
 #ifdef RTDEBUG
 	pp_printf("%s:%d Trigger %d:%d:%d - entry %p\n",
@@ -1271,13 +1276,19 @@ static inline void ctl_chan_arm (uint32_t seq, struct wrnc_msg *ibuf)
 
 static inline void ctl_chan_set_log_level (uint32_t seq, struct wrnc_msg *ibuf)
 {
-	int ch;
+	int ch, i;
 	wrnc_msg_int32(ibuf, &ch);
 
 	struct lrt_output *st = &outputs[ch];
 	wrnc_msg_uint32(ibuf, &st->log_level);
 
 	ctl_ack(seq);
+
+	/* Set promiscuous_mode - so it's enable if at least one channel
+	   has enable it */
+	promiscuous_mode = 0;
+	for (i = 0; i < FD_NUM_CHANNELS; i++)
+		promiscuous_mode |= (outputs[i].log_level & WRTD_LOG_PROMISC);
 }
 /* Receives command messages and call matching command handlers */
 static inline void do_control()

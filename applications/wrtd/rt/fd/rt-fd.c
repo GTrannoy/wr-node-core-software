@@ -613,6 +613,9 @@ void enqueue_trigger(int output, struct lrt_output_rule *rule,
 	if(rule->state & HASH_ENT_DISABLED)
 		return;
 
+	if (!(out->flags & WRTD_ENABLED))
+		return;
+
 	ts_adjust_delay (&adjusted, rule->delay_cycles, rule->delay_frac);
 
 	struct wrtd_trigger_entry ent;

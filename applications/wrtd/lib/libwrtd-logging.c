@@ -27,7 +27,7 @@ const char *wrtd_strlogging(enum wrtd_log_level lvl)
 	case WRTD_LOG_SENT:
 		return "sent";
 	case WRTD_LOG_PROMISC:
-		return "promiscious";
+		return "promiscuous";
 	case WRTD_LOG_FILTERED:
 		return "filtered";
 	case WRTD_LOG_EXECUTED:
@@ -75,7 +75,7 @@ enum wrtd_log_level wrtd_strlogging_to_level(char *log)
 {
 	if(!strcmp(log, "all"))
 		return WRTD_LOG_ALL;
-        if(!strcmp(log, "promiscious"))
+        if(!strcmp(log, "promiscuous"))
 		return WRTD_LOG_PROMISC;
         if(!strcmp(log, "raw"))
 		return WRTD_LOG_RAW;

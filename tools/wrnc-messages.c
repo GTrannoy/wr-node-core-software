@@ -332,24 +332,22 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	if(show_all_debug)
-	{
+	if(show_all_debug) {
 		char **list = wrnc_list();
 		unsigned int cpucount = 0;
 
-		for (i = 0; list[i]; ++i) {
+		for (di = 0; list[di]; ++di) {
 			int j;
-			struct wrnc_dev *wrnc = wrnc_open(list[i]);
+			struct wrnc_dev *wrnc = wrnc_open(list[di]);
 
 			wrnc_cpu_count(wrnc, &cpucount);
-			printf("ID %s n_cpu %d\n", list[i], cpucount);
-			th_data[i].wrnc = wrnc;
+			printf("ID %s n_cpu %d\n", list[di], cpucount);
+			th_data[di].wrnc = wrnc;
 			for(j = 0; j < cpucount; j++)
-				th_data[i].cpu_index[j] = j;
-			th_data[i].n_cpu = cpucount;
-			th_data[i].n_slot = 0;
+				th_data[di].cpu_index[j] = j;
+			th_data[di].n_cpu = cpucount;
+			th_data[di].n_slot = 0;
 		}
-		di = i - 1;
 		wrnc_list_free(list);
 	}
 

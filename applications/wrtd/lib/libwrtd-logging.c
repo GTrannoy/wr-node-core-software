@@ -120,7 +120,7 @@ static struct wrnc_hmq *wrtd_log_open(struct wrtd_node *dev,
 	unsigned int hmq_back_index = core ? WRTD_OUT_FD_LOGGING :
 					     WRTD_OUT_TDC_LOGGING;
 
-	if (channel < -1 || channel > n_chan) {
+	if (channel < -1 || channel >= n_chan) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return NULL;
 	}
@@ -245,7 +245,7 @@ static int wrtd_log_level_set(struct wrtd_node *dev, unsigned int channel,
 			     WRTD_CMD_TDC_CHAN_SET_LOG_LEVEL;
 	int n_chan = core ? FD_NUM_CHANNELS : TDC_NUM_CHANNELS;
 
-	if (channel > n_chan) {
+	if (channel >= n_chan) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}

@@ -194,9 +194,7 @@ extern void wrtd_strlogging_full(char *buf, uint32_t log_level);
 extern int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
 			 int count);
 extern void wrtd_log_close(struct wrnc_hmq *hmq);
-extern struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev,
-					 uint32_t lvl,
-					 int input);
+extern struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev, int input);
 extern int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
 				 uint32_t log_level);
 extern int wrtd_in_log_level_get(struct wrtd_node *dev, unsigned int input,
@@ -205,9 +203,7 @@ extern int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
 				  uint32_t log_level);
 extern int wrtd_out_log_level_get(struct wrtd_node *dev, unsigned int input,
 				  uint32_t *log_level);
-extern struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev,
-					  uint32_t lvl,
-					  int output);
+extern struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev, int output);
 /**@}*/
 
 

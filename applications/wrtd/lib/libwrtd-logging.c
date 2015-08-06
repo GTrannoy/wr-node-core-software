@@ -97,14 +97,13 @@ enum wrtd_log_level wrtd_strlogging_to_level(char *log)
  * logging level will be applied to all device channels. You can change it
  * later using wrtd_log_level_set()
  * @param[in] dev device token
- * @param[in] lvl default logging level
  * @param[in] input channel number [-1, 4]. [-1] for all channels, [0,4] for a
  *                  specific one.
  * @param[in] core WRTD core to use
  * @return a HMQ token on success, NULL on error and errno is set appropriately
  */
 static struct wrnc_hmq *wrtd_log_open(struct wrtd_node *dev,
-				      uint32_t lvl, int channel,
+				      int channel,
 				      enum wrtd_core core)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
@@ -125,37 +124,22 @@ static struct wrnc_hmq *wrtd_log_open(struct wrtd_node *dev,
 		return NULL;
 	}
 
+	hmq = wrnc_hmq_open(wrtd->wrnc, hmq_back_index, 0);
+	if (!hmq)
+		return NULL;
+
 	if (channel > -1) {
-		if (core == WRTD_CORE_IN)
-			err = wrtd_in_log_level_set(dev, channel, lvl);
-		else
-			err = wrtd_out_log_level_set(dev, channel, lvl);
-		if (err)
-			return NULL;
-
-		hmq = wrnc_hmq_open(wrtd->wrnc, hmq_back_index, 0);
-		if (!hmq)
-			return NULL;
-
+		/* the user want to filter per channel */
 		err = wrnc_hmq_filter_add(hmq, &filter);
-		if (err) {
-			wrnc_hmq_close(hmq);
-			return NULL;
-		}
-	} else {
-		/* Set the same logging level to all channels */
-		for (i = 0; i < n_chan; ++i) {
-			if (core == WRTD_CORE_IN)
-				err = wrtd_in_log_level_set(dev, i, lvl);
-			else
-				err = wrtd_out_log_level_set(dev, i, lvl);
-			if (err)
-				return NULL;
-		}
-		hmq = wrnc_hmq_open(wrtd->wrnc, hmq_back_index, 0);
+		if (err)
+			goto out_close;
 	}
 
 	return hmq;
+
+out_close:
+	wrnc_hmq_close(hmq);
+	return NULL;
 }
 
 
@@ -264,16 +248,13 @@ static int wrtd_log_level_set(struct wrtd_node *dev, unsigned int channel,
  * logging level will be applied to all device channels. You can change it
  * later using wrtd_out_log_level_set()
  * @param[in] dev device token
- * @param[in] lvl default logging level
  * @param[in] output channel number [-1, 3]. [-1] for all channels, [0,3] for a
  *                   specific one.
  * @return a HMQ token on success, NULL on error and errno is set appropriately
  */
-struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev,
-				   uint32_t lvl,
-				   int output)
+struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev, int output)
 {
-	return wrtd_log_open(dev, lvl, output, WRTD_CORE_OUT);
+	return wrtd_log_open(dev, output, WRTD_CORE_OUT);
 }
 
 
@@ -324,11 +305,9 @@ int wrtd_out_log_level_get(struct wrtd_node *dev, unsigned int input,
  *                  specific one.
  * @return a HMQ token on success, NULL on error and errno is set appropriately
  */
-struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev,
-				  uint32_t lvl,
-				  int input)
+struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev, int input)
 {
-	return wrtd_log_open(dev, lvl, input, WRTD_CORE_IN);
+	return wrtd_log_open(dev, input, WRTD_CORE_IN);
 }
 
 

@@ -20,11 +20,14 @@
 
 #include "libwrnc-internal.h"
 
+const unsigned int wrnc_default_timeout_ms = 1000;
+
 static char *wrnc_error_str[] = {
 	"Cannot parse data from sysfs attribute",
 	"Invalid slot",
 	"Operation not yet implemented",
 	"The HMQ slot is close",
+	"Invalid message",
 	NULL,
 };
 

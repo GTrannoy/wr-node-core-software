@@ -8,7 +8,7 @@ WRNC ?= ../../../
 LIB = libdemo.a
 LOBJ := libdemo.o
 
-CFLAGS += -Wall -ggdb -O0 -I. -I../include -I$(WRNC)/include -I$(WRNC)/lib $(EXTRACFLAGS)
+CFLAGS += -Wall -ggdb -O0 -I. -I../include -I$(WRNC)/include -I$(WRNC)/lib -I$(WRNC)/kernel $(EXTRACFLAGS)
 LDLIBS += -L. -ldemo
 
 

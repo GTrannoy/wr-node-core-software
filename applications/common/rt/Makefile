@@ -26,6 +26,9 @@ OBJS += $(WRNC)/applications/common/rt/wrn-crt0.o
 OBJS += $(WRNC)/applications/common/rt/vsprintf-xint.o
 OBJS += $(WRNC)/applications/common/rt/printf.o
 OBJS += $(WRNC)/applications/common/rt/rt-common.o
+ifdef RT_USE_LIBRT
+OBJS += $(WRNC)/applications/common/rt/librt.o
+endif
 
 LDSCRIPT = $(WRNC)/applications/common/rt/wrnode.ld
 

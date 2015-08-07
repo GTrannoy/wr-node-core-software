@@ -8,7 +8,9 @@ DESTDIR ?= /usr/local
 WRNC ?= ../../../
 
 CFLAGS += -Wall -ggdb -I. -I../include -I$(WRNC)/include -I$(WRNC)/lib -I../lib
-LDLIBS += -L../lib -ldemo -L$(WRNC)/lib -lwrnc
+CFLAGS += $(EXTRACFLAGS)
+LDLIBS-WRNC := -L$(WRNC)/lib -lwrnc
+LDLIBS += -L../lib -ldemo $(LDLIBS-WRNC)
 
 PROGS := demo
 
@@ -18,10 +20,8 @@ install:
 	install -d $(DESTDIR)/bin
 	install -D $(PROGS) $(DESTDIR)/bin
 
-%: %.c ../lib/libwrtd.a wrtd-inout-common.o
+demo: demo.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS) -o $@
-wrtd-inout-common.o: wrtd-inout-common.c
-	$(CC) -c $(CFLAGS) $^ -o $@
 
 # make nothing for modules_install, but avoid errors
 modules_install:

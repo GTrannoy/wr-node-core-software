@@ -16,10 +16,12 @@ struct demo_status {
 	uint32_t led;
 	uint32_t lemo;
 	uint32_t lemo_dir;
+	uint32_t autodemo;
 };
 
 enum demo_error_list {
 	EDEMO_INVALID_ANSWER_ACK = 3200,
+	EDEMO_ANSWER_NACK,
 	__EDEMO_MAX_ERROR_NUMBER,
 };
 
@@ -42,4 +44,10 @@ extern int demo_led_set(struct demo_node *dev, uint32_t value,
 extern int demo_lemo_set(struct demo_node *dev, uint32_t value);
 extern int demo_lemo_dir_set(struct demo_node *dev, uint32_t value);
 extern int demo_status_get(struct demo_node *dev, struct demo_status *status);
+extern int demo_run_autodemo(struct demo_node *dev, uint32_t run);
+extern int demo_version(struct demo_node *dev, struct wrnc_rt_version *version);
+extern int demo_test_struct_set(struct demo_node *dev,
+				struct demo_structure *test);
+extern int demo_test_struct_get(struct demo_node *dev,
+				struct demo_structure *test);
 #endif

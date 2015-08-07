@@ -15,7 +15,7 @@ LDLIBS += -L. -ldemo
 modules all: $(LIB)
 
 
-%: %.c $(LIB)
+%: %.c $(LIB) $(LIBRT)
 	$(CC) $(CFLAGS) $(LDFLAGS) $*.c $(LDLIBS) -o $@
 
 $(LIB): $(LOBJ)

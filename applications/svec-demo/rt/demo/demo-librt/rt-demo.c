@@ -19,15 +19,6 @@
 
 static uint32_t out_seq = 0;
 
-static struct demo_structure demo_struct;
-
-struct rt_structure demo_structures[] = {
-	[DEMO_STRUCT_TEST] = {
-		.struct_ptr = &demo_struct,
-		.len = sizeof(struct demo_structure),
-	}
-};
-
 struct rt_variable demo_variables[] = {
 	[DEMO_VAR_LEMO_STA] = {
 		.addr = CPU_DP_BASE + GPIO_PSR,
@@ -43,41 +34,29 @@ struct rt_variable demo_variables[] = {
 		.addr = CPU_DP_BASE + GPIO_SODR,
 		.mask = PIN_LEMO_MASK,
 		.offset = 0,
-		.flags = RT_VARIABLE_FLAG_WO,
 	},
 	[DEMO_VAR_LEMO_CLR] = {
 		.addr = CPU_DP_BASE + GPIO_CODR,
 		.mask = PIN_LEMO_MASK,
 		.offset = 0,
-		.flags = RT_VARIABLE_FLAG_WO,
 	},
 	[DEMO_VAR_LED_STA] = {
 		.addr = CPU_DP_BASE + GPIO_PSR,
 		.mask = PIN_LED_MASK,
-		.offset = PIN_LED_OFFSET,
+		.offset = 0,
 	},
 	[DEMO_VAR_LED_SET] = {
 		.addr = CPU_DP_BASE + GPIO_SODR,
 		.mask = PIN_LED_MASK,
-		.offset = PIN_LED_OFFSET,
-		.flags = RT_VARIABLE_FLAG_WO,
+		.offset = 0,
 	},
 	[DEMO_VAR_LED_CLR] = {
 		.addr = CPU_DP_BASE + GPIO_CODR,
 		.mask = PIN_LED_MASK,
-		.offset = PIN_LED_OFFSET,
-		.flags = RT_VARIABLE_FLAG_WO,
+		.offset = 0,
 	},
 };
 
-static action_t *demo_actions[] = {
-	[RT_ACTION_RECV_PING] = rt_recv_ping,
-	[RT_ACTION_RECV_VERSION] = rt_version_getter,
-	[RT_ACTION_RECV_FIELD_SET] = rt_variable_setter,
-	[RT_ACTION_RECV_FIELD_GET] = rt_variable_getter,
-	[RT_ACTION_RECV_STRUCT_SET] = rt_structure_setter,
-	[RT_ACTION_RECV_STRUCT_GET] = rt_structure_getter,
-};
 
 /**
  * It sends messages over the debug interface
@@ -95,13 +74,17 @@ static void demo_debug_interface(void)
  */
 int main()
 {
-
 	demo_debug_interface();
 
-	/* Export a set of variables */
 	rt_variable_export(demo_variables, __DEMO_VAR_MAX);
-	rt_structure_export(demo_structures, __DEMO_STRUCT_MAX);
-	rt_action_export(demo_actions, 128); /* FIXME replace 128 with correct number */
+
+	/* Register all the action that the RT application can take */
+	rt_mq_action_recv_register(RT_ACTION_RECV_PING, DEMO_HMQ_OUT,
+				   rt_recv_ping);
+	rt_mq_action_recv_register(RT_ACTION_RECV_DATA_SET, DEMO_HMQ_OUT,
+				   rt_setter);
+	rt_mq_action_recv_register(RT_ACTION_RECV_DATA_GET, DEMO_HMQ_OUT,
+				   rt_getter);
 
 	while (1) {
 		/* Handle all messages incoming from slot DEMO_HMQ_IN

@@ -16,6 +16,7 @@
 
 const char *demo_errors[] = {
 	"Received an invalid answer from white-rabbit-node-code CPU",
+	"Real-Time application does not acknowledge",
 };
 
 
@@ -148,56 +149,23 @@ struct wrnc_dev *demo_get_wrnc_dev(struct demo_node *dev)
 	return (struct wrnc_dev *)demo->wrnc;
 }
 
-
 int demo_lemo_dir_set(struct demo_node *dev, uint32_t value)
 {
 	struct demo_desc *demo = (struct demo_desc *)dev;
-	struct wrnc_msg msg;
-	struct wrnc_hmq *hmq;
-	int err;
+	uint32_t fields[] = {DEMO_VAR_LEMO_DIR, value};
 
-	/* Build the message */
-	msg.datalen = 3;
-	msg.data[0] = DEMO_ID_LEMO_DIR_SET;
-	msg.data[1] = 0;
-	msg.data[2] = value & PIN_LEMO_MASK;
-
-	hmq = wrnc_hmq_open(demo->wrnc, DEMO_HMQ_IN, WRNC_HMQ_INCOMING);
-	if (!hmq)
-		return -1;
-
-	/* Send synchronous message  */
-	err = wrnc_hmq_send_and_receive_sync(hmq, DEMO_HMQ_OUT, &msg, 1000);
-
-	wrnc_hmq_close(hmq);
-
-	return err;
+	return wrnc_rt_variable_set(demo->wrnc, DEMO_HMQ_IN, DEMO_HMQ_OUT,
+				    fields, sizeof(fields) / 4 / 2, 1);
 }
-
 
 int demo_lemo_set(struct demo_node *dev, uint32_t value)
 {
 	struct demo_desc *demo = (struct demo_desc *)dev;
-	struct wrnc_msg msg;
-	struct wrnc_hmq *hmq;
-	int err;
+	uint32_t fields[] = {DEMO_VAR_LEMO_SET, value,
+			     DEMO_VAR_LEMO_CLR, ~value};
 
-	/* Build the message */
-	msg.datalen = 3;
-	msg.data[0] = DEMO_ID_LEMO_SET;
-	msg.data[1] = 0;
-	msg.data[2] = value & PIN_LEMO_MASK;
-
-	hmq = wrnc_hmq_open(demo->wrnc, DEMO_HMQ_IN, WRNC_HMQ_INCOMING);
-	if (!hmq)
-		return -1;
-
-	/* Send synchronous message  */
-	err = wrnc_hmq_send_and_receive_sync(hmq, DEMO_HMQ_OUT, &msg, 1000);
-
-	wrnc_hmq_close(hmq);
-
-	return err;
+	return wrnc_rt_variable_set(demo->wrnc, DEMO_HMQ_IN, DEMO_HMQ_OUT,
+				    fields, sizeof(fields) / 4 / 2, 0);
 }
 
 
@@ -233,65 +201,71 @@ static uint32_t demo_apply_color(uint32_t value, enum demo_color color)
 int demo_led_set(struct demo_node *dev, uint32_t value, enum demo_color color)
 {
 	struct demo_desc *demo = (struct demo_desc *)dev;
-	struct wrnc_msg msg;
-	struct wrnc_hmq *hmq;
-	int err;
+	uint32_t real_value = demo_apply_color(value, color);
+	uint32_t fields[] = {DEMO_VAR_LED_SET, real_value,
+			     DEMO_VAR_LED_CLR, ~real_value};
 
-	/* Build the message */
-	msg.datalen = 3;
-	msg.data[0] = DEMO_ID_LED_SET;
-	msg.data[1] = 0;
-	msg.data[2] = demo_apply_color(value, color);
-
-	hmq = wrnc_hmq_open(demo->wrnc, DEMO_HMQ_IN, WRNC_HMQ_INCOMING);
-	if (!hmq)
-		return -1;
-
-	/* Send asynchronous message, we do not wait for answers  */
-	err = wrnc_hmq_send(hmq, &msg);
-	wrnc_hmq_close(hmq);
-
-	return err;
+	return wrnc_rt_variable_set(demo->wrnc, DEMO_HMQ_IN, DEMO_HMQ_OUT,
+				    fields, sizeof(fields) / 4 / 2, 0);
 }
 
 
+#define DEMO_STATUS_N_VARIABLES 3
 /**
  * It gets the status of the DEMO program
  */
 int demo_status_get(struct demo_node *dev, struct demo_status *status)
 {
 	struct demo_desc *demo = (struct demo_desc *)dev;
-	struct wrnc_hmq *hmq;
-	struct wrnc_msg msg;
+	uint32_t fields[] = {DEMO_VAR_LEMO_STA, 0,
+			     DEMO_VAR_LED_STA, 0,
+			     DEMO_VAR_LEMO_DIR, 0};
 	int err;
 
-	/* Build the message */
-	msg.datalen = 2;
-	msg.data[0] = DEMO_ID_STATE_GET;
-	msg.data[1] = 0;
+	err = wrnc_rt_variable_get(demo->wrnc, DEMO_HMQ_IN, DEMO_HMQ_OUT,
+				   fields, DEMO_STATUS_N_VARIABLES);
+	if (err)
+		return err;
 
-	hmq = wrnc_hmq_open(demo->wrnc, DEMO_HMQ_IN, WRNC_HMQ_INCOMING);
-	if (!hmq)
-		return -1;
+	status->lemo = fields[1];
+	status->led = fields[3];
+	status->lemo_dir = fields[5];
 
-	/* Send synchronous message. The answer will overwrite our message */
-	err = wrnc_hmq_send_and_receive_sync(hmq, DEMO_HMQ_OUT, &msg, 1000);
+	return 0;
+}
 
-	wrnc_hmq_close(hmq);
+int demo_run_autodemo(struct demo_node *dev, uint32_t run){ return 0; }
 
+int demo_version(struct demo_node *dev, struct wrnc_rt_version *version)
+{
+	struct demo_desc *demo = (struct demo_desc *)dev;
 
-	/* Check if it is the answer that we are expecting */
-	if (msg.data[0] != DEMO_ID_STATE_GET_REP) {
-		return -1;
-	}
+	return wrnc_rt_version_get(demo->wrnc, version,
+				   DEMO_HMQ_IN, DEMO_HMQ_OUT);
+}
 
-	/* unpack data */
-	status->led = msg.data[2];
-	status->lemo = msg.data[3];
-	status->lemo_dir = msg.data[4];
+int demo_test_struct_get(struct demo_node *dev, struct demo_structure *test)
+{
+	struct demo_desc *demo = (struct demo_desc *)dev;
+	struct wrnc_structure_tlv tlv = {
+		.index = DEMO_STRUCT_TEST,
+		.size = sizeof(struct demo_structure),
+		.structure = test,
+	};
 
-	/* Of course you can use memcpy() to unpack, but this is a demo so,
-	   this way is more explicit */
+	return wrnc_rt_structure_get(demo->wrnc, DEMO_HMQ_IN, DEMO_HMQ_OUT,
+				     &tlv, 1);
+}
 
-	return err;
+int demo_test_struct_set(struct demo_node *dev, struct demo_structure *test)
+{
+	struct demo_desc *demo = (struct demo_desc *)dev;
+	struct wrnc_structure_tlv tlv = {
+		.index = DEMO_STRUCT_TEST,
+		.size = sizeof(struct demo_structure),
+		.structure = test,
+	};
+
+	return wrnc_rt_structure_set(demo->wrnc, DEMO_HMQ_IN, DEMO_HMQ_OUT,
+				     &tlv, 1, 0);
 }

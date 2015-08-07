@@ -18,13 +18,16 @@
 static void help()
 {
 	fprintf(stderr,
-		"demo -D 0x<hex-number> -L 0x<hex-number> -l 0x<hex-number> -c <char> -s\n");
+		"demo -D 0x<hex-number> -L 0x<hex-number> -l 0x<hex-number> -c <char> -a <char> -s\n");
 	fprintf(stderr, "-D device id\n");
 	fprintf(stderr, "-l value to write into the LED register\n");
 	fprintf(stderr, "-L value to write into the LEMO register\n");
 	fprintf(stderr, "-d value to write into the LEMO direction register\n");
 	fprintf(stderr, "-s it reports the content of LED and LEMO registers\n");
 	fprintf(stderr, "-c set led color (g: green, r: red, o: orange)\n");
+	fprintf(stderr, "-a set autodemo status (r: run, s: stop)\n");
+	fprintf(stderr, "-v show version\n");
+	fprintf(stderr, "-t send random value to the structure and read them back\n");
 	fprintf(stderr, "\n");
 	exit(1);
 }
@@ -35,6 +38,26 @@ static void demo_print_status(struct demo_status *status)
 	fprintf(stdout, "\tled\t0x%x\n", status->led);
 	fprintf(stdout, "\tlemo\t0x%x\n", status->lemo);
 	fprintf(stdout, "\t\tdirection\t0x%x\n", status->lemo_dir);
+	fprintf(stdout, "\tautodemo\t%s\n", status->autodemo ? "run" : "stop");
+}
+
+static void demo_print_version(struct wrnc_rt_version *version)
+{
+	fprintf(stdout, "Version:\n");
+	fprintf(stdout, "\tFPGA: 0x%x\n", version->fpga_id);
+	fprintf(stdout, "\tRT: 0x%x\n", version->rt_id);
+	fprintf(stdout, "\tRT Version: 0x%x\n", version->rt_version);
+	fprintf(stdout, "\tGit Version: 0x%x\n", version->git_version);
+}
+
+static void demo_print_structure(struct demo_structure *test)
+{
+	int i;
+
+	fprintf(stdout, "\tfield1: 0x%x\n", test->field1);
+	fprintf(stdout, "\tfield2: 0x%x\n", test->field2);
+	for (i = 0; i < DEMO_STRUCT_MAX_ARRAY; i++)
+		fprintf(stdout, "\tarray[%d]: 0x%x\n", i, test->array[i]);
 }
 
 int main(int argc, char *argv[])
@@ -42,12 +65,14 @@ int main(int argc, char *argv[])
 	struct demo_node *demo;
 	struct demo_status status;
 	uint32_t dev_id = 0;
-	int led = -1, lemo = -1, lemo_dir = -1;
-	char c, c_color;
-	int err = 0, show_status = 0;
+	int led = -1, lemo = -1, lemo_dir = -1, i;
+	char c, c_color = 0, autodemo = 0;
+	int err = 0, show_status = 0, show_version = 0, structure = 0;
 	enum demo_color color = DEMO_RED;
+	struct wrnc_rt_version version;
+	struct demo_structure test, test_rb;
 
-	while ((c = getopt (argc, argv, "hD:l:L:d:c:s")) != -1) {
+	while ((c = getopt (argc, argv, "hD:l:L:d:c:sa:vt")) != -1) {
 		switch (c) {
 		case 'h':
 		case '?':
@@ -82,6 +107,15 @@ int main(int argc, char *argv[])
 		case 's':
 			show_status = 1;
 			break;
+		case 'a':
+			sscanf(optarg, "%c", &autodemo);
+			break;
+		case 'v':
+			show_version = 1;
+			break;
+		case 't':
+			structure = 1;
+			break;
 		}
 	}
 
@@ -103,6 +137,11 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Cannot open demo: %s\n", demo_strerror(errno));
 		exit(1);
 	}
+
+
+	/* Set autodemo status */
+	if (autodemo != 0)
+		demo_run_autodemo(demo, autodemo == 'r' ? 1 : 0);
 
 	if (lemo_dir >= 0) {
 		/* Set LEMO direction */
@@ -133,6 +172,48 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "Cannot get status: %s\n", demo_strerror(errno));
 		else
 			demo_print_status(&status);
+	}
+
+	if (show_version) {
+		err = demo_version(demo, &version);
+		if (err)
+			fprintf(stderr, "Cannot get version: %s\n",
+				demo_strerror(errno));
+		else
+			demo_print_version(&version);
+	}
+
+	if (structure) {
+		/* Generate random numbers (cannot use getrandom(2) because
+		   of old system)*/
+		test.field1 = random();
+		test.field2 = random();
+		for (i = 0; i < DEMO_STRUCT_MAX_ARRAY; i++)
+			test.array[i] = random();
+
+		fprintf(stdout, "Generated structure:\n");
+		demo_print_structure(&test);
+
+		err = demo_test_struct_set(demo, &test);
+		if (err) {
+			fprintf(stderr, "Cannot set structure: %s\n",
+				demo_strerror(errno));
+		} else {
+			err = demo_test_struct_get(demo, &test_rb);
+			if (err) {
+				fprintf(stderr, "Cannot get structure: %s\n",
+					demo_strerror(errno));
+			} else {
+				if (memcmp(&test, &test_rb, sizeof(struct demo_structure))) {
+					fprintf(stderr, "Got wrong structure: %s\n",
+						demo_strerror(errno));
+					demo_print_structure(&test_rb);
+				} else {
+					fprintf(stderr,
+						"Structure correctly read back\n");
+				}
+			}
+		}
 	}
 
 	demo_close(demo);

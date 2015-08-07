@@ -10,6 +10,7 @@
 
 #include <string.h>
 #include "rt.h"
+#include <demo-common-rt.h>
 
 #define GPIO_CODR 0x0
 #define GPIO_SODR 0x4
@@ -19,9 +20,6 @@
 #define PIN_LEMO_L2 0
 #define PIN_LEMO_L3 3
 #define PIN_LEMO_L4 2
-
-#define PIN_LED_RED(ledno) (8+(ledno*2))
-#define PIN_LED_GREEN(ledno) (9+(ledno*2))
 
 void gpio_set_dir(int pin, int out)
 {
@@ -46,25 +44,21 @@ int gpio_get_state(int pin)
 	return dp_readl(GPIO_PSR) & (1 << pin) ? 1 : 0;
 }
 
-main()
+void autodemo()
 {
 	int state, on = 1;
 	uint32_t i, j = 0;
 
 	/* Print something on the debug interface */
-	pp_printf("Hello, world!\n");
+	pp_printf("Running autodemo\n");
 
 	gpio_set_dir(PIN_LEMO_L1, 0); // Lemo L1 = input
 	gpio_set_dir(PIN_LEMO_L2, 1); // Lemo L2 = output
 	gpio_set_dir(PIN_LEMO_L3, 1); // Lemo L3 = output
 	gpio_set_dir(PIN_LEMO_L4, 1); // Lemo L4 = output
-	pp_printf("GPIO direction 0x%x\n", dp_readl(GPIO_DDR));
 
-	/* Just in case set led to OUTPUT and turn them on 1 red 1 green */
-	for (i = 0; i < 8; ++i) {
-		gpio_set_state(PIN_LED_RED(i), 0);
-		gpio_set_state(PIN_LED_GREEN(i), 0);
-	}
+	/* Clear all GPIOs (LEDs and LEMOs) */
+	dp_writel(~0, GPIO_CODR);
 
 	for (i = 0;; i++) {
 		/* Lemo 2 follows Lemo 1 */
@@ -98,6 +92,33 @@ main()
 				  dp_readl(GPIO_DDR),
 				  dp_readl(GPIO_PSR));
 		}
+
+		/* Check if someone else (HOST or other RT application) want
+		   to stop this execution */
+		if (!autodemo_run) {
+			pp_printf("Stopping autodemo\n");
+			break;
+		}
 	}
 
+	/* Clear all GPIOs (LEDs and LEMOs) */
+	dp_writel(~0, GPIO_CODR);
+	/* Set all GPIO as output */
+	dp_writel(~0, GPIO_DDR);
+}
+
+
+int main()
+{
+	/* By default allow this program to run */
+	smem_atomic_or(&autodemo_run, 1);
+
+	while (1) {
+		/* Wait that someone (HOST or other RT application) allows
+		   this program to run */
+		if (!autodemo_run)
+			continue;
+
+		autodemo();
+	}
 }

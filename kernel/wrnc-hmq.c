@@ -496,7 +496,8 @@ static uint32_t wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
 			   hmq->base_sr + MQUEUE_SLOT_DATA_START + i * 4);
 	}
 	/* The slot is ready to be sent to the CPU */
-	fmc_writel(fmc, MQUEUE_CMD_READY, hmq->base_sr + MQUEUE_SLOT_COMMAND);
+	fmc_writel(fmc, MQUEUE_CMD_READY | (msg->datalen & 0xFF),
+		   hmq->base_sr + MQUEUE_SLOT_COMMAND);
 
 	return seq;
 }

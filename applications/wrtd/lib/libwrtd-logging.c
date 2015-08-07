@@ -114,7 +114,7 @@ static struct wrnc_hmq *wrtd_log_open(struct wrtd_node *dev,
 		.value = channel, /* required channel */
 	};
 	struct wrnc_hmq *hmq = NULL;
-	int i, err;
+	int err;
 	int n_chan = core ? FD_NUM_CHANNELS : TDC_NUM_CHANNELS;
 	unsigned int hmq_back_index = core ? WRTD_OUT_FD_LOGGING :
 					     WRTD_OUT_TDC_LOGGING;

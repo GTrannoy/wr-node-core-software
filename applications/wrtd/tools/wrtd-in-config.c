@@ -260,7 +260,7 @@ static int wrtd_cmd_sw_trigger(struct wrtd_node *wrtd, int input,
 	uint64_t ts;
 	int ret;
 
-	if (argc != 1 || argv[0] == NULL) {
+	if (argc < 1 || argv[0] == NULL) {
 		fprintf(stderr, "Missing ID value.\n");
 		return -1;
 	}

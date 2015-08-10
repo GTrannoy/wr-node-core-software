@@ -41,4 +41,5 @@ extern int wrtd_trivial_request(struct wrtd_node *dev,
 extern int wrtd_send_and_receive_sync(struct wrtd_desc *wrtd,
 				      struct wrnc_msg *msg,
 				      enum wrtd_core core);
+extern void wrtd_timestamp_endianess_fix(struct wr_timestamp *ts);
 #endif

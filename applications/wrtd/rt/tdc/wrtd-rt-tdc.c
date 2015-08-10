@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2013-2014 CERN (www.cern.ch)
  * Author: Tomasz Wlostowski <tomasz.wlostowski@cern.ch>
+ * Author: Federico Vaga <federico.vaga@cern.ch>
  *
  * Released according to the GNU GPL, version 2 or any later version.
  */
@@ -23,88 +24,90 @@
 #include "hw/tdc_regs.h"
 #include "loop-queue.h"
 
+#include <librt.h>
+
 #define DEFAULT_DEAD_TIME (80000/16)
 
 #define BASE_DP_TDC_REGS    0x2000
 #define BASE_DP_TDC_DIRECT  0x8000
 
-static const uint32_t version = GIT_VERSION;
-
-/* Structure describing state of each TDC channel*/
-struct tdc_channel_state {
-/* Currently assigned trigger ID */
-    struct wrtd_trig_id id;
-/* Trigger delay, added to each timestamp */
-    struct wr_timestamp delay;
-/* Internal time base offset. Used to compensate the TDC-to-WR timebase lag.
-   Not exposed to the public, set from the internal calibration data of the TDC driver. */
-    struct wr_timestamp timebase_offset;
-/* Timestamp of the last tagged pulse */
-    struct wr_timestamp last_tagged;
-/* Last transmitted trigger */
-    struct wrtd_trigger_entry last_sent;
-/* Channel flags (enum wrnc_io_flags) */
-    uint32_t flags;
-/* Log level (enum wrnc_log_level) */
-    uint32_t log_level;
-/* Triggering mode (enum wrtd_triger_mode) */
-    enum wrtd_trigger_mode mode;
-/* Number of the channel described in this structure */
-    int n;
-/* Total tagged pulses */
-    uint32_t total_pulses;
-/* Total sent pulses */
-    uint32_t sent_pulses;
-/* Total missed pulses (no WR) */
-    uint32_t miss_no_timing;
-/* Trigger message sequence counter */
-    uint32_t seq;
-/* TDC dead time, in 8ns ticks */
-    uint32_t dead_time;
+enum wrtd_in_wr_link {
+	WR_LINK_OFFLINE = 1,
+	WR_LINK_ONLINE,
+	WR_LINK_SYNCING,
+	WR_LINK_SYNCED,
+	WR_LINK_TDC_WAIT,
 };
 
-/* States of all TDC channels */
-static struct tdc_channel_state channels[TDC_NUM_CHANNELS];
-/* Total number of packets sent */
-static uint32_t sent_packets = 0;
-/* RMQ coalescing counter */
-static int coalesce_count = 0;
+static struct wrtd_in wrtd_in_dev;
+static struct wrtd_in_channel wrtd_in_channels[TDC_NUM_CHANNELS];
 
-/*
- * Timestamp Processing part
- */
 
- static void log_trigger(int type, int miss_reason, struct tdc_channel_state *st, struct wr_timestamp *ts, struct wrtd_trigger_entry *ent)
+uint32_t seq = 0; /**< global sequence number */
+uint32_t sent_packets = 0; /**< Total number of packets sent */
+int coalesce_count = 0; /**< RMQ coalescing counter */
+int wr_state = 0; /**< White-Rabbit link status */
+uint32_t tai_start = 0;
+
+
+static inline int wr_link_up()
 {
-    uint32_t id = WRTD_REP_LOG_MESSAGE;
-    uint32_t seq = 0;
+	return dp_readl(BASE_DP_TDC_REGS + TDC_REG_WR_STAT) & TDC_WR_STAT_LINK;
+}
 
-    if ( !(st->log_level & type))
-        return;
+static inline int wr_time_locked()
+{
+	return dp_readl(BASE_DP_TDC_REGS + TDC_REG_WR_STAT) & TDC_WR_STAT_AUX_LOCKED;
+}
 
-    struct wrnc_msg buf = hmq_msg_claim_out (WRTD_OUT_TDC_LOGGING, 16);
+static inline int wr_time_ready()
+{
+	return dp_readl(BASE_DP_TDC_REGS + TDC_REG_WR_STAT) & TDC_WR_STAT_TIME_VALID;
+}
 
-    wrnc_msg_header (&buf, &id, &seq);
-    wrnc_msg_int32 (&buf, &type);
-    wrnc_msg_int32 (&buf, &st->n);
-    wrnc_msg_int32 (&buf, &miss_reason);
-    if(ent)
-    {
-        wrtd_msg_trigger_entry (&buf, ent);
-    } else {
-        struct wrtd_trig_id fake_id;
-        
-        wrtd_msg_timestamp (&buf, ts);
-        wrtd_msg_trig_id (&buf, &fake_id);
-        wrnc_msg_uint32 (&buf, &st->total_pulses);
-    }
-
-    hmq_msg_send (&buf);
+static inline int wr_is_timing_ok()
+{
+	return (wr_state == WR_LINK_SYNCED);
 }
 
 
-/* Creates a trigger message with timestamp (ts) for the channel (ch) and pushes it
-   to the RMQ output (without sending) and sends immediately through the loopback queue */
+/**
+ * Send logging message to the host
+ */
+static void log_trigger(int type, int miss_reason,
+			struct wrtd_in_channel *st, struct wr_timestamp *ts,
+			struct wrtd_trigger_entry *ent)
+{
+	uint32_t id = WRTD_REP_LOG_MESSAGE;
+	uint32_t seq = 0;
+
+	if (!(st->config.log_level & type))
+		return;
+
+	struct wrnc_msg buf = hmq_msg_claim_out (WRTD_OUT_TDC_LOGGING, 16);
+	wrnc_msg_header (&buf, &id, &seq);
+	wrnc_msg_int32 (&buf, &type);
+	wrnc_msg_int32 (&buf, &st->n);
+	wrnc_msg_int32 (&buf, &miss_reason);
+
+	if (ent) {
+		wrtd_msg_trigger_entry (&buf, ent);
+	} else {
+		struct wrtd_trig_id fake_id;
+		wrtd_msg_timestamp (&buf, ts);
+		wrtd_msg_trig_id (&buf, &fake_id);
+		wrnc_msg_uint32 (&buf, &st->stats.total_pulses);
+	}
+
+	hmq_msg_send (&buf);
+}
+
+
+/**
+ * Creates a trigger message with timestamp (ts) for the channel (ch) and
+ * pushes it to the RMQ output (without sending) and sends immediately through
+ * the loopback queue
+ */
 static inline void send_trigger (struct wrtd_trigger_entry *ent)
 {
     volatile struct wrtd_trigger_message *msg = mq_map_out_buffer(1, WRTD_REMOTE_OUT_TDC);
@@ -119,591 +122,362 @@ static inline void send_trigger (struct wrtd_trigger_entry *ent)
 }
 
 
-/* Prepares the RMQ output slot for transmission of trigger message */
-static inline void claim_tx()
-{
-    mq_claim(1, WRTD_REMOTE_OUT_TDC);
-}
-
-/* Flushes the triggerrs in the RMQ output buffer to the WR Network */
+/**
+ * Flushes the triggerrs in the RMQ output buffer to the WR Network
+ */
 static inline void flush_tx ()
 {
-    volatile struct wrtd_trigger_message *msg = mq_map_out_buffer(1, WRTD_REMOTE_OUT_TDC);
+	volatile struct wrtd_trigger_message *msg = mq_map_out_buffer(1, WRTD_REMOTE_OUT_TDC);
 
-    msg->hdr.target_ip = 0xffffffff;    /* broadcast */
-    msg->hdr.target_port = 0xebd0;      /* port */
-    msg->hdr.target_offset = 0x4000;    /* target EB slot */
+	msg->hdr.target_ip = 0xffffffff;    /* broadcast */
+	msg->hdr.target_port = 0xebd0;      /* port */
+	msg->hdr.target_offset = 0x4000;    /* target EB slot */
 
-    /* Embed transmission time for latency measyurement */
-    msg->transmit_seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
-    msg->transmit_cycles = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
-    msg->count = coalesce_count;
+	/* Embed transmission time for latency measyurement */
+	msg->transmit_seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
+	msg->transmit_cycles = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
+	msg->count = coalesce_count;
 
-    mq_send(1, WRTD_REMOTE_OUT_TDC, 7 + 7 * coalesce_count);
-    coalesce_count = 0;
-    sent_packets ++;
+	mq_send(1, WRTD_REMOTE_OUT_TDC, 7 + 7 * coalesce_count);
+	coalesce_count = 0;
+	sent_packets++;
 }
 
-/* Processes a pulse with timestamp (ts) arriving on channel (channel) */
-static inline void do_channel (int channel, struct wr_timestamp *ts)
-{
-    struct tdc_channel_state *ch = &channels[channel];
 
-/* Apply timebase offset to align TDC time with WR timebase */
-    ts_sub(ts, &ch->timebase_offset);
-    ch->last_tagged = *ts;
-
-/* Log raw value if needed */
-    log_trigger (WRTD_LOG_RAW, 0, ch, ts, NULL);
-
-    ch->total_pulses++;
-   
-/* Apply trigger delay */
-    ts_add(ts, &ch->delay);
-
-/* Enable/Arm/Trigger logic */
-    if( (ch->flags & WRTD_TRIGGER_ASSIGNED ) && (ch->flags & WRTD_ARMED) )
-    {
-        struct wrtd_trigger_entry ent;
-        
-        ent.ts = *ts;
-        ent.id = ch->id;
-        ent.seq = ch->seq;
-
-        if(!wr_is_timing_ok())
-        {
-            ch->miss_no_timing ++;
-            log_trigger (WRTD_LOG_MISSED, WRTD_MISS_NO_WR, ch, NULL, &ent);
-            return;
-        }
-
-    	ch->seq++;
-    	ch->flags |= WRTD_TRIGGERED;
-    	if(ch->mode == WRTD_TRIGGER_MODE_SINGLE )
-    	    ch->flags &= ~WRTD_ARMED;
-
-        ch->sent_pulses++;
-        ch->last_sent = ent;
-
-        send_trigger(&ent);
-        log_trigger (WRTD_LOG_SENT, 0, ch, NULL, &ent);
-
-        ch->flags |= WRTD_LAST_VALID;
-
-    }
-}
-
-/* Handles input timestamps from all TDC channels, calling do_output() on incoming pulses */
-static inline void do_input ()
-{
-    int i;
-
-    /* Prepare for message transmission */
-    claim_tx();
-
-    /* We can send up to TDC_TRIGGER_COALESCE_LIMIT triggers in a single message - the loop will iterate
-       up to this limit or exit immediately if there's no more input pulses in the TDC FIFO */
-
-    for(i = 0; i < TDC_TRIGGER_COALESCE_LIMIT; i++)
-    {
-        uint32_t fifo_sr = dp_readl (BASE_DP_TDC_DIRECT + DR_REG_FIFO_CSR);
-        struct wr_timestamp ts;
-        int meta;
-
-        /* Poll the FIFO and read the timestamp */
-        if(fifo_sr & DR_FIFO_CSR_EMPTY)
-            break;
-
-        ts.seconds = dp_readl(BASE_DP_TDC_DIRECT + DR_REG_FIFO_R0);
-        ts.ticks  = dp_readl(BASE_DP_TDC_DIRECT + DR_REG_FIFO_R1);
-        meta   = dp_readl(BASE_DP_TDC_DIRECT + DR_REG_FIFO_R2);
-
-        /* Convert from ACAM bins (81ps) to WR time format. Numerical hack used
-           to avoid time-consuming division. */
-        ts.frac = ( (meta & 0x3ffff) * 5308 ) >> 7;
-    	ts.ticks += ts.frac >> 12;
-    	ts.frac &= 0xfff;
-
-        /* Make sure there's no overflow after conversion */
-    	if (ts.ticks >= 125000000)
-    	{
-    		ts.ticks -= 125000000;
-    		ts.seconds ++;
-    	}
-
-    	int channel = (meta >> 19) & 0x7;
-
-        /* Pass the timestamp to triggering/TX logic */
-        do_channel( channel, &ts );
-    }
-
-    /* Flush the RMQ buffer if it contains anything */
-    if(coalesce_count)
-        flush_tx();
-
-};
-
-
-/*
- * WRTD Command Handlers
+/**
+ * Processes a pulse with timestamp (ts) arriving on channel (channel)
  */
-
-
-/* Creates a hmq_buf serializing object for the control output slot */
-static inline struct wrnc_msg ctl_claim_out_buf()
+static inline void do_channel(int channel, struct wr_timestamp *ts)
 {
-    return hmq_msg_claim_out (WRTD_OUT_TDC_CONTROL, 128);
+	struct wrtd_in_channel *ch = &wrtd_in_channels[channel];
+	struct wrtd_trigger_entry ent;
+
+	/* Apply timebase offset to align TDC time with WR timebase */
+	ts_sub(ts, &ch->config.timebase_offset);
+	ch->stats.last_tagged = *ts;
+
+	/* Log raw value if needed */
+	log_trigger(WRTD_LOG_RAW, 0, ch, ts, NULL);
+
+	ch->stats.total_pulses++;
+
+	/* Apply trigger delay */
+	ts_add(ts, &ch->config.delay);
+
+	/* Enable/Arm/Trigger logic */
+	if (!((ch->config.flags & WRTD_TRIGGER_ASSIGNED ) &&
+	      (ch->config.flags & WRTD_ARMED)))
+		return;
+
+	if (!wr_is_timing_ok()) {
+		ch->stats.miss_no_timing++;
+		log_trigger(WRTD_LOG_MISSED, WRTD_MISS_NO_WR, ch, NULL, &ent);
+		return;
+	}
+
+	ent.ts = *ts;
+	ent.id = ch->config.id;
+	ent.seq = ch->stats.seq++;
+
+	ch->config.flags |= WRTD_TRIGGERED;
+	if (ch->config.mode == WRTD_TRIGGER_MODE_SINGLE )
+		ch->config.flags &= ~WRTD_ARMED;
+
+	ch->stats.sent_pulses++;
+	ch->stats.last_sent = ent;
+
+	send_trigger(&ent);
+	log_trigger(WRTD_LOG_SENT, 0, ch, NULL, &ent);
+
+	ch->config.flags |= WRTD_LAST_VALID;
 }
 
-/* Creates a hmq_buf deserializing object for the control input slot */
-static inline struct wrnc_msg ctl_claim_in_buf()
+/**
+ * Handles input timestamps from all TDC channels, calling do_output() on
+ * incoming pulses
+ */
+static inline void do_input(void)
 {
-    return hmq_msg_claim_in (WRTD_IN_TDC_CONTROL, 16);
+	int i;
+
+	/* Prepare for message transmission */
+	mq_claim(1, WRTD_REMOTE_OUT_TDC);
+
+	/* We can send up to TDC_TRIGGER_COALESCE_LIMIT triggers in a
+	   single message - the loop will iterate up to this limit or exit
+	   immediately if there's no more input pulses in the TDC FIFO */
+	for (i = 0; i < TDC_TRIGGER_COALESCE_LIMIT; i++) {
+		uint32_t fifo_sr = dp_readl(BASE_DP_TDC_DIRECT + DR_REG_FIFO_CSR);
+		struct wr_timestamp ts;
+		int meta;
+
+		/* Poll the FIFO and read the timestamp */
+		if(fifo_sr & DR_FIFO_CSR_EMPTY)
+			break;
+
+		ts.seconds = dp_readl(BASE_DP_TDC_DIRECT + DR_REG_FIFO_R0);
+		ts.ticks = dp_readl(BASE_DP_TDC_DIRECT + DR_REG_FIFO_R1);
+		meta = dp_readl(BASE_DP_TDC_DIRECT + DR_REG_FIFO_R2);
+
+		/* Convert from ACAM bins (81ps) to WR time format. Numerical
+		   hack used  to avoid time-consuming division. */
+		ts.frac = ( (meta & 0x3ffff) * 5308 ) >> 7;
+		ts.ticks += ts.frac >> 12;
+		ts.frac &= 0xfff;
+
+		/* Make sure there's no overflow after conversion */
+		if (ts.ticks >= 125000000) {
+			ts.ticks -= 125000000;
+			ts.seconds ++;
+		}
+
+		int channel = (meta >> 19) & 0x7;
+
+		/* Pass the timestamp to triggering/TX logic */
+		do_channel(channel, &ts);
+	}
+
+	/* Flush the RMQ buffer if it contains anything */
+	if(coalesce_count)
+		flush_tx();
 }
 
 
-/* Sends an acknowledgement reply */
-static inline void ctl_ack( uint32_t seq )
+/**
+ * It generate a software trigger accorging to the trigger entry coming
+ * from the user space. The user space entry must provide the trigger
+ * delay, then this function will add it to the current time to compute
+ * the correct fire time.
+ */
+static int wrtd_in_trigger_sw(struct wrnc_proto_header *hin, void *pin,
+			      struct wrnc_proto_header *hout, void *pout)
 {
-    struct wrnc_msg buf = ctl_claim_out_buf();
-    uint32_t id_ack = WRTD_REP_ACK_ID;
-
-    wrnc_msg_header (&buf, &id_ack, &seq);
-    hmq_msg_send (&buf);
-}
-
-
-static inline void ctl_chan_enable (uint32_t seq, struct wrnc_msg *ibuf)
-{
-    int channel, enable;
-
-    /* Deserailize the request */
-    wrnc_msg_int32 (ibuf, &channel);
-    wrnc_msg_int32 (ibuf, &enable);
-
-    uint32_t mask = dp_readl(BASE_DP_TDC_DIRECT + DR_REG_CHAN_ENABLE);
-    struct tdc_channel_state *ch = &channels[channel];
-
-    if(enable)
-    {
-	   mask |= (1 << channel);
-       ch->flags |= WRTD_ENABLED;
-    } else {
-	   mask &= ~(1 << channel);
-       ch->flags &= ~WRTD_ENABLED;
-    }
-
-    /* Update TDC FIFO channel mask */
-    dp_writel(mask, BASE_DP_TDC_DIRECT + DR_REG_CHAN_ENABLE);
-
-    ctl_ack(seq);
-}
-
-static inline void ctl_chan_set_dead_time (uint32_t seq, struct wrnc_msg *ibuf)
-{
-    int channel, dead_time, i;
-
-    /* Deserailize the request */
-    wrnc_msg_int32 (ibuf, &channel);
-    wrnc_msg_int32 (ibuf, &dead_time);
-
-    dp_writel( dead_time, BASE_DP_TDC_DIRECT + DR_REG_DEAD_TIME);
-
-    for(i=0; i < TDC_NUM_CHANNELS; i++)
-        channels[i].dead_time = dead_time;
-
-    ctl_ack(seq);
-}
-
-static inline void ctl_ping (uint32_t seq, struct wrnc_msg *ibuf)
-{
-    ctl_ack(seq);
-}
-
-static inline void ctl_base_time (uint32_t seq, struct wrnc_msg *ibuf)
-{
-	struct wrnc_msg buf = ctl_claim_out_buf();
-	uint32_t id_ack = WRTD_REP_BASE_TIME_ID, seconds, ticks;
+	struct wrtd_trigger_entry ent;
 	struct wr_timestamp ts;
 
+	/* Verify that the size is correct */
+	if (hin->len * 4 != sizeof(struct wrtd_trigger_entry)) {
+		rt_send_nack(hin, pin, hout, pout);
+		return -1;
+	}
+
+	/* Copy the trigger instance and ack the message */
+	memcpy(&ent, pin, hin->len * 4);
+	rt_send_ack(hin, pin, hout, pout);
+
+	/* trigger entity ts from the host contains the delay.
+	   So add to it the current time */
 	ts.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
 	ts.ticks = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
 	ts.frac = 0;
-	wrnc_msg_header (&buf, &id_ack, &seq);
-	wrtd_msg_timestamp(&buf, &ts);
-	hmq_msg_send (&buf);
+	ts_add(&ent.ts, &ts);
+
+	/* Send trigger */
+	send_trigger(&ent);
 }
 
-static inline void ctl_version(uint32_t seq, struct wrnc_msg *ibuf)
+int wr_enable_lock(int enable)
 {
-	struct wrnc_msg buf = ctl_claim_out_buf();
-	uint32_t id_ack = WRTD_REP_VERSION;
-
-	wrnc_msg_header(&buf, &id_ack, &seq);
-	wrnc_msg_uint32(&buf, &version);
-	hmq_msg_send(&buf);
-}
-
-static inline void ctl_chan_set_delay (uint32_t seq, struct wrnc_msg *ibuf)
-{
-    int channel;
-
-    wrnc_msg_int32(ibuf, &channel);
-    wrtd_msg_timestamp(ibuf, &channels[channel].delay);
-
-    ctl_ack(seq);
-}
-
-static inline void ctl_chan_set_timebase_offset (uint32_t seq, struct wrnc_msg *ibuf)
-{
-    int channel;
-
-    wrnc_msg_int32(ibuf, &channel);
-    wrtd_msg_timestamp(ibuf, &channels[channel].timebase_offset);
-
-    ctl_ack(seq);
-}
-
-static inline void ctl_chan_get_state (uint32_t seq, struct wrnc_msg *ibuf)
-{
-    int channel;
-    uint32_t id_state = WRTD_REP_STATE;
-
-    wrnc_msg_int32(ibuf, &channel);
-
-    struct tdc_channel_state *st = &channels[channel];
-    struct wrnc_msg obuf = ctl_claim_out_buf();
-
-    wrnc_msg_header (&obuf, &id_state, &seq);
-    wrnc_msg_int32 (&obuf, &channel);
-    wrtd_msg_trig_id (&obuf, &st->id);
-    wrtd_msg_timestamp (&obuf, &st->delay);
-    wrtd_msg_timestamp (&obuf, &st->timebase_offset);
-    wrtd_msg_timestamp (&obuf, &st->last_tagged);
-
-    uint32_t flags = st->flags;
-
-    if( !wr_is_timing_ok() )
-        flags |= WRTD_NO_WR;
-
-    wrnc_msg_uint32 (&obuf, &flags);
-    wrnc_msg_uint32 (&obuf, &st->log_level);
-    wrnc_msg_int32 (&obuf, (int *) &st->mode);
-    wrnc_msg_uint32 (&obuf, &st->total_pulses);
-    wrnc_msg_uint32 (&obuf, &st->sent_pulses);
-    wrnc_msg_uint32 (&obuf, &st->dead_time);
-    wrtd_msg_trigger_entry (&obuf, &st->last_sent);
-    wrnc_msg_uint32 (&obuf, &sent_packets);
-
-    hmq_msg_send (&obuf);
-}
-
-static inline void ctl_software_trigger (uint32_t seq, struct wrnc_msg *ibuf)
-{
-    struct wr_timestamp ts;
-
-    /* and dumbly copy the trigger entry */
-    struct wrtd_trigger_entry ent;
-    wrtd_msg_trigger_entry(ibuf, &ent);
-    ctl_ack(seq);
-
-    /* trigger entity ts from the host contains the delay.
-       So add to it the current time */
-    ts.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
-    ts.ticks = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
-    ts.frac = 0;
-    ts_add(&ent.ts, &ts);
-
-    /* Send trigger */
-    send_trigger(&ent);
-}
-
-static inline void ctl_chan_set_mode (uint32_t seq, struct wrnc_msg *ibuf)
-{
-    int channel, mode;
-
-    wrnc_msg_int32(ibuf, &channel);
-    wrnc_msg_int32(ibuf, &mode);
-
-    struct tdc_channel_state *ch = &channels[channel];
-
-    ch->mode = mode;
-
-    ctl_ack(seq);
-}
-
-
-static inline void ctl_chan_set_seq (uint32_t seq, struct wrnc_msg *ibuf)
-{
-    int channel;
-
-    wrnc_msg_int32(ibuf, &channel);
-    wrnc_msg_uint32(ibuf, &channels[channel].seq);
-
-    ctl_ack(seq);
-}
-
-
-static inline void ctl_chan_arm (uint32_t seq, struct wrnc_msg *ibuf)
-{
-    int channel, arm;
-
-    wrnc_msg_int32(ibuf, &channel);
-    wrnc_msg_int32(ibuf, &arm);
-
-    struct tdc_channel_state *ch = &channels[channel];
-
-    if(arm)
-        ch->flags |= WRTD_ARMED;
-    else
-        ch->flags &= ~WRTD_ARMED;
-
-    /* Arming clears triggered flag */
-    ch->flags &= ~WRTD_TRIGGERED;
-
-    ctl_ack(seq);
-}
-
-static inline void ctl_chan_assign_trigger (uint32_t seq, struct wrnc_msg *ibuf)
-{
-    int channel, assign;
-    struct wrtd_trig_id id;
-
-    wrnc_msg_int32(ibuf, &channel);
-    wrnc_msg_int32(ibuf, &assign);
-
-    struct tdc_channel_state *ch = &channels[channel];
-
-    if(assign)
-    {
-        wrtd_msg_trig_id(ibuf, &ch->id);
-
-        ch->flags |= WRTD_TRIGGER_ASSIGNED;
-        ch->flags &= ~WRTD_LAST_VALID;
-    } else {
-        ch->id.system = 0;
-        ch->id.source_port = 0;
-        ch->id.trigger = 0;
-
-        ch->flags &= ~WRTD_TRIGGER_ASSIGNED;
-    }
-
-    ctl_ack(seq);
-}
-
-static inline void ctl_chan_reset_counters (uint32_t seq, struct wrnc_msg *ibuf)
-{
-    int channel;
-
-    wrnc_msg_int32(ibuf, &channel);
-
-    struct tdc_channel_state *ch = &channels[channel];
-
-    ch->total_pulses = 0;
-    ch->sent_pulses = 0;
-    ch->miss_no_timing = 0;
-    sent_packets = 0;
-    ch->flags &= ~WRTD_LAST_VALID;
-
-    ctl_ack(seq);
-}
-
-static inline void ctl_chan_set_log_level (uint32_t seq, struct wrnc_msg *ibuf)
-{
-    int channel;
-    uint32_t log_level;
-
-    wrnc_msg_int32(ibuf, &channel);
-    wrnc_msg_uint32(ibuf, &log_level);
-
-    channels[channel].log_level = log_level;
-
-    ctl_ack(seq);
-}
-
-/* Receives command messages and call matching command handlers */
-static inline void do_control()
-{
-    uint32_t cmd, seq;
-    uint32_t p = mq_poll();
-
-    /* HMQ control slot empty? */
-    if(! ( p & ( 1<< WRTD_IN_TDC_CONTROL )))
-        return;
-
-
-    struct wrnc_msg ibuf = ctl_claim_in_buf();
-
-    wrnc_msg_header(&ibuf, &cmd, &seq);
-
-#define _CMD(id, func)          \
-    case id:                    \
-    {                           \
-        func(seq, &ibuf);       \
-        break;                  \
-    }
-
-	switch(cmd)
-	{
-	_CMD(WRTD_CMD_TDC_CHAN_ENABLE,                ctl_chan_enable)
-	_CMD(WRTD_CMD_TDC_CHAN_SET_DEAD_TIME,         ctl_chan_set_dead_time)
-	_CMD(WRTD_CMD_TDC_CHAN_SET_DELAY,             ctl_chan_set_delay)
-	_CMD(WRTD_CMD_TDC_CHAN_SET_TIMEBASE_OFFSET,   ctl_chan_set_timebase_offset)
-	_CMD(WRTD_CMD_TDC_CHAN_GET_STATE,             ctl_chan_get_state)
-	_CMD(WRTD_CMD_TDC_SOFTWARE_TRIGGER,           ctl_software_trigger)
-	_CMD(WRTD_CMD_TDC_CHAN_ASSIGN_TRIGGER,        ctl_chan_assign_trigger)
-	_CMD(WRTD_CMD_TDC_CHAN_SET_MODE,              ctl_chan_set_mode)
-	_CMD(WRTD_CMD_TDC_CHAN_ARM,                   ctl_chan_arm)
-	_CMD(WRTD_CMD_TDC_CHAN_SET_SEQ,               ctl_chan_set_seq)
-	_CMD(WRTD_CMD_TDC_CHAN_SET_LOG_LEVEL,         ctl_chan_set_log_level)
-	_CMD(WRTD_CMD_TDC_CHAN_RESET_COUNTERS,        ctl_chan_reset_counters)
-	_CMD(WRTD_CMD_TDC_PING,                       ctl_ping)
-	_CMD(WRTD_CMD_TDC_BASE_TIME,                  ctl_base_time)
-	_CMD(WRTD_CMD_TDC_VERSION,                    ctl_version)
-	default:
-		  break;
-	}
-
-    /* Drop the message once handled */
-	mq_discard(0, WRTD_IN_TDC_CONTROL);
-}
-
-
-#define WR_LINK_OFFLINE		1
-#define WR_LINK_ONLINE		2
-#define WR_LINK_SYNCING		3
-#define WR_LINK_SYNCED		4
-#define WR_LINK_TDC_WAIT	5
-
-
-static int wr_state;
-
-int wr_link_up()
-{
-	uint32_t stat = dp_readl (BASE_DP_TDC_REGS + TDC_REG_WR_STAT);
-	return stat & TDC_WR_STAT_LINK;
-}
-
-int wr_time_locked()
-{
-	uint32_t stat = dp_readl (BASE_DP_TDC_REGS + TDC_REG_WR_STAT);
-	return stat & TDC_WR_STAT_AUX_LOCKED;
-}
-
-int wr_time_ready()
-{
-	uint32_t stat = dp_readl (BASE_DP_TDC_REGS + TDC_REG_WR_STAT);
-	return stat & TDC_WR_STAT_TIME_VALID;
-}
-
-int wr_enable_lock( int enable )
-{
-    int i = 0;
-	
-	dp_writel (TDC_CTRL_DIS_ACQ, BASE_DP_TDC_REGS + TDC_REG_CTRL);
-	if(enable)
-		dp_writel (TDC_WR_CTRL_ENABLE, BASE_DP_TDC_REGS + TDC_REG_WR_CTRL);
+	int i = 0;
+
+	dp_writel(TDC_CTRL_DIS_ACQ, BASE_DP_TDC_REGS + TDC_REG_CTRL);
+	if (enable)
+		dp_writel(TDC_WR_CTRL_ENABLE, BASE_DP_TDC_REGS + TDC_REG_WR_CTRL);
 	else
-		dp_writel (0, BASE_DP_TDC_REGS + TDC_REG_WR_CTRL);
-   
-	dp_writel (TDC_CTRL_EN_ACQ, BASE_DP_TDC_REGS + TDC_REG_CTRL);
+		dp_writel(0, BASE_DP_TDC_REGS + TDC_REG_WR_CTRL);
+	dp_writel(TDC_CTRL_EN_ACQ, BASE_DP_TDC_REGS + TDC_REG_CTRL);
 }
 
-
-static uint32_t tai_start;
-
-void wr_update_link()
+/**
+ * It updates the White-Rabbit link status
+ */
+void wr_update_link(void)
 {
 
-	switch(wr_state)
-	{
-		case WR_LINK_OFFLINE:
-			if ( wr_link_up() )
-			{
-				wr_state = WR_LINK_ONLINE;
-			}
-			break;
-		
-		case WR_LINK_ONLINE:
-			if (wr_time_ready())
-			{
-				wr_state = WR_LINK_SYNCING;
-				wr_enable_lock(1);
-			}
-			break;
-
-		case WR_LINK_SYNCING:
-			if (wr_time_locked())
-			{
-				pp_printf("rt-tdc: WR synced, waiting for TDC plumbing to catch up...\n");
-				wr_state = WR_LINK_TDC_WAIT;
-				tai_start = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
-
-			}
-			break;
-
-		case WR_LINK_TDC_WAIT:
-			if (lr_readl(WRN_CPU_LR_REG_TAI_SEC) == (tai_start + 4))
-			{
-				pp_printf("rt-tdc: WR TDC synced\n");
-				wr_state = WR_LINK_SYNCED;
-			}
-			break;
-
-		case WR_LINK_SYNCED:
-			break;
+	switch (wr_state) {
+	case WR_LINK_OFFLINE:
+		if (wr_link_up())
+			wr_state = WR_LINK_ONLINE;
+		break;
+	case WR_LINK_ONLINE:
+		if (wr_time_ready()) {
+			wr_state = WR_LINK_SYNCING;
+			wr_enable_lock(1);
+		}
+		break;
+	case WR_LINK_SYNCING:
+		if (wr_time_locked()) {
+			pp_printf("rt-tdc: WR synced, waiting for TDC plumbing to catch up...\n");
+			wr_state = WR_LINK_TDC_WAIT;
+			tai_start = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
+		}
+		break;
+	case WR_LINK_TDC_WAIT:
+		if (lr_readl(WRN_CPU_LR_REG_TAI_SEC) == (tai_start + 4)) {
+			pp_printf("rt-tdc: WR TDC synced\n");
+			wr_state = WR_LINK_SYNCED;
+		}
+		break;
+	case WR_LINK_SYNCED:
+		break;
 	}
 
-	if( wr_state != WR_LINK_OFFLINE && !wr_link_up() )
-	{
+	if ( wr_state != WR_LINK_OFFLINE && !wr_link_up() ) {
 	        pp_printf("rt-tdc: WR sync lost\n");
-                
 		wr_state = WR_LINK_OFFLINE;
 		wr_enable_lock(0);
-	} 
-
+	}
 }
 
-int wr_is_timing_ok()
+
+/**
+ * Data structures to export to host system
+ */
+static struct rt_structure wrtd_in_structures[] = {
+	[IN_STRUCT_DEVICE] = {
+		.struct_ptr = &wrtd_in_dev,
+		.len = sizeof(struct wrtd_in),
+	},
+	[IN_STRUCT_CHAN_0] = {
+		.struct_ptr = &wrtd_in_channels[0],
+		.len = sizeof(struct wrtd_in_channel),
+	},
+	[IN_STRUCT_CHAN_1] = {
+		.struct_ptr = &wrtd_in_channels[1],
+		.len = sizeof(struct wrtd_in_channel),
+	},
+	[IN_STRUCT_CHAN_2] = {
+		.struct_ptr = &wrtd_in_channels[2],
+		.len = sizeof(struct wrtd_in_channel),
+	},
+	[IN_STRUCT_CHAN_3] = {
+		.struct_ptr = &wrtd_in_channels[3],
+		.len = sizeof(struct wrtd_in_channel),
+	},
+	[IN_STRUCT_CHAN_4] = {
+		.struct_ptr = &wrtd_in_channels[4],
+		.len = sizeof(struct wrtd_in_channel),
+	},
+};
+
+static struct rt_variable wrtd_in_variables[] = {
+	[IN_VAR_CHAN_ENABLE] = {
+		.addr = CPU_DP_BASE + BASE_DP_TDC_DIRECT + DR_REG_CHAN_ENABLE,
+		.mask = 0x2F,
+		.offset = 16,
+	},
+	[IN_VAR_DEVICE_TIME_S] = {
+		.addr = CPU_LR_BASE + WRN_CPU_LR_REG_TAI_SEC,
+		.mask = 0xFFFFFFFF,
+		.offset = 0,
+	},
+	[IN_VAR_DEVICE_TIME_T] = {
+		.addr = CPU_LR_BASE + WRN_CPU_LR_REG_TAI_CYCLES,
+		.mask = 0xFFFFFFFF,
+		.offset = 0,
+	},
+	[IN_VAR_DEVICE_SENT_PACK] = {
+		.addr = (uint32_t)&sent_packets,
+		.mask = 0xFFFFFFFF,
+		.offset = 0,
+	},
+	[IN_VAR_DEVICE_DEAD_TIME] = {
+		.addr = CPU_DP_BASE + BASE_DP_TDC_DIRECT + DR_REG_DEAD_TIME,
+		.mask = 0xFFFFFFFF,
+		.offset = 0,
+	},
+	[IN_VAR_DEVICE_CHAN_ENABLE] = {
+		.addr = CPU_DP_BASE + BASE_DP_TDC_DIRECT + DR_REG_CHAN_ENABLE,
+		.mask = 0x1F,
+		.offset = 0,
+	},
+};
+
+#define __WRTD_IN_ACTION_MAX 128 // FIXME
+static action_t *wrtd_in_actions[__WRTD_IN_ACTION_MAX] = {
+	[RT_ACTION_RECV_PING] = rt_recv_ping,
+	[RT_ACTION_RECV_VERSION] = rt_version_getter,
+	[RT_ACTION_RECV_FIELD_SET] = rt_variable_setter,
+	[RT_ACTION_RECV_FIELD_GET] = rt_variable_getter,
+	[RT_ACTION_RECV_STRUCT_SET] = rt_structure_setter,
+	[RT_ACTION_RECV_STRUCT_GET] = rt_structure_getter,
+};
+
+enum rt_slot_name {
+	IN_CMD_IN = 0,
+	IN_CMD_OUT,
+	IN_LOG,
+};
+
+struct rt_mq mq[] = {
+	[IN_CMD_IN] = {
+		.index = 0,
+		.flags = RT_MQ_FLAGS_LOCAL | RT_MQ_FLAGS_INPUT,
+	},
+	[IN_CMD_OUT] = {
+		.index = 0,
+		.flags = RT_MQ_FLAGS_LOCAL | RT_MQ_FLAGS_OUTPUT,
+	},
+	[IN_LOG] = {
+		.index = 2,
+		.flags = RT_MQ_FLAGS_LOCAL | RT_MQ_FLAGS_OUTPUT,
+	},
+};
+
+struct rt_application app = {
+	.name = "wrtd-input",
+	.version = {
+		.fpga_id = 0x115790de,
+		.rt_id = 0xbadc0fee,
+		.rt_version = RT_VERSION(2, 0),
+		.git_version = GIT_VERSION
+	},
+	.mq = mq,
+	.n_mq = 2,
+
+	.structures = wrtd_in_structures,
+	.n_structures = __WRTD_IN_STRUCT_MAX,
+
+	.variables = wrtd_in_variables,
+	.n_variables = __WRTD_IN_VAR_MAX,
+
+	.actions = wrtd_in_actions,
+	.n_actions = __WRTD_IN_ACTION_MAX,
+};
+
+
+static void init(void)
 {
-	return (wr_state == WR_LINK_SYNCED);
+	int i;
+
+	loop_queue_init();
+
+	wr_state = WR_LINK_OFFLINE;
+	wr_enable_lock(0);
+
+	/* Initialize the TDC FIFO (channels disabled, default dead time) */
+	dp_writel(0x0, BASE_DP_TDC_DIRECT + DR_REG_CHAN_ENABLE);
+	dp_writel(DEFAULT_DEAD_TIME, BASE_DP_TDC_DIRECT + DR_REG_DEAD_TIME);
+
+	/* Set up channel states to safe default values */
+	memset(&wrtd_in_channels[i], 0,
+	       sizeof(struct wrtd_in_channel) * TDC_NUM_CHANNELS);
+	for(i = 0; i < TDC_NUM_CHANNELS; i++) {
+		wrtd_in_channels[i].n = i;
+		wrtd_in_channels[i].config.mode = WRTD_TRIGGER_MODE_AUTO;
+	}
 }
 
-void init()
+int main(void)
 {
-    int i;
+	init();
+	rt_init(&app);
 
-    loop_queue_init();
+	while (1) {
+		do_input();
+		rt_mq_action_dispatch(IN_CMD_IN);
+		wr_update_link();
+	}
 
-    wr_state = WR_LINK_OFFLINE;
-    wr_enable_lock(0);
-
-    /* Initialize the TDC FIFO (channels disabled, default dead time) */
-    dp_writel( 0x0, BASE_DP_TDC_DIRECT + DR_REG_CHAN_ENABLE);
-    dp_writel( DEFAULT_DEAD_TIME, BASE_DP_TDC_DIRECT + DR_REG_DEAD_TIME);
-
-    /* Set up channel states to safe default values */
-    for(i=0;i<TDC_NUM_CHANNELS;i++)
-    {
-    	memset(&channels[i], 0, sizeof(struct tdc_channel_state));
-        channels[i].n = i;
-        channels[i].mode = WRTD_TRIGGER_MODE_AUTO;
-        channels[i].dead_time = DEFAULT_DEAD_TIME;
-    }
-
-    pp_printf("rt-tdc firmware initialized.\n");
-}
-
-main()
-{
-	pp_printf("Running %s from commit 0x%x.\n", __FILE__, version);
-    init();
-
-    for(;;)
-    {
-        do_input();
-        do_control();
-        wr_update_link();
-    }
-    return 0;
+	return 0;
 }

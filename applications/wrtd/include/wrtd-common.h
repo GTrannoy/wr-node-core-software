@@ -96,6 +96,24 @@
 #define FD_HASH_ENTRIES 64
 #define FD_MAX_QUEUE_PULSES 16
 
+enum wrtd_in_variables_indexes {
+	IN_VAR_CHAN_ENABLE = 0,
+	IN_VAR_DEVICE_TIME_S,
+	IN_VAR_DEVICE_TIME_T,
+	IN_VAR_DEVICE_SENT_PACK,
+	IN_VAR_DEVICE_DEAD_TIME,
+	IN_VAR_DEVICE_CHAN_ENABLE,
+	__WRTD_IN_VAR_MAX,
+};
+enum wrtd_in_structures_indexes {
+	IN_STRUCT_DEVICE = 0,
+	IN_STRUCT_CHAN_0,
+	IN_STRUCT_CHAN_1,
+	IN_STRUCT_CHAN_2,
+	IN_STRUCT_CHAN_3,
+	IN_STRUCT_CHAN_4,
+	__WRTD_IN_STRUCT_MAX,
+};
 
 /**
  * availables trigger mode
@@ -274,5 +292,45 @@ static inline void ts_sub(struct wr_timestamp *a, const struct wr_timestamp *b)
     }
 }
 #endif
+
+
+/**
+ * Structure describing state of each TDC channel
+ * All fields must be 32bit (do not use enum because there are no guarantee)
+ */
+struct wrtd_in_channel_config {
+	struct wrtd_trig_id id; /**< Currently assigned trigger ID */
+	struct wr_timestamp delay; /**< Trigger delay, added to each timestamp */
+	struct wr_timestamp timebase_offset; /* Internal time base offset. Used
+						to compensate the TDC-to-WR
+						timebase lag. Not exposed to the
+						public, set from the internal
+						calibration data of the TDC
+						driver. */
+	uint32_t flags; /**< Channel flags (enum wrnc_io_flags) */
+	uint32_t log_level; /**< Log level (enum wrnc_log_level) */
+        uint32_t mode; /**< Triggering mode (enum wrtd_triger_mode) */
+};
+
+struct wrtd_in_channel_stats {
+	struct wr_timestamp last_tagged; /**< Timestamp of the last tagged
+					    pulse */
+	struct wrtd_trigger_entry last_sent; /**< Last transmitted trigger */
+	uint32_t total_pulses; /**< Total tagged pulses */
+	uint32_t sent_pulses; /**< Total sent pulses */
+	uint32_t miss_no_timing; /**< Total missed pulses (no WR) */
+	uint32_t seq;
+};
+
+/* Structure describing state of each TDC channel*/
+struct wrtd_in_channel {
+	int n;
+	struct wrtd_in_channel_stats stats;
+	struct wrtd_in_channel_config config;
+};
+
+struct wrtd_in {
+	uint32_t dead_time; /**< TDC dead time, in 8ns ticks */
+};
 
 #endif

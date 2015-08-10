@@ -98,3 +98,13 @@ int wrtd_trivial_request(struct wrtd_node *dev,
 
 	return wrtd_validate_acknowledge(request_msg);
 }
+
+
+/**
+ * The embedded core is big endian, convert it to little endian (host)
+ */
+void wrtd_timestamp_endianess_fix(struct wr_timestamp *ts)
+{
+	ts->seconds = ((ts->seconds & 0xFFFFFFFF) << 32) |
+		      ((ts->seconds >> 32) & 0xFFFFFFFF);
+}

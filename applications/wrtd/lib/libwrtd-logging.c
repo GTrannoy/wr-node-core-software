@@ -235,21 +235,44 @@ static int wrtd_log_level_set(struct wrtd_node *dev, unsigned int channel,
 {
 	struct wrnc_msg msg = wrnc_msg_init(4);
 	uint32_t seq = 0;
-	uint32_t id = core ? WRTD_CMD_FD_CHAN_SET_LOG_LEVEL :
-			     WRTD_CMD_TDC_CHAN_SET_LOG_LEVEL;
-	int n_chan = core ? FD_NUM_CHANNELS : TDC_NUM_CHANNELS;
 
-	if (channel >= n_chan) {
-		errno = EWRTD_INVALID_CHANNEL;
-		return -1;
+	if (core) { /* Output */
+		uint32_t id = WRTD_CMD_FD_CHAN_SET_LOG_LEVEL;
+
+		if (channel >= FD_NUM_CHANNELS) {
+			errno = EWRTD_INVALID_CHANNEL;
+			return -1;
+		}
+
+		/* Build the message */
+		wrnc_msg_header(&msg, &id, &seq);
+		wrnc_msg_uint32(&msg, &channel);
+		wrnc_msg_uint32(&msg, &log_level);
+
+		return wrtd_trivial_request(dev, &msg, core);
+	} else { /* Input */
+		struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+		struct wrtd_in_channel chan;
+		struct wrnc_structure_tlv tlv = {
+			.index = IN_STRUCT_CHAN_0 + channel,
+			.size = sizeof(struct wrtd_in_channel),
+			.structure = &chan,
+		};
+		int err;
+
+		if (channel >= TDC_NUM_CHANNELS) {
+			errno = EWRTD_INVALID_CHANNEL;
+			return -1;
+		}
+		err = wrnc_rt_structure_get(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+					    WRTD_OUT_TDC_CONTROL, &tlv, 1);
+		if (err)
+			return err;
+
+		chan.config.log_level = log_level;
+		return wrnc_rt_structure_set(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+					     WRTD_OUT_TDC_CONTROL, &tlv, 1, 1);
 	}
-
-	/* Build the message */
-	wrnc_msg_header(&msg, &id, &seq);
-	wrnc_msg_uint32(&msg, &channel);
-	wrnc_msg_uint32(&msg, &log_level);
-
-	return wrtd_trivial_request(dev, &msg, core);
 }
 
 

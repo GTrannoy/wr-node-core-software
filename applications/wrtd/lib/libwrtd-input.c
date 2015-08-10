@@ -57,10 +57,15 @@ int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 		      struct wrtd_input_state *state)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg = wrnc_msg_init(19);
 	int err;
-	uint32_t id, seq = 0;
-	uint32_t dead_time_cycles;
+	struct wrtd_in_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = IN_STRUCT_CHAN_0 + input,
+		.size = sizeof(struct wrtd_in_channel),
+		.structure = &chan,
+	};
+	uint32_t variables[] = {IN_VAR_DEVICE_SENT_PACK, 0,
+				IN_VAR_DEVICE_DEAD_TIME, 0};
 
 	if (input >= TDC_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
@@ -72,51 +77,38 @@ int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 		return -1;
 	}
 
-	/* Build the message */
-	id = WRTD_CMD_TDC_CHAN_GET_STATE;
-	wrnc_msg_header (&msg, &id, &seq);
-   	wrnc_msg_uint32 (&msg, &input);
+	err = wrnc_rt_structure_get(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1);
+	if (err)
+		return err;
 
+	err = wrnc_rt_variable_get(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				   WRTD_OUT_TDC_CONTROL, variables, 2);
+	if (err)
+		return err;
 
-	/* Send the message and get answer */
-	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
-        if (err) {
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
-
-	/* Deserialize and check the answer */
-	wrnc_msg_header(&msg, &id, &seq);
-
-	if(id != WRTD_REP_STATE)
-	{
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
-
-	wrnc_msg_int32		(&msg, &state->input);
-	wrtd_msg_trig_id   	(&msg, &state->assigned_id);
-	wrtd_msg_timestamp 	(&msg, &state->delay);
-	wrtd_msg_timestamp 	(&msg, &state->tdc_timebase_offset);
-	wrtd_msg_timestamp 	(&msg, &state->last_tagged_pulse);
-	wrnc_msg_uint32    	(&msg, &state->flags);
-	wrnc_msg_uint32    	(&msg, &state->log_level);
-	wrnc_msg_int32 	   	(&msg, (int *) &state->mode);
-	wrnc_msg_uint32 	(&msg, &state->tagged_pulses);
-	wrnc_msg_uint32 	(&msg, &state->sent_triggers);
-	wrnc_msg_uint32 	(&msg, &dead_time_cycles);
-	wrtd_msg_trigger_entry 	(&msg, &state->last_sent);
-	wrnc_msg_uint32 	(&msg, &state->sent_packets);
+	/* Convert to state structure */
+	state->input = chan.n;
+	state->assigned_id = chan.config.id;
+	state->delay = chan.config.delay;
+	wrtd_timestamp_endianess_fix(&state->delay);
+	state->tdc_timebase_offset = chan.config.timebase_offset;
+	wrtd_timestamp_endianess_fix(&state->tdc_timebase_offset);
+	state->last_tagged_pulse = chan.stats.last_tagged;
+	wrtd_timestamp_endianess_fix(&state->last_tagged_pulse);
+	state->flags = chan.config.flags;
+	state->log_level = chan.config.log_level;
+	state->mode = chan.config.mode;
+	state->tagged_pulses = chan.stats.total_pulses;
+	state->sent_triggers = chan.stats.sent_pulses;
+	state->last_sent = chan.stats.last_sent;
+	wrtd_timestamp_endianess_fix(&state->last_sent);
 
 	state->dead_time.seconds = 0;
 	state->dead_time.frac = 0;
-	state->dead_time.ticks = dead_time_cycles * 2;
-
-	/* Check for deserialization errors (buffer underflow/overflow) */
-	if ( wrnc_msg_check_error(&msg) ) {
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
+	state->dead_time.ticks = variables[3] * 2;
+	wrtd_timestamp_endianess_fix(&state->dead_time);
+	state->sent_packets = variables[1];
 
 	return 0;
 }
@@ -132,7 +124,13 @@ int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 int wrtd_in_enable(struct wrtd_node *dev, unsigned int input, int enable)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg;
+	struct wrtd_in_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = IN_STRUCT_CHAN_0 + input,
+		.size = sizeof(struct wrtd_in_channel),
+		.structure = &chan,
+	};
+	uint32_t variables[] = {IN_VAR_DEVICE_CHAN_ENABLE, 0};
 	int err;
 
 	if (input >= TDC_NUM_CHANNELS) {
@@ -140,19 +138,31 @@ int wrtd_in_enable(struct wrtd_node *dev, unsigned int input, int enable)
 		return -1;
 	}
 
-	/* Build the message */
-	msg.datalen = 4;
-	msg.data[0] = WRTD_CMD_TDC_CHAN_ENABLE;
-	msg.data[1] = 0;
-	msg.data[2] = input;
-	msg.data[3] = !!enable;
-
-	/* Send the message and get answer */
-	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
+	err = wrnc_rt_structure_get(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1);
+	if (err)
+		return err;
+	err = wrnc_rt_variable_get(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				   WRTD_OUT_TDC_CONTROL, variables, 1);
 	if (err)
 		return err;
 
-	return wrtd_validate_acknowledge(&msg);
+
+	if (enable) {
+		variables[1] |= (1 << input);
+		chan.config.flags |= WRTD_ENABLED;
+	} else {
+		variables[1] &= ~(1 << input);
+		chan.config.flags &= ~WRTD_ENABLED;
+	}
+
+
+	err = wrnc_rt_structure_set(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1, 1);
+	if (err)
+		return err;
+	return wrnc_rt_variable_set(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, variables, 1, 1);
 }
 
 
@@ -169,8 +179,13 @@ int wrtd_in_enable(struct wrtd_node *dev, unsigned int input, int enable)
 int wrtd_in_trigger_assign(struct wrtd_node *dev, unsigned int input,
 					  struct wrtd_trig_id *trig_id)
 {
-   	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrtd_in_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = IN_STRUCT_CHAN_0 + input,
+		.size = sizeof(struct wrtd_in_channel),
+		.structure = &chan,
+	};
 	int err;
 
 	if (input >= TDC_NUM_CHANNELS) {
@@ -178,23 +193,22 @@ int wrtd_in_trigger_assign(struct wrtd_node *dev, unsigned int input,
 		return -1;
 	}
 
-	/* Build the message */
-	msg.datalen = 7;
-	msg.data[0] = WRTD_CMD_TDC_CHAN_ASSIGN_TRIGGER;
-	msg.data[1] = 0;
-	msg.data[2] = input;
-	/* '? :' should be optimized by the compiler */
-	msg.data[3] = trig_id ? 1 : 0;
-	msg.data[4] = trig_id ? trig_id->system : 0;
-	msg.data[5] = trig_id ? trig_id->source_port : 0;
-	msg.data[6] = trig_id ? trig_id->trigger : 0;
-
-	/* Send the message and get answer */
-	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
+	err = wrnc_rt_structure_get(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1);
 	if (err)
 		return err;
 
-	return wrtd_validate_acknowledge(&msg);
+	if (trig_id) {
+		chan.config.id = *trig_id;
+		chan.config.flags |= WRTD_TRIGGER_ASSIGNED;
+		chan.config.flags &= ~WRTD_LAST_VALID;
+	} else {
+		memset(&chan.config.id, 0, sizeof(struct wrtd_trig_id));
+		chan.config.flags &= ~WRTD_TRIGGER_ASSIGNED;
+	}
+
+	return wrnc_rt_structure_set(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1, 1);
 }
 
 
@@ -228,8 +242,13 @@ int wrtd_in_trigger_unassign(struct wrtd_node *dev,
 int wrtd_in_trigger_mode_set(struct wrtd_node *dev, unsigned int input,
 			     enum wrtd_trigger_mode mode)
 {
-    	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrtd_in_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = IN_STRUCT_CHAN_0 + input,
+		.size = sizeof(struct wrtd_in_channel),
+		.structure = &chan,
+	};
 	int err;
 
 	if (input >= TDC_NUM_CHANNELS) {
@@ -237,19 +256,15 @@ int wrtd_in_trigger_mode_set(struct wrtd_node *dev, unsigned int input,
 		return -1;
 	}
 
-	/* Build the message */
-	msg.datalen = 4;
-	msg.data[0] = WRTD_CMD_TDC_CHAN_SET_MODE;
-	msg.data[1] = 0;
-	msg.data[2] = input;
-	msg.data[3] = mode;
-
-	/* Send the message and get answer */
-	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
+	err = wrnc_rt_structure_get(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1);
 	if (err)
 		return err;
 
-	return wrtd_validate_acknowledge(&msg);
+	chan.config.mode = mode;
+
+	return wrnc_rt_structure_set(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1, 1);
 }
 
 
@@ -298,8 +313,13 @@ int wrtd_in_trigger_software(struct wrtd_node *dev,
  */
 int wrtd_in_arm(struct wrtd_node *dev, unsigned int input, int armed)
 {
-   	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrtd_in_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = IN_STRUCT_CHAN_0 + input,
+		.size = sizeof(struct wrtd_in_channel),
+		.structure = &chan,
+	};
 	int err;
 
 	if (input >= TDC_NUM_CHANNELS) {
@@ -307,19 +327,19 @@ int wrtd_in_arm(struct wrtd_node *dev, unsigned int input, int armed)
 		return -1;
 	}
 
-	/* Build the message */
-	msg.datalen = 4;
-	msg.data[0] = WRTD_CMD_TDC_CHAN_ARM;
-	msg.data[1] = 0;
-	msg.data[2] = input;
-	msg.data[3] = !!armed;
-
-	/* Send the message and get answer */
-	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
+	err = wrnc_rt_structure_get(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1);
 	if (err)
 		return err;
 
-	return wrtd_validate_acknowledge(&msg);
+	if (armed)
+		chan.config.flags |= WRTD_ARMED;
+	else
+		chan.config.flags &= ~WRTD_ARMED;
+	chan.config.flags &= ~WRTD_TRIGGERED;
+
+	return wrnc_rt_structure_set(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1, 1);
 }
 
 
@@ -333,11 +353,11 @@ int wrtd_in_arm(struct wrtd_node *dev, unsigned int input, int armed)
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_in_dead_time_set(struct wrtd_node *dev, unsigned int input,
-				 uint64_t dead_time_ps)
+			  uint64_t dead_time_ps)
 {
-  	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg;
-	int err, dead_time_cycles;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	uint32_t variables[] = {IN_VAR_DEVICE_DEAD_TIME, 0};
+	uint32_t dead_time_cycles;
 
 	if (input >= TDC_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
@@ -350,20 +370,10 @@ int wrtd_in_dead_time_set(struct wrtd_node *dev, unsigned int input,
 		errno = EWRTD_INVALID_DEAD_TIME;
 		return -1;
 	}
+	variables[1] =  dead_time_cycles; // FIXME wrong API
 
-	/* Build the message */
-	msg.datalen = 4;
-	msg.data[0] = WRTD_CMD_TDC_CHAN_SET_DEAD_TIME;
-	msg.data[1] = 0;
-	msg.data[2] = input;
-	msg.data[3] = dead_time_cycles;
-
-	/* Send the message and get answer */
-	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
-	if (err)
-		return err;
-
-	return wrtd_validate_acknowledge(&msg);
+	return wrnc_rt_variable_set(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, variables, 1, 1);
 }
 
 
@@ -379,9 +389,14 @@ int wrtd_in_dead_time_set(struct wrtd_node *dev, unsigned int input,
 int wrtd_in_delay_set(struct wrtd_node *dev, unsigned int input,
 		      uint64_t delay_ps)
 {
-  	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrtd_in_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = IN_STRUCT_CHAN_0 + input,
+		.size = sizeof(struct wrtd_in_channel),
+		.structure = &chan,
+	};
 	struct wr_timestamp t;
-	struct wrnc_msg msg;
 	int err;
 
 	if (input >= TDC_NUM_CHANNELS) {
@@ -389,24 +404,16 @@ int wrtd_in_delay_set(struct wrtd_node *dev, unsigned int input,
 		return -1;
 	}
 
-        wrtd_pico_to_ts(&delay_ps, &t);
-
-	/* Build the message */
-	msg.datalen = 7;
-	msg.data[0] = WRTD_CMD_TDC_CHAN_SET_DELAY;
-	msg.data[1] = 0;
-	msg.data[2] = input;
-	msg.data[3] = t.seconds >> 32;
-	msg.data[4] = t.seconds & 0xFFFFFFFF;
-	msg.data[5] = t.ticks;
-	msg.data[6] = t.frac;
-
-	/* Send the message and get answer */
-	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
+	err = wrnc_rt_structure_get(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1);
 	if (err)
 		return err;
 
-	return wrtd_validate_acknowledge(&msg);
+	wrtd_pico_to_ts(&delay_ps, &t);
+	memcpy(&chan.config.delay, &t, sizeof(struct wr_timestamp));
+
+	return wrnc_rt_structure_set(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1, 1);
 }
 
 
@@ -425,8 +432,13 @@ int wrtd_in_timebase_offset_set(struct wrtd_node *dev, unsigned int input,
 				uint64_t offset)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrtd_in_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = IN_STRUCT_CHAN_0 + input,
+		.size = sizeof(struct wrtd_in_channel),
+		.structure = &chan,
+	};
 	struct wr_timestamp t;
-	struct wrnc_msg msg;
 	int err;
 
 	if (input >= TDC_NUM_CHANNELS) {
@@ -434,24 +446,16 @@ int wrtd_in_timebase_offset_set(struct wrtd_node *dev, unsigned int input,
 		return -1;
 	}
 
-	wrtd_pico_to_ts(&offset, &t);
-
-	/* Build the message */
-	msg.datalen = 7;
-	msg.data[0] = WRTD_CMD_TDC_CHAN_SET_TIMEBASE_OFFSET;
-	msg.data[1] = 0;
-	msg.data[2] = input;
-	msg.data[3] = t.seconds >> 32;
-	msg.data[4] = t.seconds & 0xFFFFFFFF;
-	msg.data[5] = t.ticks;
-	msg.data[6] = t.frac;
-
-	/* Send the message and get answer */
-	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
-        if (err)
+	err = wrnc_rt_structure_get(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1);
+	if (err)
 		return err;
 
-	return wrtd_validate_acknowledge(&msg);
+	wrtd_pico_to_ts(&offset, &t);
+	memcpy(&chan.config.timebase_offset, &t, sizeof(struct wr_timestamp));
+
+	return wrnc_rt_structure_set(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1, 1);
 }
 
 
@@ -463,8 +467,13 @@ int wrtd_in_timebase_offset_set(struct wrtd_node *dev, unsigned int input,
  */
 int wrtd_in_counters_reset(struct wrtd_node *dev, unsigned int input)
 {
-   	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrtd_in_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = IN_STRUCT_CHAN_0 + input,
+		.size = sizeof(struct wrtd_in_channel),
+		.structure = &chan,
+	};
 	int err;
 
 	if (input >= TDC_NUM_CHANNELS) {
@@ -472,18 +481,18 @@ int wrtd_in_counters_reset(struct wrtd_node *dev, unsigned int input)
 		return -1;
 	}
 
-	/* Build the message */
-	msg.datalen = 3;
-	msg.data[0] = WRTD_CMD_TDC_CHAN_RESET_COUNTERS;
-	msg.data[1] = 0;
-	msg.data[2] = input;
-
-	/* Send the message and get answer */
-	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
+	err = wrnc_rt_structure_get(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1);
 	if (err)
 		return err;
 
-	return wrtd_validate_acknowledge(&msg);
+	chan.stats.total_pulses = 0;
+	chan.stats.sent_pulses = 0;
+	chan.stats.miss_no_timing = 0;
+	chan.config.flags &= ~WRTD_LAST_VALID;
+
+	return wrnc_rt_structure_set(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1, 1);
 }
 
 
@@ -497,13 +506,26 @@ int wrtd_in_counters_reset(struct wrtd_node *dev, unsigned int input)
 int wrtd_in_is_enabled(struct wrtd_node *dev, unsigned int input,
 		       unsigned int *enable)
 {
-	struct wrtd_input_state state;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrtd_in_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = IN_STRUCT_CHAN_0 + input,
+		.size = sizeof(struct wrtd_in_channel),
+		.structure = &chan,
+	};
 	int err;
 
-	err = wrtd_in_state_get(dev, input, &state);
-	if (err)
+	if (input >= TDC_NUM_CHANNELS) {
+		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
-	*enable = !!(state.flags & WRTD_ENABLED);
+	}
+
+	err = wrnc_rt_structure_get(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1);
+	if (err)
+		return err;
+
+	*enable = !!(chan.config.flags & WRTD_ENABLED);
 
 	return 0;
 }
@@ -519,13 +541,26 @@ int wrtd_in_is_enabled(struct wrtd_node *dev, unsigned int input,
 int wrtd_in_is_armed(struct wrtd_node *dev, unsigned int input,
 		     unsigned int *armed)
 {
-	struct wrtd_input_state state;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrtd_in_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = IN_STRUCT_CHAN_0 + input,
+		.size = sizeof(struct wrtd_in_channel),
+		.structure = &chan,
+	};
 	int err;
 
-	err = wrtd_in_state_get(dev, input, &state);
-	if (err)
+	if (input >= TDC_NUM_CHANNELS) {
+		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
-	*armed = !!(state.flags & WRTD_ARMED);
+	}
+
+	err = wrnc_rt_structure_get(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1);
+	if (err)
+		return err;
+
+	*armed = !!(chan.config.flags & WRTD_ARMED);
 
 	return 0;
 }
@@ -540,13 +575,26 @@ int wrtd_in_is_armed(struct wrtd_node *dev, unsigned int input,
 int wrtd_in_has_trigger(struct wrtd_node *dev, unsigned int input,
 			unsigned int *assigned)
 {
-	struct wrtd_input_state state;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrtd_in_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = IN_STRUCT_CHAN_0 + input,
+		.size = sizeof(struct wrtd_in_channel),
+		.structure = &chan,
+	};
 	int err;
 
-	err = wrtd_in_state_get(dev, input, &state);
-	if (err)
+	if (input >= TDC_NUM_CHANNELS) {
+		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
-	*assigned = !!(state.flags & WRTD_TRIGGER_ASSIGNED);
+	}
+
+	err = wrnc_rt_structure_get(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1);
+	if (err)
+		return err;
+
+	*assigned = !!(chan.config.flags & WRTD_TRIGGER_ASSIGNED);
 
 	return 0;
 }
@@ -566,8 +614,23 @@ int wrtd_in_has_trigger(struct wrtd_node *dev, unsigned int input,
 int wrtd_in_dead_time_get(struct wrtd_node *dev, unsigned int input,
 			  uint64_t *dead_time_ps)
 {
-	errno = EWRTD_NO_IMPLEMENTATION;
-	return -1;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	uint32_t variables[] = {IN_VAR_DEVICE_DEAD_TIME, 0};
+	int err;
+
+	if (input >= TDC_NUM_CHANNELS) {
+		errno = EWRTD_INVALID_CHANNEL;
+		return -1;
+	}
+
+	err = wrnc_rt_variable_get(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				   WRTD_OUT_TDC_CONTROL, variables, 1);
+	if (err)
+		return err;
+
+	*dead_time_ps = variables[1] * 16000;
+
+	return 0;
 }
 
 
@@ -583,8 +646,28 @@ int wrtd_in_dead_time_get(struct wrtd_node *dev, unsigned int input,
 int wrtd_in_delay_get(struct wrtd_node *dev, unsigned int input,
 		      uint64_t *delay_ps)
 {
-	errno = EWRTD_NO_IMPLEMENTATION;
-	return -1;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrtd_in_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = IN_STRUCT_CHAN_0 + input,
+		.size = sizeof(struct wrtd_in_channel),
+		.structure = &chan,
+	};
+	int err;
+
+	if (input >= TDC_NUM_CHANNELS) {
+		errno = EWRTD_INVALID_CHANNEL;
+		return -1;
+	}
+
+	err = wrnc_rt_structure_get(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1);
+	if (err)
+		return err;
+
+	wrtd_ts_to_pico(&chan.config.delay, delay_ps);
+
+	return 0;
 }
 
 
@@ -598,8 +681,12 @@ int wrtd_in_seq_counter_set(struct wrtd_node *dev, unsigned int input,
 			    unsigned int value)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg = wrnc_msg_init(4);
-	uint32_t id, seq = 0;
+	struct wrtd_in_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = IN_STRUCT_CHAN_0 + input,
+		.size = sizeof(struct wrtd_in_channel),
+		.structure = &chan,
+	};
 	int err;
 
 	if (input >= TDC_NUM_CHANNELS) {
@@ -607,19 +694,15 @@ int wrtd_in_seq_counter_set(struct wrtd_node *dev, unsigned int input,
 		return -1;
 	}
 
-	id = WRTD_CMD_TDC_CHAN_SET_SEQ;
-	wrnc_msg_header(&msg, &id, &seq);
-	wrnc_msg_uint32(&msg, &input);
-	wrnc_msg_uint32(&msg, &value);
+	err = wrnc_rt_structure_get(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1);
+	if (err)
+		return err;
 
-	/* Send the message and get answer */
-	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
-        if (err) {
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
+	chan.stats.seq = value;
 
-	return wrtd_validate_acknowledge(&msg);
+	return wrnc_rt_structure_set(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				    WRTD_OUT_TDC_CONTROL, &tlv, 1, 1);
 }
 
 
@@ -631,21 +714,9 @@ int wrtd_in_seq_counter_set(struct wrtd_node *dev, unsigned int input,
 int wrtd_in_ping(struct wrtd_node *dev)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg = wrnc_msg_init(3); /* FIXME cannot use 2 */
-	uint32_t id, seq = 0;
-	int err;
 
-	id = WRTD_CMD_TDC_PING;
-	wrnc_msg_header(&msg, &id, &seq);
-
-	/* Send the message and get answer */
-	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
-        if (err) {
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
-
-	return wrtd_validate_acknowledge(&msg);
+	return wrnc_rt_ping(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+			    WRTD_OUT_TDC_CONTROL);
 }
 
 
@@ -658,30 +729,16 @@ int wrtd_in_ping(struct wrtd_node *dev)
 int wrtd_in_base_time(struct wrtd_node *dev, struct wr_timestamp *ts)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg = wrnc_msg_init(6); /* FIXME cannot use 2 */
-	uint32_t id, seq = 0;
+	uint32_t variables[] = {IN_VAR_DEVICE_TIME_S, 0,
+				IN_VAR_DEVICE_TIME_T, 0};
 	int err;
 
-	id = WRTD_CMD_TDC_BASE_TIME;
-	wrnc_msg_header(&msg, &id, &seq);
-
-	/* Send the message and get answer */
-	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
-        if (err) {
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
-
-	/* Deserialize and check the answer */
-	wrnc_msg_header(&msg, &id, &seq);
-
-	if(id != WRTD_REP_BASE_TIME_ID)
-	{
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
-
-	wrtd_msg_timestamp(&msg, ts);
+	err = wrnc_rt_variable_get(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
+				   WRTD_OUT_TDC_CONTROL, variables, 2);
+	if (err)
+		return err;
+	ts->seconds = variables[1];
+	ts->ticks = variables[3];
 
 	return 0;
 }
@@ -696,30 +753,14 @@ int wrtd_in_base_time(struct wrtd_node *dev, struct wr_timestamp *ts)
 int wrtd_in_version(struct wrtd_node *dev, uint32_t *gitsha1)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg = wrnc_msg_init(6); /* FIXME cannot use 2 */
-	uint32_t id, seq = 0;
+	struct wrnc_rt_version version;
 	int err;
 
-	id = WRTD_CMD_TDC_VERSION;
-	wrnc_msg_header(&msg, &id, &seq);
-
-	/* Send the message and get answer */
-	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
-        if (err) {
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
-
-	/* Deserialize and check the answer */
-	wrnc_msg_header(&msg, &id, &seq);
-
-	if(id != WRTD_REP_VERSION)
-	{
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
-
-	wrnc_msg_uint32(&msg, gitsha1);
+	err = wrnc_rt_version_get(wrtd->wrnc, &version,
+				  WRTD_IN_TDC_CONTROL, WRTD_OUT_TDC_CONTROL);
+	if (err)
+		return err;
+	*gitsha1 = version.git_version;
 
 	return 0;
 }

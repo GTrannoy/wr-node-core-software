@@ -400,31 +400,18 @@ static inline void ctl_chan_get_state (uint32_t seq, struct wrnc_msg *ibuf)
 
 static inline void ctl_software_trigger (uint32_t seq, struct wrnc_msg *ibuf)
 {
-    struct wrtd_trigger_message *msg = mq_map_out_buffer(1, WRTD_REMOTE_OUT_TDC);
-
-    mq_claim(1, WRTD_REMOTE_OUT_TDC);
-
-    /* assemble a trigger message on the spot */
-    msg->hdr.target_ip = 0xffffffff; // broadcast
-    msg->hdr.target_port = 0xebd0;   // port
-    msg->hdr.target_offset = 0x4000; // target EB slot
-    msg->transmit_seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
-    msg->transmit_cycles = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
-    msg->count = 1;
 
     /* and dumbly copy the trigger entry */
     struct wrtd_trigger_entry ent;
     wrtd_msg_trigger_entry(ibuf, &ent);
+    ctl_ack(seq);
 
     ent.ts.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
     ent.ts.ticks = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
     ent.ts.frac = 0;
 
-    msg->triggers[0] = ent;
-
-    mq_send(1, WRTD_REMOTE_OUT_TDC, sizeof(struct wrtd_trigger_message) / 4); // fixme
-    sent_packets++;
-    ctl_ack(seq);
+    /* Send trigger */
+    send_trigger(&ent);
 }
 
 static inline void ctl_chan_set_mode (uint32_t seq, struct wrnc_msg *ibuf)

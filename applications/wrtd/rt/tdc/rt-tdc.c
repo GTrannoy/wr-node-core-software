@@ -400,15 +400,19 @@ static inline void ctl_chan_get_state (uint32_t seq, struct wrnc_msg *ibuf)
 
 static inline void ctl_software_trigger (uint32_t seq, struct wrnc_msg *ibuf)
 {
+    struct wr_timestamp ts;
 
     /* and dumbly copy the trigger entry */
     struct wrtd_trigger_entry ent;
     wrtd_msg_trigger_entry(ibuf, &ent);
     ctl_ack(seq);
 
-    ent.ts.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
-    ent.ts.ticks = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
-    ent.ts.frac = 0;
+    /* trigger entity ts from the host contains the delay.
+       So add to it the current time */
+    ts.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
+    ts.ticks = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
+    ts.frac = 0;
+    ts_add(&ent.ts, &ts);
 
     /* Send trigger */
     send_trigger(&ent);

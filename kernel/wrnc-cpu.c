@@ -7,6 +7,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/fs.h>
+#include <linux/delay.h>
 
 #include <linux/fmc.h>
 #include <hw/wrn_cpu_csr.h>
@@ -200,7 +201,9 @@ static int wrnc_cpu_firmware_load(struct wrnc_cpu *cpu, void *fw_buf,
 	/* Clean CPU memory */
 	for (i = offset; i < cpu_memsize / 1024; ++i) {
 		fmc_writel(fmc, i, wrnc->base_csr + WRN_CPU_CSR_REG_UADDR);
+		udelay(1);
 		fmc_writel(fmc, 0, wrnc->base_csr + WRN_CPU_CSR_REG_UDATA);
+		udelay(1);
 	}
 
 	/* Load the firmware */
@@ -208,9 +211,12 @@ static int wrnc_cpu_firmware_load(struct wrnc_cpu *cpu, void *fw_buf,
 		word = cpu_to_be32(fw[i]);
 		fmc_writel(fmc, i + offset,
 			   wrnc->base_csr + WRN_CPU_CSR_REG_UADDR);
+		udelay(1);
 		fmc_writel(fmc, word, wrnc->base_csr + WRN_CPU_CSR_REG_UDATA);
+		udelay(1);
 		word_rb = fmc_readl(fmc,
 				    wrnc->base_csr + WRN_CPU_CSR_REG_UDATA);
+		udelay(1);
 		if (word != word_rb) {
 			dev_err(&cpu->dev,
 				"failed to load firmware (byte %d | 0x%x != 0x%x)\n",
@@ -250,7 +256,9 @@ static int wrnc_cpu_firmware_dump(struct wrnc_cpu *cpu, void *fw_buf,
 	for (i = 0; i < size; ++i) {
 		fmc_writel(fmc, i + offset,
 			   wrnc->base_csr + WRN_CPU_CSR_REG_UADDR);
+		udelay(1);
 		word = fmc_readl(fmc, wrnc->base_csr + WRN_CPU_CSR_REG_UDATA);
+		udelay(1);
 		fw[i] = be32_to_cpu(word);
 	}
 

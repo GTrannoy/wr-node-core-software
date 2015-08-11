@@ -7,6 +7,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/fs.h>
+#include <linux/delay.h>
 
 #include <linux/fmc.h>
 #include <hw/wrn_cpu_csr.h>
@@ -177,12 +178,16 @@ static int wrnc_cpu_firmware_load(struct wrnc_cpu *cpu, void *fw_buf,
 	struct wrnc_dev *wrnc = to_wrnc_dev(cpu->dev.parent);
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
 	uint32_t *fw = fw_buf, word, word_rb;
-	int size, offset, i;
+	int size, offset, i, cpu_memsize;
 
-	if (off + count > WRNC_CPU_MEM_SIZE_BYTE) {
+	/* Select the CPU memory to write */
+	fmc_writel(fmc, cpu->index, wrnc->base_csr + WRN_CPU_CSR_REG_CORE_SEL);
+	cpu_memsize = fmc_readl(fmc, wrnc->base_csr + WRN_CPU_CSR_REG_CORE_MEMSIZE );
+
+	if (off + count > cpu_memsize) {
 		dev_err(&cpu->dev,
 			"Cannot load firmware: size limit %d byte\n",
-			WRNC_CPU_MEM_SIZE_BYTE);
+			cpu_memsize);
 		return -ENOMEM;
 	}
 
@@ -193,14 +198,12 @@ static int wrnc_cpu_firmware_load(struct wrnc_cpu *cpu, void *fw_buf,
 	/* Reset the CPU before overwrite its memory */
 	wrnc_cpu_reset_set(wrnc, (1 << cpu->index));
 
-	/* Select the CPU memory to write */
-	fmc_writel(fmc, cpu->index, wrnc->base_csr + WRN_CPU_CSR_REG_CORE_SEL);
-
 	/* Clean CPU memory */
-	/* FIXME get size dynamically*/
-	for (i = offset; i < WRNC_CPU_MEM_SIZE_WORD; ++i) {
+	for (i = offset; i < cpu_memsize / 1024; ++i) {
 		fmc_writel(fmc, i, wrnc->base_csr + WRN_CPU_CSR_REG_UADDR);
+		udelay(1);
 		fmc_writel(fmc, 0, wrnc->base_csr + WRN_CPU_CSR_REG_UDATA);
+		udelay(1);
 	}
 
 	/* Load the firmware */
@@ -208,9 +211,12 @@ static int wrnc_cpu_firmware_load(struct wrnc_cpu *cpu, void *fw_buf,
 		word = cpu_to_be32(fw[i]);
 		fmc_writel(fmc, i + offset,
 			   wrnc->base_csr + WRN_CPU_CSR_REG_UADDR);
+		udelay(1);
 		fmc_writel(fmc, word, wrnc->base_csr + WRN_CPU_CSR_REG_UDATA);
+		udelay(1);
 		word_rb = fmc_readl(fmc,
 				    wrnc->base_csr + WRN_CPU_CSR_REG_UDATA);
+		udelay(1);
 		if (word != word_rb) {
 			dev_err(&cpu->dev,
 				"failed to load firmware (byte %d | 0x%x != 0x%x)\n",
@@ -228,13 +234,8 @@ static int wrnc_cpu_firmware_dump(struct wrnc_cpu *cpu, void *fw_buf,
 	struct wrnc_dev *wrnc = to_wrnc_dev(cpu->dev.parent);
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
 	uint32_t *fw = fw_buf, word;
-	int size, offset, i;
+	int size, offset, i, cpu_memsize;
 
-	if (off + count > WRNC_CPU_MEM_SIZE_BYTE) {
-		dev_err(&cpu->dev, "Cannot dump firmware: size limit %d byte\n",
-			WRNC_CPU_MEM_SIZE_BYTE);
-		return -ENOMEM;
-	}
 
 	/* Calculate code size in 32bit word*/
 	size = (count + 3) / 4;
@@ -243,11 +244,21 @@ static int wrnc_cpu_firmware_dump(struct wrnc_cpu *cpu, void *fw_buf,
 	/* Select the CPU memory to write */
 	fmc_writel(fmc, cpu->index, wrnc->base_csr + WRN_CPU_CSR_REG_CORE_SEL);
 
+	cpu_memsize = fmc_readl(fmc, wrnc->base_csr + WRN_CPU_CSR_REG_CORE_MEMSIZE );
+
+	if (off + count > cpu_memsize) {
+		dev_err(&cpu->dev, "Cannot dump firmware: size limit %d byte\n",
+			cpu_memsize);
+		return -ENOMEM;
+	}
+
 	/* Dump the firmware */
 	for (i = 0; i < size; ++i) {
 		fmc_writel(fmc, i + offset,
 			   wrnc->base_csr + WRN_CPU_CSR_REG_UADDR);
+		udelay(1);
 		word = fmc_readl(fmc, wrnc->base_csr + WRN_CPU_CSR_REG_UDATA);
+		udelay(1);
 		fw[i] = be32_to_cpu(word);
 	}
 

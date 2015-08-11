@@ -1,5 +1,5 @@
 # and don't touch the rest unless you know what you're doing.
-CROSS_COMPILE_TARGET ?= lm32-elf-
+CROSS_COMPILE_TARGET ?= /opt/gcc-lm32/bin/lm32-elf-
 INSTALL_PREFIX ?= .
 PATH_COMMON_RT ?= .
 PATH_COMMON_H ?= ../include

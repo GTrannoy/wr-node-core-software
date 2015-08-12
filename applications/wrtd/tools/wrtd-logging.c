@@ -35,7 +35,7 @@ static int print_message(struct wrnc_hmq *hmq)
 		return -1;
 
 	fprintf(stdout, "Event Type  %s\n", wrtd_strlogging(log.type));
-	if (log.type == WRTD_LOG_PROMISC)
+	if (log.type == WRTD_LOG_PROMISC || log.channel < 0)
 		fprintf(stdout, "Channel     --\n");
 	else
 		fprintf(stdout, "Channel     %d\n", log.channel);

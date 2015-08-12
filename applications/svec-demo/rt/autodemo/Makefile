@@ -1,5 +1,5 @@
 OBJS = autodemo.o
 OUTPUT = autodemo
-PATH_COMMON = ../../../common/
+WRNC = ../../../../
 
-include $(PATH_COMMON)/rt/Makefile
+include $(WRNC)/applications/common/rt/Makefile

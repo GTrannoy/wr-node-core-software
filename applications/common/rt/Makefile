@@ -3,6 +3,7 @@ CROSS_COMPILE_TARGET ?= lm32-elf-
 INSTALL_PREFIX ?= .
 PATH_COMMON_RT ?= .
 PATH_COMMON_H ?= ../include
+WRNC ?= ../../
 
 CC =		$(CROSS_COMPILE_TARGET)gcc
 LD =		$(CROSS_COMPILE_TARGET)ld
@@ -14,18 +15,19 @@ RT_GIT_VERSION = 0x$(shell cd ../../..; git rev-parse --short=8 HEAD)
 
 CFLAGS += -DWRNODE_RT -g -O3 -mmultiply-enabled -mbarrel-shift-enabled
 CFLAGS += -I.
-CFLAGS += -I$(PATH_COMMON)/rt
-CFLAGS += -I$(PATH_COMMON)/include
+CFLAGS += -I$(WRNC)/applications/common/rt
+CFLAGS += -I$(WRNC)/applications/common/include
+CFLAGS += -I$(WRNC)/include
 CFLAGS += -DGIT_VERSION=$(RT_GIT_VERSION)
 CFLAGS += $(EXTRA_CFLAGS)
 
 
-OBJS += $(PATH_COMMON)/rt/wrn-crt0.o
-OBJS += $(PATH_COMMON)/rt/vsprintf-xint.o
-OBJS += $(PATH_COMMON)/rt/printf.o
-OBJS += $(PATH_COMMON)/rt/rt-common.o
+OBJS += $(WRNC)/applications/common/rt/wrn-crt0.o
+OBJS += $(WRNC)/applications/common/rt/vsprintf-xint.o
+OBJS += $(WRNC)/applications/common/rt/printf.o
+OBJS += $(WRNC)/applications/common/rt/rt-common.o
 
-LDSCRIPT = $(PATH_COMMON)/rt/wrnode.ld
+LDSCRIPT = $(WRNC)/applications/common/rt/wrnode.ld
 
 all:	$(OUTPUT)
 

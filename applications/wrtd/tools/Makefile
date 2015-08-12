@@ -7,7 +7,8 @@ DESTDIR ?= /usr/local
 
 WRNC ?= ../../../
 
-CFLAGS += -Wall -ggdb -I. -I../include -I$(WRNC)/lib -I$(WRNC)/kernel -I../lib $(EXTRACFLAGS)
+CFLAGS += -Wall -ggdb -I. -I../include -I$(WRNC)/include -I$(WRNC)/lib -I../lib
+CFLAGS += $(EXTRACFLAGS)
 LDLIBS += -L../lib -lwrtd -L$(WRNC)/lib -lwrnc
 
 PROGS := wrtd-boot

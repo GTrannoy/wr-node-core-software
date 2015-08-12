@@ -1,8 +1,8 @@
 OBJS := rt-tdc.o
 OBJS += ../common/loop-queue.o
 OUTPUT = rt-tdc
-PATH_COMMON = ../../../common/
+WRNC = ../../../../
+
 EXTRA_CFLAGS += -I../../include
 EXTRA_CFLAGS += -I../common
-
-include $(PATH_COMMON)/rt/Makefile
+include $(WRNC)/applications/common/rt/Makefile

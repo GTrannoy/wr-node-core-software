@@ -17,7 +17,9 @@ endif
 
 ccflags-y += -DGIT_VERSION=\"$(GIT_VERSION)\" \
 	-I$(FMC_BUS)/kernel/include \
-	-I$(src)
+	-I$(src) \
+	-I$(src)/../include
+
 
 ccflags-$(CONFIG_WRNC_DEBUG) += -DDEBUG
 

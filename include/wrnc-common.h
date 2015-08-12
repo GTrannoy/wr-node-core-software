@@ -71,7 +71,7 @@ struct wrnc_proto_header {
  */
 static inline struct wrnc_proto_header *rt_proto_header_get(void *raw_msg)
 {
-	return raw_msg;
+	return (struct wrnc_proto_header *) raw_msg;
 }
 
 

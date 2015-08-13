@@ -110,6 +110,7 @@ static inline int wrnc_rt_variable(struct wrnc_dev *wrnc,
 	if (!hmq)
 		return -1;
 
+	memset(&msg, 0, sizeof(struct wrnc_msg));
 	memset(&hdr, 0, sizeof(struct wrnc_proto_header));
 	hdr.msg_id = msg_id_in;
 	hdr.slot_io = (hmq->index << 4) | (hmq_out & 0xF);
@@ -227,6 +228,7 @@ static int wrnc_rt_structure(struct wrnc_dev *wrnc,
 	if (!hmq)
 		return -1;
 
+	memset(&msg, 0, sizeof(struct wrnc_msg));
 	memset(&hdr, 0, sizeof(struct wrnc_proto_header));
 	hdr.msg_id = msg_id_in;
 	hdr.slot_io = (hmq->index << 4) | (hmq_out & 0xF);

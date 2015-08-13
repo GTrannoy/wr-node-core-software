@@ -10,7 +10,7 @@ WRNC ?= ../../../
 CFLAGS += -Wall -ggdb -I. -I../include -I$(WRNC)/include -I$(WRNC)/lib -I../lib
 CFLAGS += $(EXTRACFLAGS)
 CFLAGS += $(EXTRACFLAGS)
-LDLIBS += -L../lib -lwrtd -L$(WRNC)/lib -lwrnc
+LDLIBS += -L../lib -lwrtd -L$(WRNC)/lib -lwrnc -lpthread
 
 PROGS := wrtd-boot
 PROGS += wrtd-in-config

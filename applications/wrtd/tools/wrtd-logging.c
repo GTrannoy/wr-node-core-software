@@ -12,8 +12,18 @@
 #include <getopt.h>
 #include <poll.h>
 #include <inttypes.h>
+#include <pthread.h>
 #include <libwrnc.h>
 #include <libwrtd.h>
+
+static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+
+struct wrtd_log_th {
+	struct wrtd_node *wrtd;
+	enum wrtd_core core;
+	int n_read;
+};
+
 
 static void help()
 {
@@ -25,32 +35,64 @@ static void help()
 	exit(1);
 }
 
-static int print_message(struct wrnc_hmq *hmq)
+
+static void *logging_thread(void *arg)
 {
+	struct wrtd_log_th *th_data = arg;
+	struct wrnc_hmq *hlog;
 	struct wrtd_log_entry log;
-	int count;
 
-	count = wrtd_log_read(hmq, &log, 1, 0);
-	if (count <= 0)
-		return -1;
+	int i, count;
 
-	fprintf(stdout, "Event Type  %s\n", wrtd_strlogging(log.type));
-	if (log.type == WRTD_LOG_PROMISC || log.channel < 0)
-		fprintf(stdout, "Channel     --\n");
-	else
-		fprintf(stdout, "Channel     %d\n", log.channel);
-	fprintf(stdout, "Miss reason %x\n", log.miss_reason);
-	fprintf(stdout, "Seq         %d\n", log.seq);
-	if (log.type == WRTD_LOG_RAW)
-		fprintf(stdout, "Identifier  ----:----:----\n");
-	else
-		fprintf(stdout, "Identifier  %04x:%04x:%04x\n",
-			log.id.system, log.id.source_port, log.id.trigger);
-	fprintf(stdout, "Timestamp   %"PRIu64"s  %"PRIu32"tick %"PRIu32"frac\n",
-		log.ts.seconds, log.ts.ticks, log.ts.frac);
-	fprintf(stdout, "----\n");
+	/* Open logging interfaces */
+	switch (th_data->core) {
+	case WRTD_CORE_IN:
+		hlog = wrtd_in_log_open(th_data->wrtd, -1);
+		break;
+	case WRTD_CORE_OUT:
+		hlog = wrtd_out_log_open(th_data->wrtd, -1);
+		break;
+	default:
+		fprintf(stderr, "Unknow core %d\n", th_data->core);
+		return NULL;
+	}
 
-	return 0;
+	if (!hlog) {
+		fprintf(stderr, "Cannot open input logging HMQ: %s\n",
+			wrtd_strerror(errno));
+	        return NULL;
+	}
+
+	while (i < th_data->n_read || th_data->n_read == 0) {
+		count = wrtd_log_read(hlog, &log, 1, -1);
+		if (count <= 0)
+			break;
+
+		fprintf(stdout, "Device      %s\n",
+			th_data->core == WRTD_CORE_IN ? "input" : "output");
+		fprintf(stdout, "Event Type  %s\n", wrtd_strlogging(log.type));
+		if (log.type == WRTD_LOG_PROMISC || log.channel < 0)
+			fprintf(stdout, "Channel     --\n");
+		else
+			fprintf(stdout, "Channel     %d\n", log.channel);
+		fprintf(stdout, "Miss reason %x\n", log.miss_reason);
+		fprintf(stdout, "Seq         %d\n", log.seq);
+		if (log.type == WRTD_LOG_RAW)
+			fprintf(stdout, "Identifier  ----:----:----\n");
+		else
+			fprintf(stdout, "Identifier  %04x:%04x:%04x\n",
+				log.id.system, log.id.source_port, log.id.trigger);
+		fprintf(stdout, "Timestamp   %"PRIu64"s  %"PRIu32"tick %"PRIu32"frac\n",
+			log.ts.seconds, log.ts.ticks, log.ts.frac);
+		fprintf(stdout, "----\n");
+
+		pthread_mutex_lock(&mtx);
+		i++;
+		pthread_mutex_unlock(&mtx);
+	}
+
+	wrtd_log_close(hlog);
+	return NULL;
 }
 
 static void show_logging_level(struct wrtd_node *dev, enum wrtd_core core)
@@ -78,10 +120,9 @@ static void show_logging_level(struct wrtd_node *dev, enum wrtd_core core)
 #define N_LOG 2
 int main(int argc, char *argv[])
 {
-	struct wrnc_hmq *log[N_LOG];
-	struct pollfd p[N_LOG];  /* each node has 2 logging channels (in, out) */
-	int n = 0, i = 0, ret, k, err, chan = -1, show_log = 0;
-	struct wrtd_node *wrtd;
+	struct wrtd_log_th th_data[N_LOG];
+	pthread_t tid[N_LOG];
+	int i = 0, err, show_log = 0;
 	uint32_t dev_id = 0;
 	char c;
 
@@ -94,7 +135,8 @@ int main(int argc, char *argv[])
 			sscanf(optarg, "0x%x", &dev_id);
 			break;
 		case 'n':
-			sscanf(optarg, "0x%x", &n);
+			sscanf(optarg, "0x%x", &th_data[0].n_read);
+			th_data[1].n_read = th_data[0].n_read;
 			break;
 		case 's':
 			show_log = 1;
@@ -113,70 +155,33 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	wrtd = wrtd_open_by_fmc(dev_id);
-	if (!wrtd) {
+	th_data[0].wrtd = wrtd_open_by_fmc(dev_id);
+	if (!th_data[0].wrtd) {
 		fprintf(stderr, "Cannot open WRNC: %s\n", wrtd_strerror(errno));
 		exit(1);
 	}
+	th_data[1].wrtd = th_data[0].wrtd;
 
 	if (show_log) {
-		show_logging_level(wrtd, WRTD_CORE_IN);
-		show_logging_level(wrtd, WRTD_CORE_OUT);
+		show_logging_level(th_data[WRTD_CORE_IN].wrtd, WRTD_CORE_IN);
+		show_logging_level(th_data[WRTD_CORE_OUT].wrtd, WRTD_CORE_OUT);
 		exit(0);
 	}
 
-	/* Open logging interfaces */
-	log[0] = wrtd_in_log_open(wrtd, chan);
-	if (!log[0]) {
-		fprintf(stderr, "Cannot open input logging HMQ: %s\n",
-				wrtd_strerror(errno));
-		goto out_in;
-	}
-	p[0].fd = log[0]->fd;
-	p[0].events = POLLIN;
-
-	log[1] = wrtd_out_log_open(wrtd, chan);
-	if (!log[1]) {
-		fprintf(stderr, "Cannot open output logging HMQ: %s\n",
-				wrtd_strerror(errno));
-		goto out_out;
-	}
-	p[1].fd = log[1]->fd;
-	p[1].events = POLLIN;
-
-	/* Print messages till the end */
-	while (i < n || n == 0) {
-		/* Polling debug messages */
-		ret = poll(p, N_LOG, 10000);
-		switch (ret) {
-		default:
-			/* Dump from the slot */
-			for (k = 0; k < N_LOG; ++k) {
-				if (!(p[k].revents & POLLIN))
-					continue;
-				ret = print_message(log[k]);
-				if (!ret)
-					continue;
-				i++;
-			}
-			break;
-		case 0:
-			/* timeout */
-			break;
-		case -1:
-			/* error */
-			fprintf(stderr, "Cannot poll the HMQ: %s\n",
-				wrtd_strerror(errno));
-		        goto out_dump;
-			break;
-		}
+	for (i = 0; i < N_LOG; i++) {
+		th_data[i].core = i;
+	        err = pthread_create(&tid[i], NULL, logging_thread, (void *)&th_data[i]);
+		if (err)
+			fprintf(stderr,
+				"Cannot create 'logging_thread' instance %d: %s\n",
+				i, strerror(errno));
 	}
 
-out_dump:
-	wrtd_log_close(log[1]);
-out_out:
-	wrtd_log_close(log[0]);
-out_in:
-	wrtd_close(wrtd);
+
+	/* Wait for the threads to finish */
+	for (i = 0; i < N_LOG; i++)
+		pthread_join(tid[i], NULL);
+
+	wrtd_close(th_data[0].wrtd);
 	exit(0);
 }

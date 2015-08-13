@@ -192,7 +192,7 @@ extern const char *wrtd_strlogging(enum wrtd_log_level lvl);
 enum wrtd_log_level wrtd_strlogging_to_level(char *log);
 extern void wrtd_strlogging_full(char *buf, uint32_t log_level);
 extern int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
-			 int count);
+			 int count, int poll_timeout);
 extern void wrtd_log_close(struct wrnc_hmq *hmq);
 extern struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev, int input);
 extern int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,

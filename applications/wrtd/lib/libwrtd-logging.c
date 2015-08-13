@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <poll.h>
 #include <libwrnc.h>
 #include <libwrtd-internal.h>
 #include <wrtd-serializers.h>
@@ -149,17 +150,22 @@ out_close:
  * @param[in] hmq_log logging HMQ.
  * @param[out] log log message
  * @param[in] count number of messages to read
+ * @param[in] poll_timeout poll(2) timeout argument. Negative means infinite.
  * @return number of read messages on success (check errno if it returns less
  *         messages than expected), -1 on error and errno is set appropriately
  */
 int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
-		  int count)
+		  int count, int poll_timeout)
 {
 	struct wrtd_log_entry *cur = log;
 	struct wrnc_msg *msg;
+	struct pollfd p;
 	int remaining = count;
-	int n_read = 0;
+	int n_read = 0, ret;
 	uint32_t id = 0, seq = 0;
+
+	p.fd = hmq_log->fd;
+	p.events = POLLIN;
 
 	/* Clean up errno to be able to distinguish between error cases and
 	   normal behaviour when the function return less messages
@@ -167,6 +173,10 @@ int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
 	errno = 0;
 	while (remaining) {
 		struct wrtd_trigger_entry ent;
+		ret = poll(&p, 1, poll_timeout);
+		if (ret <= 0 || !(p.revents & POLLIN))
+			break;
+
 		msg = wrnc_hmq_receive(hmq_log);
 		if (!msg)
 			break;

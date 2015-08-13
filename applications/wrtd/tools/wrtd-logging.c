@@ -30,7 +30,7 @@ static int print_message(struct wrnc_hmq *hmq)
 	struct wrtd_log_entry log;
 	int count;
 
-	count = wrtd_log_read(hmq, &log, 1);
+	count = wrtd_log_read(hmq, &log, 1, 0);
 	if (count <= 0)
 		return -1;
 

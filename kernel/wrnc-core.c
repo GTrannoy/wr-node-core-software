@@ -453,7 +453,9 @@ static void wrnc_hmq_release(struct device *dev)
 	/*wrnc_minor_put(dev);*/
 }
 
-
+#define WRNC_SLOT_CFG(_name, _val)                          \
+	(1 << ((_val & MQUEUE_SLOT_STATUS_LOG2_##_name##_MASK) \
+	       >> MQUEUE_SLOT_STATUS_LOG2_##_name##_SHIFT))
 /**
  * It initializes and registers a HMQ device
  */
@@ -462,6 +464,7 @@ static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
 {
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
 	struct wrnc_hmq *hmq;
+	uint32_t val;
 	int err;
 
 	hmq = is_input ? &wrnc->hmq_in[slot] : &wrnc->hmq_out[slot];
@@ -498,6 +501,14 @@ static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
 	} else { /* CPU output */
 		hmq->base_sr = wrnc->base_hmq +	MQUEUE_BASE_OUT(slot);
 	}
+
+	/* Get HMQ dimensions */
+	val = fmc_readl(fmc, hmq->base_sr + MQUEUE_SLOT_STATUS);
+	hmq->max_width = WRNC_SLOT_CFG(WIDTH, val);
+	hmq->max_depth = WRNC_SLOT_CFG(ENTRIES, val);
+
+	dev_info(&hmq->dev, " 0x%x -> %d %d\n",
+		 val, hmq->max_width, hmq->max_depth);
 	spin_lock_init(&hmq->lock);
 	/* Flush the content of the slot */
 	fmc_writel(fmc, MQUEUE_CMD_PURGE,

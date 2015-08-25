@@ -15,8 +15,11 @@ else
   ccflags-y += -DCERN_SUPER_MODULE=""
 endif
 
+# The library includes <sdb.h>, so point -I directtly there
+# include our header before to avoid conflicts with the kernel
+LINUXINCLUDE := -I$(FMC_BUS)/kernel/include $(LINUXINCLUDE)
+
 ccflags-y += -DGIT_VERSION=\"$(GIT_VERSION)\" \
-	-I$(FMC_BUS)/kernel/include \
 	-I$(src) \
 	-I$(src)/../include
 

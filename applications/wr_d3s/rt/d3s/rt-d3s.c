@@ -683,8 +683,10 @@ static inline void ctl_d3s_stream_config (uint32_t seq, struct wrnc_msg *ibuf)
     dds_loop.enabled = (mode != D3S_STREAM_OFF ) ? 1 : 0;
     dds_loop.master = (mode == D3S_STREAM_MASTER ) ? 1 : 0;
 
+    pp_printf("StreamConfig: mode %d\n", mode );
+
     dds_loop_start(&dds_loop);
-    rf_counter_init(&rf_cnt, &dds_loop);
+//    rf_counter_init(&rf_cnt, &dds_loop);
 
     ctl_ack (seq);
 }
@@ -884,7 +886,7 @@ void main_loop()
     {
         do_rx(&dds_loop);
         dds_loop_update (&dds_loop);
-        rf_counter_update (&rf_cnt);
+//        rf_counter_update (&rf_cnt);
         wr_update_link();
         do_control();
     }

@@ -27,9 +27,7 @@ gitmodules:
 CURDIR ?= $(shell pwd)
 FMC_BUS ?= $(CURDIR)/fmc-bus
 export FMC_BUS
-SVEC_SW ?= $(CURDIR)/svec-sw
-export SVEC_SW
-SUBMOD = $(FMC_BUS) $(SVEC_SW)
+SUBMOD = $(FMC_BUS)
 LIBWRNC= $(CURDIR)/lib
 export LIBWRNC
 WRNC=$(CURDIR)

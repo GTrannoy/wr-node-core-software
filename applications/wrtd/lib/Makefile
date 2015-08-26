@@ -7,6 +7,7 @@ WRNC ?= ../../../
 LIBTDC ?= ../fmc-tdc-sw/lib
 LIBFD ?= ../fine-delay-sw/lib
 
+LIBS = libwrtd.so
 LIB = libwrtd.a
 LOBJ := libwrtd-internal.o
 LOBJ += libwrtd-common.o
@@ -14,12 +15,12 @@ LOBJ += libwrtd-logging.o
 LOBJ += libwrtd-input.o
 LOBJ += libwrtd-output.o
 
-CFLAGS += -Wall -ggdb -O2 -I. -I../include -I$(WRNC)/include -I$(WRNC)/lib -I$(LIBFD) -I$(LIBTDC) -I$(LIBFD)/../kernel
+CFLAGS += -Wall -ggdb -O2 -fPIC -I. -I../include -I$(WRNC)/include -I$(WRNC)/lib -I$(LIBFD) -I$(LIBTDC) -I$(LIBFD)/../kernel
 CFLAGS += $(EXTRACFLAGS)
 LDLIBS += -L. -lwrtd
 
 
-modules all: $(LIB)
+modules all: $(LIB) $(LIBS)
 
 
 %: %.c $(LIB)
@@ -27,6 +28,9 @@ modules all: $(LIB)
 
 $(LIB): $(LOBJ)
 	ar r $@ $^
+
+$(LIBS): $(LIB)
+	$(CC) -shared  -o $@ -Wl,--whole-archive,-soname,$@ $^ -Wl,--no-whole-archive
 
 clean:
 	rm -f $(LIB) .depend *.o *~

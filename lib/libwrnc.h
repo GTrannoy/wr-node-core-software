@@ -131,8 +131,12 @@ extern int wrnc_cpu_run_set(struct wrnc_dev *wrnc, uint32_t mask);
 extern int wrnc_cpu_run_get(struct wrnc_dev *wrnc, uint32_t *mask);
 extern int wrnc_cpu_enable(struct wrnc_dev *wrnc, unsigned int index);
 extern int wrnc_cpu_disable(struct wrnc_dev *wrnc, unsigned int index);
+extern int wrnc_cpu_is_enable(struct wrnc_dev *wrnc, unsigned int index,
+			      unsigned int *enable);
 extern int wrnc_cpu_start(struct wrnc_dev *wrnc, unsigned int index);
 extern int wrnc_cpu_stop(struct wrnc_dev *wrnc, unsigned int index);
+extern int wrnc_cpu_is_running(struct wrnc_dev *wrnc, unsigned int index,
+			       unsigned int *run);
 /**@}*/
 
 /**

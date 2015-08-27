@@ -107,6 +107,9 @@ struct rf_counter_state {
     int state;
     uint32_t period;    
     struct dds_loop_state *dds;
+    uint32_t snap_tai_cycles;
+    uint32_t snap_tai_seconds;
+    uint32_t snap_rf_cycles;    
 };
 
 struct resp_log_state rsplog;
@@ -216,6 +219,8 @@ void init()
 }
 
 
+int eabs, esamples = 0;
+
 int dds_pi_update(struct dds_loop_state *state, int phase_error)
 {
     int err = -(phase_error - 32768);
@@ -226,6 +231,10 @@ int dds_pi_update(struct dds_loop_state *state, int phase_error)
 
     resp_log_update(&rsplog, phase_error, y);
 
+
+    eabs = abs(err);
+    esamples++;
+    
     if( !state->locked )
     {
         if(  abs(err) <= state->lock_threshold)
@@ -379,12 +388,16 @@ void dds_slave_got_fixup(struct dds_loop_state *state, struct wr_d3s_remote_mess
     if( state->stream_id != msg->stream_id)
     	return; // not a stream we're interested in
 
+#if 0
     if(state->lock_id != msg->lock_id)
     {
 	pp_printf("Master has relocked. Restarting loop.\n");
 	state->lock_id = msg->lock_id;
 	state->slave_state = SLAVE_WAIT_CONFIG;
+
+	gqueue_init(&state->tune_queue, TUNE_QUEUE_ENTRIES, sizeof(struct dds_tune_entry), _tune_queue_buf);
     }
+#endif
 
     if ( state->slave_state == SLAVE_WAIT_CONFIG )
     {
@@ -398,8 +411,7 @@ void dds_slave_got_fixup(struct dds_loop_state *state, struct wr_d3s_remote_mess
         uint32_t tune_hi = (state->base_tune >> 32) & 0xffffffff;
 	uint32_t tune_lo = (state->base_tune >> 0) & 0xffffffff;
 
-//        pp_printf("BaseHI=0x%x\n", tune_hi);
-//        pp_printf("BaseO=0x%x\n", tune_lo);
+//        pp_printf("Got Config BaseHI=0x%x\n", tune_hi);
 //        pp_printf("Delay %d samples, div %d, Fsamp %d\n\n", state->slave_delay, state->sampling_divider, state->samples_per_second);
 
         /* set DDS center frequency */
@@ -414,13 +426,20 @@ void dds_slave_got_fixup(struct dds_loop_state *state, struct wr_d3s_remote_mess
 	state->tune_delay_pos = 0;
 	pf_cnt = 0;
     } else {
+//        pp_printf("Got Fixup [%d]\n", state->fixup_count);
 	state->fixup_phase = msg->phase_fixup.fixup_value;
 	state->fixup_tai =  msg->phase_fixup.tai;
 	state->fixup_count++;
 	if(state->fixup_count == 3)
+	{
+	    pp_printf("Apply Fixup\n");
 	    state->slave_state = SLAVE_APPLY_FIXUP;
+	}
     }
 }
+
+int tunes_overflow = 0;
+int tunes_rx = 0;
 
 void dds_slave_got_tune_update(struct dds_loop_state *state, struct wr_d3s_remote_message *msg)
 {
@@ -432,10 +451,14 @@ void dds_slave_got_tune_update(struct dds_loop_state *state, struct wr_d3s_remot
 	    if( state->stream_id != msg->stream_id)
         	return; // not a stream we're interested in
 
+	    tunes_rx ++;
+
     	    struct dds_tune_entry *ent = gqueue_push( &state->tune_queue );
 	    if(!ent)
-		return; // queue full
-
+	    {
+		tunes_overflow++;
+	    		return; // queue full
+	    }
 	    ent->sample = msg->tune_update.sample_id;
 	    ent->tai = msg->tune_update.tai;
 	    ent->tune  = msg->tune_update.tune;
@@ -493,6 +516,12 @@ int64_t calculate_phase_correction(struct dds_loop_state *state)
     return acc;
 }
 
+int tunes_app = 0;
+
+//int sidx_prev = -1;
+
+int lost_samples = 0;
+
 void dds_slave_update(struct dds_loop_state *state)
 {
     uint32_t pd_data;
@@ -506,16 +535,23 @@ void dds_slave_update(struct dds_loop_state *state)
 	    if(!dds_poll_next_sample(&pd_data))
     		return;
 	
+//	    pp_printf("ApplyFixup\n");
+	
         // produce timestamp of the current tune sample
 	    int sample_idx = dp_readl(DDS_REG_SAMPLE_IDX);
 	    uint32_t tai = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
 
+	    int sample_idx_exp = state->current_sample_idx + 1;
+	    if (sample_idx_exp == state->samples_per_second)
+		sample_idx_exp = 0;
+		
+	    if(sample_idx_exp != sample_idx)
+	    {
+//		pp_printf("Lost %d samples\n", sample_idx - sample_idx_exp);
+	    }
+	    
 	    state->current_sample_idx = sample_idx;
 	    
-	    if(pf_cnt++ < 6)
-	    {
-		//pp_printf("SID %d\n", sample_idx );
-	    }
 
 	    sample_idx++;
 
@@ -529,6 +565,12 @@ void dds_slave_update(struct dds_loop_state *state)
 		return;
 		
 	    struct dds_tune_entry *ent = gqueue_front ( &state->tune_queue );
+
+	    if(pf_cnt++ < 20)
+	    {
+//		pp_printf("etai %d tai %d eidx %d sidx %d\n", ent->tai, tai, ent->sample, sample_idx  );
+	    }
+
 	    
 	    if( ent->tai > tai || (ent->tai == tai && ent->sample > sample_idx ) )
 		return;
@@ -559,10 +601,15 @@ void dds_slave_update(struct dds_loop_state *state)
 		    }
 		    else
 		    {
-		    
+			tunes_app++;
 		    dp_writel(ent->tune, DDS_REG_TUNE_VAL);
 		    
 		    }
+		}
+
+		if(ent->tai == tai && ent->sample < sample_idx)
+		{
+		    lost_samples++;
 		}
 
 		gqueue_pop ( &state->tune_queue );
@@ -595,9 +642,10 @@ void dds_loop_start(struct dds_loop_state *state)
     state->kp = 3000;
     state->ki = 3;
     state->locked = 0;
-    state->lock_samples = 20000;
+    state->lock_samples = 10000;
     state->delock_samples = 1000;
     state->lock_threshold = 1000;
+    state->lock_counter = 0;
     state->sampling_divider = 100;
     state->lock_id = 0;
 
@@ -623,6 +671,8 @@ void dds_loop_start(struct dds_loop_state *state)
     /* Tuning gain = 1 */
     dp_writel(1<<12, DDS_REG_GAIN);
 }
+
+void rf_counter_init(struct rf_counter_state *state, struct dds_loop_state *loop);
 
 void setup_test_output(uint32_t tune_hi, uint32_t tune_lo)
 {
@@ -683,10 +733,10 @@ static inline void ctl_d3s_stream_config (uint32_t seq, struct wrnc_msg *ibuf)
     dds_loop.enabled = (mode != D3S_STREAM_OFF ) ? 1 : 0;
     dds_loop.master = (mode == D3S_STREAM_MASTER ) ? 1 : 0;
 
-    pp_printf("StreamConfig: mode %d\n", mode );
+    pp_printf("StreamConfig: mode %d enabled %d\n", mode, dds_loop.enabled );
 
     dds_loop_start(&dds_loop);
-//    rf_counter_init(&rf_cnt, &dds_loop);
+    rf_counter_init(&rf_cnt, &dds_loop);
 
     ctl_ack (seq);
 }
@@ -758,8 +808,15 @@ void rf_counter_init(struct rf_counter_state *state, struct dds_loop_state *loop
     state->period = 44 * 1000 * 100; // roughly 100 ms @ RF = 352 MHz, make configurable
     state->dds = loop;
     
+
     dp_writel(state->period - 1, DDS_REG_RF_CNT_PERIOD);
+
+    uint32_t cr = dp_readl(DDS_REG_CR);
+    
+    dp_writel(cr | DDS_CR_RF_CNT_ENABLE, DDS_REG_CR);
+
 }
+
 
 void rf_counter_update(struct rf_counter_state *state)
 {
@@ -782,7 +839,11 @@ void rf_counter_update(struct rf_counter_state *state)
 	case RF_COUNTER_MASTER_WAIT_SNAPSHOT:
 	    if(state->dds->current_sample_idx == 0)
 	    {
-		pp_printf("Snapshot!\n");
+		state->snap_rf_cycles = dp_readl(DDS_REG_RF_CNT_RF_SNAPSHOT);
+		state->snap_tai_cycles = dp_readl(DDS_REG_RF_CNT_CYCLES_SNAPSHOT);
+		state->snap_tai_seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
+
+		pp_printf("Snapshot [rf %d tai %d]\n", state->snap_rf_cycles, state->snap_tai_cycles);
 		state->state = RF_COUNTER_MASTER_WAIT_NEXT_SAMPLE;
 	    }
 	    
@@ -881,14 +942,28 @@ void main_loop()
     dp_writel(DDS_TRIG_IN_CSR_ARM, DDS_REG_TRIG_IN_CSR);
     dp_writel(44000000, DDS_REG_RF_CNT_PERIOD); // roughly 1s
 
+    dds_loop.enabled = 0;
+
+    int x = 0;
 
     for(;;)
     {
         do_rx(&dds_loop);
         dds_loop_update (&dds_loop);
-//        rf_counter_update (&rf_cnt);
+        rf_counter_update (&rf_cnt);
         wr_update_link();
         do_control();
+
+        x++;
+        
+        if ( ( (x & 0xffff) == 0 ) && !dds_loop.master && dds_loop.enabled)
+        {
+//	    pp_printf("Lost %d\n", lost_samples);
+//	    uint32_t sec = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
+	//    uint32_t cyc = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
+//	    pp_printf("secs %d cycs %d\n", sec,cyc);
+        }
+        //pp_printf("TuneSamples: applied %d rx %d overflow %d\n", tunes_app, tunes_rx, tunes_overflow );
     }
 
 }   

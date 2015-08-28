@@ -94,7 +94,7 @@ static inline void rt_proto_header_set(void *raw_msg,
  */
 static inline void *rt_proto_payload_get(void *raw_msg)
 {
-	return (raw_msg + sizeof(struct wrnc_proto_header));
+	return ((char *)raw_msg + sizeof(struct wrnc_proto_header));
 }
 
 

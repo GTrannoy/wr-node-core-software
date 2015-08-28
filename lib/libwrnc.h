@@ -82,6 +82,15 @@ enum wrnc_error_number {
 
 
 /**
+ * TLV structure used to embed structures within a message
+ */
+struct wrnc_structure_tlv {
+	uint32_t index; /**< structure index (type) */
+	void *structure; /**< pointer to the structure */
+	size_t size; /**< structure size in byte */
+};
+
+/**
  * @file libwrnc.c
  */
 /**
@@ -193,6 +202,29 @@ extern int wrnc_debug_message_get(struct wrnc_dbg *dbg,
 
 
 /**
+ * @defgroup proto Protocol management
+ * Set of utilities to properly handle the protocol
+ * @{
+ */
+extern void wrnc_message_header_set(struct wrnc_msg *msg,
+				    struct wrnc_proto_header *hdr);
+extern void wrnc_message_header_get(struct wrnc_msg *msg,
+				    struct wrnc_proto_header *hdr);
+extern void wrnc_message_pack(struct wrnc_msg *msg,
+			      struct wrnc_proto_header *hdr,
+			      void *payload);
+extern void wrnc_message_unpack(struct wrnc_msg *msg,
+				struct wrnc_proto_header *hdr,
+				void *payload);
+extern void wrnc_message_structure_push(struct wrnc_msg *msg,
+					struct wrnc_proto_header *hdr,
+					struct wrnc_structure_tlv *tlv);
+extern void wrnc_message_structure_pop(struct wrnc_msg *msg,
+				       struct wrnc_proto_header *hdr,
+				       struct wrnc_structure_tlv *tlv);
+/**@}*/
+
+/**
  * @defgroup rtmsg Real Time service messages
  * Message builders for RT service messages
  * @{
@@ -202,154 +234,6 @@ extern int wrnc_rt_version_get(struct wrnc_dev *wrnc,
 			       unsigned int hmq_in, unsigned int hmq_out);
 extern int wrnc_rt_ping(struct wrnc_dev *wrnc,
 			unsigned int hmq_in, unsigned int hmq_out);
-/**@}*/
-
-/**
- * It embeds the header into the message
- * @param[in] msg the wrnc message
- * @param[in] hdr the header you want to embed into the message
- */
-static inline void wrnc_message_header_set(struct wrnc_msg *msg,
-					   struct wrnc_proto_header *hdr)
-{
-	uint32_t *hdr32 = (uint32_t *) hdr;
-
-	msg->data[0] = htobe32((hdr32[0] & 0xFFFF0000) |
-			       ((hdr32[0] >> 8) & 0x00FF) |
-			       ((hdr32[0] << 8) & 0xFF00));
-	msg->data[1] = hdr32[1];
-	msg->data[2] = htobe32(hdr32[2]);
-	msg->data[3] = hdr32[3];
-	msg->datalen = sizeof(struct wrnc_proto_header) / 4;
-	msg->max_size = msg->datalen;
-}
-
-/**
- * It retrieves the header from the message
- * @param[in] msg the wrnc message
- * @param[out] hdr the header from the message
- */
-static inline void wrnc_message_header_get(struct wrnc_msg *msg,
-					   struct wrnc_proto_header *hdr)
-{
-	uint32_t *hdr32 = (uint32_t *) hdr;
-
-	hdr32[0] = be32toh((msg->data[0] & 0x0000FFFF) |
-			   ((msg->data[0] >> 8) & 0x00FF0000) |
-			   ((msg->data[0] << 8) & 0xFF000000));
-	hdr32[1] = msg->data[1];
-	hdr32[2] = be32toh(msg->data[2]);
-	hdr32[3] = msg->data[3];
-}
-
-
-/**
- * It packs a message to send to the HMQ. The function uses the header to get
- * the payload size. Rembember that the payload length unit is the 32bit word.
- * Remind also that the WRNC VHDL code, will convert a given 32bit word between
- * little endian and big endian
- * @param[out] msg raw message
- * @param[in] hdr message header
- * @param[in] payload data
- */
-static inline void wrnc_message_pack(struct wrnc_msg *msg,
-				     struct wrnc_proto_header *hdr,
-				     void *payload)
-{
-	void *data = msg->data;
-
-	wrnc_message_header_set(msg, hdr);
-	if (!payload)
-		return;
-	memcpy(data + sizeof(struct wrnc_proto_header), payload,
-	       hdr->len * 4);
-	msg->datalen += hdr->len;
-	msg->max_size = msg->datalen;
-}
-
-
-/**
- * it unpacks a message coming from the HMQ by separating the header from
- * the payload. You will find the payload size in the header.
- * Rembember that the payload length unit is the 32bit word.
- * Remind also that the WRNC VHDL code, will convert a given 32bit word between
- * little endian and big endian
- * @param[in] msg raw message
- * @param[out] hdr message header
- * @param[out] payload data
- */
-static inline void wrnc_message_unpack(struct wrnc_msg *msg,
-				       struct wrnc_proto_header *hdr,
-				       void *payload)
-{
-	void *data = msg->data;
-
-	wrnc_message_header_get(msg, hdr);
-	if (!payload)
-		return;
-	memcpy(payload, data + sizeof(struct wrnc_proto_header),
-	       hdr->len * 4);
-}
-
-struct wrnc_structure_tlv {
-	uint32_t index;
-	void *structure;
-	size_t size;
-};
-
-static inline void wrnc_message_structure_push(struct wrnc_msg *msg,
-					       struct wrnc_proto_header *hdr,
-					       struct wrnc_structure_tlv *tlv)
-{
-	unsigned int offset = sizeof(struct wrnc_proto_header) / 4 + hdr->len;
-	void *data;
-
-	msg->data[offset++] = tlv->index;
-	msg->data[offset++] = tlv->size;
-	data = &msg->data[offset];
-
-	memcpy(data, tlv->structure, tlv->size);
-
-	hdr->len += 2 + (tlv->size / 4);
-
-	wrnc_message_header_set(msg, hdr);
-	msg->datalen = hdr->len + sizeof(struct wrnc_proto_header) / 4;
-}
-
-/**
- * A TLV record containing a structure will be take from the message head.
- * The function will update the message lenght in the header by removing
- * the size occupied by the last record.
- * @param[in] msg raw message
- * @param[in] hdr message header
- * @param[out] tlv TLV record containing a structure
- */
-static inline void wrnc_message_structure_pop(struct wrnc_msg *msg,
-					      struct wrnc_proto_header *hdr,
-					      struct wrnc_structure_tlv *tlv)
-{
-	unsigned int offset = sizeof(struct wrnc_proto_header) / 4;
-	void *data;
-
-	wrnc_message_header_get(msg, hdr);
-
-	if (hdr->len < 3)
-		return; /* there is nothing to read */
-
-	tlv->index = msg->data[offset++];
-	tlv->size = msg->data[offset++];
-	if (tlv->size / 4 > hdr->len - 2)
-		return; /* TLV greater than what is declared in header */
-
-	data = &msg->data[offset];
-	memcpy(tlv->structure, data, tlv->size);
-	hdr->len = hdr->len - (tlv->size / 4) - 2; /* -2 because of index
-						      and size in TLV */
-
-	/* shift all data - +8 because of index and size which are uint32_t */
-	memcpy(data, data + tlv->size + 8, hdr->len * 4);
-}
-
 extern int wrnc_rt_variable_set(struct wrnc_dev *wrnc,
 				unsigned int hmq_in, unsigned int hmq_out,
 				uint32_t *variables,
@@ -368,6 +252,7 @@ extern int wrnc_rt_structure_get(struct wrnc_dev *wrnc,
 				 unsigned int hmq_in, unsigned int hmq_out,
 				 struct wrnc_structure_tlv *tlv,
 				 unsigned int n_tlv);
+/**@}*/
 #ifdef __cplusplus
 };
 #endif

@@ -525,7 +525,7 @@ int wrtd_out_trig_delay_set(struct wrtd_node *dev,
  * Sets the pulse width for a given output channel.
  * @param[in] dev device token
  * @param[in] output index (0-based) of output channel
- * @param[in] width_ps pulse width in pico-seconds (from 1us to 1s)
+ * @param[in] width_ps pulse width in pico-seconds (from 250ns to 1s)
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_out_pulse_width_set(struct wrtd_node *dev, unsigned int output,

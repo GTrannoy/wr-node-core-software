@@ -94,5 +94,15 @@ static inline void delay_us(uint32_t usecs)
     return delay_ticks(usecs * 125);
 }
 
+static inline uint32_t rt_set_delay_counter(uint32_t delay_cnt)
+{
+    lr_writel(delay_cnt, WRN_CPU_LR_REG_DELAY_CNT);
+    return lr_readl( WRN_CPU_LR_REG_DELAY_CNT);
+}
+
+static inline uint32_t rt_get_delay_counter()
+{
+    return lr_readl( WRN_CPU_LR_REG_DELAY_CNT);
+}
 
 #endif

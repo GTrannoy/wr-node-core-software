@@ -62,6 +62,9 @@ struct wr_d3s_remote_message {
             uint32_t tai;
             int64_t fixup_value;
             int64_t base_tune;
+	    uint32_t counter_snap_tai_cycles;
+            uint32_t counter_snap_rf_cycles;
+	    uint32_t counter_rf_period;
         } phase_fixup;
         struct {
             uint32_t tai;

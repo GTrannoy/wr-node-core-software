@@ -261,9 +261,6 @@ int ad9510_init()
 
 	ad95xx_write_reg(CS_PLL_VCXO ,0x000, 0x90); // bidir mode
 
-	pp_printf("r0 %x\n", ad95xx_read_reg(CS_PLL_VCXO, 0x0));
-	pp_printf("r_3c %x\n", ad95xx_read_reg(CS_PLL_VCXO, 0x3c));
-
         delay_us(100);
 
 	if(ad95xx_read_reg(CS_PLL_VCXO, 0x0)  != 0x90)

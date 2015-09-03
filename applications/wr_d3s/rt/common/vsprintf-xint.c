@@ -19,8 +19,10 @@ static int number(char *out, unsigned value, int base, int lead, int wid)
 		value = -value;
 	}
 	while (value && i) {
-		tmp[--i] = hex[value % base];
-		value /= base;
+
+		tmp[--i] = hex[value % (unsigned)base];
+		value = value / (unsigned)base;
+
 	}
 	if (i == 16)
 		tmp[--i] = '0';

@@ -100,13 +100,19 @@ struct dds_loop_state {
 #define RF_COUNTER_WAIT_LOCK 0
 #define RF_COUNTER_MASTER_WAIT_SNAPSHOT 1
 #define RF_COUNTER_MASTER_WAIT_NEXT_SAMPLE 2
+#define RF_COUNTER_SLAVE_WAIT_FIXUP 5
 #define RF_COUNTER_GOT_FIXUP 4
+#define RF_COUNTER_SLAVE_RESYNC 7
+#define RF_COUNTER_SLAVE_READY 8
 
 
 struct rf_counter_state {
     int state;
     uint32_t period;    
     struct dds_loop_state *dds;
+
+    int fixup_ready;
+    
     uint32_t snap_tai_cycles;
     uint32_t snap_tai_seconds;
     uint32_t snap_rf_cycles;    
@@ -115,6 +121,19 @@ struct rf_counter_state {
 struct resp_log_state rsplog;
 struct dds_loop_state dds_loop;
 struct rf_counter_state rf_cnt;
+
+volatile int ctai, ccyc;
+
+void trc_start()
+{
+    ctai = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
+    ccyc = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
+}
+
+void trc_show(char *what)
+{
+    	pp_printf("%s tai %d cyc %d \n", what, ctai, ccyc);
+}
 
 void resp_log_init(struct resp_log_state *state)
 {
@@ -296,12 +315,21 @@ static inline void dds_send_phase_fixup( struct dds_loop_state *state, int64_t f
     msg->phase_fixup.fixup_value = fixup_phase;
     msg->phase_fixup.base_tune = state->base_tune;
 
+//    pp_printf("send %d\n",  rf_cnt.snap_rf_cycles);
+    
+    msg->phase_fixup.counter_snap_tai_cycles = rf_cnt.snap_tai_cycles;
+    msg->phase_fixup.counter_snap_rf_cycles = rf_cnt.snap_rf_cycles;
+    msg->phase_fixup.counter_rf_period = rf_cnt.period;
+
 //    pp_printf("tx fixup-phase %x %x\n", (uint32_t)( fixup_phase  >> 32 ), (uint32_t)(fixup_phase & 0xffffffffULL));
 
     mq_send(1, WR_D3S_REMOTE_OUT_STREAM, 32);
 
     state->stats.sent_packets++;
     state->stats.sent_fixups++;
+    
+//    pp_printf("fixup snap_rf %d tai %d/%d per %d\n", rf_cnt.snap_rf_cycles, (uint32_t)ts->seconds, rf_cnt.snap_tai_cycles, rf_cnt.period);
+    
 }
 
 static inline void dds_send_tune_update( struct dds_loop_state *state, int sample_id, int tune, struct wr_timestamp *ts )
@@ -351,6 +379,9 @@ static inline void dds_master_update(struct dds_loop_state *state)
 {
 	uint32_t pd_data;
 	
+	if (!wr_is_timing_ok())
+	    return;
+	    
 	if(!dds_poll_next_sample(&pd_data))
     	    return;
 	
@@ -368,8 +399,10 @@ static inline void dds_master_update(struct dds_loop_state *state)
 
 	state->last_tune = y;
 
-        if(!state->locked || !wr_is_timing_ok())
+        if(!state->locked)
             return;
+
+        rf_counter_update (&rf_cnt);
 
         if(state->current_sample_idx == 0)
         {
@@ -388,16 +421,18 @@ void dds_slave_got_fixup(struct dds_loop_state *state, struct wr_d3s_remote_mess
     if( state->stream_id != msg->stream_id)
     	return; // not a stream we're interested in
 
-#if 0
     if(state->lock_id != msg->lock_id)
     {
 	pp_printf("Master has relocked. Restarting loop.\n");
-	state->lock_id = msg->lock_id;
-	state->slave_state = SLAVE_WAIT_CONFIG;
+	//state->slave_state = SLAVE_WAIT_CONFIG;
 
+        dds_loop_start(&dds_loop);
+	rf_counter_init(&rf_cnt, &dds_loop);
+    
+	state->lock_id = msg->lock_id;
+	
 	gqueue_init(&state->tune_queue, TUNE_QUEUE_ENTRIES, sizeof(struct dds_tune_entry), _tune_queue_buf);
     }
-#endif
 
     if ( state->slave_state == SLAVE_WAIT_CONFIG )
     {
@@ -411,8 +446,6 @@ void dds_slave_got_fixup(struct dds_loop_state *state, struct wr_d3s_remote_mess
         uint32_t tune_hi = (state->base_tune >> 32) & 0xffffffff;
 	uint32_t tune_lo = (state->base_tune >> 0) & 0xffffffff;
 
-//        pp_printf("Got Config BaseHI=0x%x\n", tune_hi);
-//        pp_printf("Delay %d samples, div %d, Fsamp %d\n\n", state->slave_delay, state->sampling_divider, state->samples_per_second);
 
         /* set DDS center frequency */
         dp_writel(state->base_tune >> 32, DDS_REG_FREQ_HI);
@@ -426,13 +459,21 @@ void dds_slave_got_fixup(struct dds_loop_state *state, struct wr_d3s_remote_mess
 	state->tune_delay_pos = 0;
 	pf_cnt = 0;
     } else {
-//        pp_printf("Got Fixup [%d]\n", state->fixup_count);
+//        pp_printf("Got Fixup [TC %d RC %d PER %d]\n", msg->phase_fixup.counter_snap_tai_cycles, msg->phase_fixup.counter_snap_rf_cycles, msg->phase_fixup.counter_rf_period );
 	state->fixup_phase = msg->phase_fixup.fixup_value;
 	state->fixup_tai =  msg->phase_fixup.tai;
 	state->fixup_count++;
+
+	rf_cnt.snap_tai_cycles = msg->phase_fixup.counter_snap_tai_cycles;
+	rf_cnt.snap_rf_cycles = msg->phase_fixup.counter_snap_rf_cycles;
+	rf_cnt.period =  msg->phase_fixup.counter_rf_period;
+	rf_cnt.fixup_ready = 1;
+
+    
+
 	if(state->fixup_count == 3)
 	{
-	    pp_printf("Apply Fixup\n");
+//	    pp_printf("Apply Fixup\n");
 	    state->slave_state = SLAVE_APPLY_FIXUP;
 	}
     }
@@ -526,15 +567,20 @@ void dds_slave_update(struct dds_loop_state *state)
 {
     uint32_t pd_data;
 
+    trc_start();
+
     switch ( state->slave_state )
     {
 	case SLAVE_APPLY_FIXUP:	
 	case SLAVE_RUN:
 	{
+
+	    rf_counter_update (&rf_cnt);
 	
 	    if(!dds_poll_next_sample(&pd_data))
     		return;
 	
+
 //	    pp_printf("ApplyFixup\n");
 	
         // produce timestamp of the current tune sample
@@ -657,11 +703,13 @@ void dds_loop_start(struct dds_loop_state *state)
     if(state->master)
     {
         /* set DDS center frequency */
+        dp_writel(DDS_CR_SAMP_DIV_W(state->sampling_divider - 1), DDS_REG_CR);
+
         dp_writel(state->base_tune >> 32, DDS_REG_FREQ_HI);
         dp_writel(state->base_tune & 0xffffffff, DDS_REG_FREQ_LO);
+	delay(100);
 
         dp_writel(DDS_CR_SAMP_EN | DDS_CR_SAMP_DIV_W(state->sampling_divider - 1), DDS_REG_CR);
-	delay(100);
         
     } else {
 
@@ -805,9 +853,9 @@ static inline void do_control()
 void rf_counter_init(struct rf_counter_state *state, struct dds_loop_state *loop)
 {
     state->state = RF_COUNTER_WAIT_LOCK;
-    state->period = 44 * 1000 * 100; // roughly 100 ms @ RF = 352 MHz, make configurable
+    state->period = 44 * 1000 * 1000; // roughly 100 ms @ RF = 352 MHz, make configurable
     state->dds = loop;
-    
+    state->fixup_ready = 0;
 
     dp_writel(state->period - 1, DDS_REG_RF_CNT_PERIOD);
 
@@ -818,23 +866,33 @@ void rf_counter_init(struct rf_counter_state *state, struct dds_loop_state *loop
 }
 
 
+    uint32_t c_start, c_complete;
+
 void rf_counter_update(struct rf_counter_state *state)
 {
+    if(!state->dds->enabled)
+    {
+	state->state=  RF_COUNTER_WAIT_LOCK;
+	return;
+    }
+
+    
     switch(state->state)
     {
 	case RF_COUNTER_WAIT_LOCK:
-	    if(state->dds->master && state->dds->locked)
-		state->state = RF_COUNTER_MASTER_WAIT_NEXT_SAMPLE;
-	    
-		break;
-	
-	case RF_COUNTER_MASTER_WAIT_NEXT_SAMPLE:
-	    if(state->dds->current_sample_idx != 0)
+	    if(state->dds->master)
 	    {
-		state->state = RF_COUNTER_MASTER_WAIT_SNAPSHOT;
+		if(state->dds->locked)
+		    state->state = RF_COUNTER_MASTER_WAIT_SNAPSHOT;
 	    }
-	    break;
-	    
+	    else if(state->dds->slave_state == SLAVE_RUN )
+	    { // slave mode
+//		    pp_printf("Countre Sync FSM Start\n");
+		    state->state = RF_COUNTER_SLAVE_WAIT_FIXUP;
+
+	    	    
+	    }
+		break;
 	
 	case RF_COUNTER_MASTER_WAIT_SNAPSHOT:
 	    if(state->dds->current_sample_idx == 0)
@@ -843,9 +901,80 @@ void rf_counter_update(struct rf_counter_state *state)
 		state->snap_tai_cycles = dp_readl(DDS_REG_RF_CNT_CYCLES_SNAPSHOT);
 		state->snap_tai_seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
 
-		pp_printf("Snapshot [rf %d tai %d]\n", state->snap_rf_cycles, state->snap_tai_cycles);
-		state->state = RF_COUNTER_MASTER_WAIT_NEXT_SAMPLE;
+//		pp_printf("Mastersnap %d\n", state->snap_rf_cycles);
+
+//		pp_printf("Snapshot [rf %d tai %d]\n", state->snap_rf_cycles, state->snap_tai_cycles);
+		state->state = RF_COUNTER_MASTER_WAIT_SNAPSHOT;
 	    }
+	    break;
+	    
+	case RF_COUNTER_SLAVE_WAIT_FIXUP:
+	    if ( state->fixup_ready )
+	    {
+//		trc_start();
+
+		state->fixup_ready = 0;
+		state->state = RF_COUNTER_SLAVE_RESYNC;
+
+    		uint64_t tune = ( state->dds->base_tune + (state->dds->last_tune * 4096 ) ) ; // fixme: gain 
+
+		uint32_t delay_clks = (state->dds->slave_delay * state->dds->sampling_divider * 125);
+
+		uint32_t correction = (uint64_t)delay_clks  * tune / (1ULL<<43) + 2;// + 200;
+		
+
+		uint32_t trig_cycles = delay_clks + state->snap_tai_cycles;
+
+
+		
+	        dp_writel(rf_cnt.period-1, DDS_REG_RF_CNT_PERIOD);
+		
+		uint32_t cr = dp_readl(DDS_REG_CR);
+		dp_writel (cr | DDS_CR_RF_CNT_ENABLE,DDS_REG_CR);
+
+
+
+		int32_t rf_cycles = state->snap_rf_cycles + correction;
+		if(rf_cycles < 0)
+		    rf_cycles += rf_cnt.period;
+		if(rf_cycles >= rf_cnt.period)
+		    rf_cycles -= rf_cnt.period;
+		    
+
+
+	        dp_writel(rf_cycles, DDS_REG_RF_CNT_SYNC_VALUE );
+	        dp_writel(trig_cycles | DDS_RF_CNT_TRIGGER_ARM_LOAD, DDS_REG_RF_CNT_TRIGGER );
+	        
+//	    	trc_show("apply-rf-cnt");
+
+	    }
+	    break;
+	    
+	case RF_COUNTER_SLAVE_RESYNC:
+	{
+	    uint32_t cr = dp_readl(DDS_REG_RF_CNT_TRIGGER);
+
+	    if(cr & DDS_RF_CNT_TRIGGER_DONE)
+	    {
+//		trc_start();
+//	    	trc_show("apply-rf-complete");
+	
+		    state->state = RF_COUNTER_SLAVE_READY;
+	    }
+
+
+	    break;
+	}
+	
+	
+	case RF_COUNTER_SLAVE_READY:
+	    if(state->dds->current_sample_idx == 0)
+	    {
+		state->snap_rf_cycles = dp_readl(DDS_REG_RF_CNT_RF_SNAPSHOT);
+//		pp_printf("Slavesnap %d\n", state->snap_rf_cycles);
+	    }
+	    
+	    break;
 	    
 	    
 	    break;
@@ -940,30 +1069,18 @@ void main_loop()
 
     /* enable sampling, set divider */
     dp_writel(DDS_TRIG_IN_CSR_ARM, DDS_REG_TRIG_IN_CSR);
-    dp_writel(44000000, DDS_REG_RF_CNT_PERIOD); // roughly 1s
+//    dp_writel(44000000, DDS_REG_RF_CNT_PERIOD); // roughly 1s
 
     dds_loop.enabled = 0;
-
-    int x = 0;
 
     for(;;)
     {
         do_rx(&dds_loop);
         dds_loop_update (&dds_loop);
-        rf_counter_update (&rf_cnt);
         wr_update_link();
         do_control();
-
-        x++;
-        
-        if ( ( (x & 0xffff) == 0 ) && !dds_loop.master && dds_loop.enabled)
-        {
-//	    pp_printf("Lost %d\n", lost_samples);
-//	    uint32_t sec = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
-	//    uint32_t cyc = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
-//	    pp_printf("secs %d cycs %d\n", sec,cyc);
-        }
-        //pp_printf("TuneSamples: applied %d rx %d overflow %d\n", tunes_app, tunes_rx, tunes_overflow );
+    
+//	pp_printf("WR Link %d\n", wr_link_up());
     }
 
 }   
@@ -972,9 +1089,15 @@ void main_loop()
 int main()
 {
 	init();
+    
 
-	main_loop();
+    
+main_loop();
+
+
 
 	
 	return 0;
 }
+
+

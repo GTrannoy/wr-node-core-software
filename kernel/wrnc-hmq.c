@@ -48,7 +48,8 @@ static int hmq_in_no_irq_wait = 10;
 module_param_named(hmq_in_no_irq_wait_us, hmq_in_no_irq_wait, int, 0444);
 MODULE_PARM_DESC(hmq_in_irq, "Time (us) to wait after sending a message from the host to the core in a no-interrupt context. Default 10us");
 
-static uint32_t wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg);
+static int wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg,
+			     uint32_t *seq);
 
 /**
  * It applies filters on a given message.
@@ -385,7 +386,7 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 	unsigned long flags;
 	unsigned int i, n, free_slot;
 	const char __user *curbuf = buf;
-	uint32_t mask;
+	uint32_t mask, seq;
 	int err = 0;
 
 	if (!(hmq->flags & WRNC_FLAG_HMQ_DIR)) {
@@ -416,6 +417,14 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 			break;
 		}
 
+		if (msg.datalen >= hmq->max_width) {
+			dev_err(&hmq->dev,
+				"Cannot send %d bytes, the maximum size is %d\n",
+				msg.datalen * 4, hmq->max_width * 4);
+			err = -EINVAL;
+			break;
+		}
+
 		/* Enqueue messages if we are going to send them using
 		   interrupts; otherwise sen them immediately */
 		if (hmq_in_irq) {
@@ -440,9 +449,10 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 			spin_unlock_irqrestore(&hmq->lock, flags);
 		} else {
 			spin_lock_irqsave(&hmq->lock, flags);
-			wrnc_message_push(hmq, &msg);
+			err = wrnc_message_push(hmq, &msg, &seq);
 			spin_unlock_irqrestore(&hmq->lock, flags);
-
+			if (err)
+				break;
 			/* wait to give time to the core to get and consume
 			   the message before sending the next one */
 			ndelay(hmq_in_no_irq_wait * 1000);
@@ -478,28 +488,38 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
  * It writes a message to a FPGA HMQ. Note that you have to take
  * the HMQ spinlock before call this function
  */
-static uint32_t wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
+static int wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg,
+			     uint32_t *seq)
 {
 	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
-	uint32_t seq;
+	uint32_t freeslot;
 	int i;
+
+	freeslot = fmc_readl(fmc, hmq->base_sr + MQUEUE_SLOT_STATUS)
+		& MQUEUE_SLOT_STATUS_OCCUPIED_MASK
+		>> MQUEUE_SLOT_STATUS_OCCUPIED_SHIFT;
+	if (!freeslot)
+		return -EAGAIN;
 
 	/* Get the slot in order to write into it */
 	fmc_writel(fmc, MQUEUE_CMD_CLAIM, hmq->base_sr + MQUEUE_SLOT_COMMAND);
-	seq = ++wrnc->message_sequence;
+	*seq = ++wrnc->message_sequence;
 	/* Assign a sequence number to the message */
-	msg->data[1] = seq;
+	msg->data[1] = *seq;
 	/* Write data into the slot */
-	for (i = 0; i < msg->datalen && i < WRNC_MAX_PAYLOAD_SIZE; ++i) {
+	for (i = 0; i < msg->datalen && i < hmq->max_width; ++i) {
+		pr_info("%s:%d data[%d] = 0x%x\n", __func__, __LINE__,
+			i, msg->data[i]);
 		fmc_writel(fmc, msg->data[i],
 			   hmq->base_sr + MQUEUE_SLOT_DATA_START + i * 4);
 	}
+
 	/* The slot is ready to be sent to the CPU */
 	fmc_writel(fmc, MQUEUE_CMD_READY | (msg->datalen & 0xFF),
 		   hmq->base_sr + MQUEUE_SLOT_COMMAND);
 
-	return seq;
+	return 0;
 }
 
 /**
@@ -564,6 +584,12 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 		dev_err(&hmq->dev, "un-existent slot %d\n", msg.index_out);
 		return -EINVAL;
 	}
+	if (msg_req.datalen >= hmq->max_width) {
+		dev_err(&hmq->dev,
+			"Cannot send %d bytes, the maximum size is %d\n",
+			msg_req.datalen * 4, hmq->max_width * 4);
+		return -EINVAL;
+	}
 	hmq_out = &wrnc->hmq_out[msg.index_out];
 
 	/* Rise wait flag */
@@ -573,8 +599,10 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 
 	/* Send the message */
 	spin_lock_irqsave(&hmq->lock, flags);
-	seq = wrnc_message_push(hmq, &msg_req);
+	err = wrnc_message_push(hmq, &msg_req, &seq);
 	spin_unlock_irqrestore(&hmq->lock, flags);
+	if (err)
+		return err;
 
 	/* Set message sequance to wait */
 	spin_lock_irqsave(&hmq_out->lock, flags);
@@ -802,7 +830,8 @@ static void wrnc_irq_handler_input(struct wrnc_hmq *hmq)
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
 	struct wrnc_msg_element *msgel;
 	unsigned long flags;
-	uint32_t mask;
+	uint32_t mask, seq;
+	int err;
 
 	/*
 	 * If the mutex is locked, then someone is writing on the message list.
@@ -817,7 +846,7 @@ static void wrnc_irq_handler_input(struct wrnc_hmq *hmq)
 	if (list_empty(&hmq->list_msg_input)) {
 		/*
 		 * We don't have nothing to send, disable the CPU input ready
-		 * interrupts
+s		 * interrupts
 		 */
 		mask = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
 		mask &= ~(1 << (hmq->index + MQUEUE_GCR_IRQ_MASK_IN_SHIFT));
@@ -833,8 +862,11 @@ static void wrnc_irq_handler_input(struct wrnc_hmq *hmq)
 	msgel = list_entry(hmq->list_msg_input.next, struct wrnc_msg_element, list);
 	list_del(&msgel->list);
 	hmq->n_input--;
-	wrnc_message_push(hmq, msgel->msg);  /* we don't care about seq num */
-
+	err = wrnc_message_push(hmq, msgel->msg, &seq);  /* we don't care about seq num */
+	if (err) {
+		dev_err(&hmq->dev,
+			"Cannot send message %d\n", seq);
+	}
 	spin_unlock_irqrestore(&hmq->lock, flags);
 
 	/* Release resources */

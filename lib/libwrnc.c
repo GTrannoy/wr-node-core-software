@@ -895,6 +895,27 @@ int wrnc_cpu_stop(struct wrnc_dev *wrnc, unsigned int index)
 
 
 /**
+ * It checks if the CPU is running (or not)
+ * @param[in] wrnc device token
+ * @param[in] index CPU index
+ * @param[out] run 1 if the CPU is running
+ * @return 0 on success, -1 otherwise and errno is set appropriately
+ */
+int wrnc_cpu_is_running(struct wrnc_dev *wrnc, unsigned int index,
+			unsigned int *run)
+{
+	uint32_t tmp, err;
+
+	err = wrnc_cpu_run_get(wrnc, &tmp);
+	if (err)
+		return -1;
+
+	*run = (tmp & (1 << index) ? 0 : 1);
+	return 0;
+}
+
+
+/**
  * It enables a CPU; in other words, it clear the reset line of a CPU.
  * This function is a wrapper of wrnc_cpu_reset_set() that allow you to safely
  * enable a single CPU.
@@ -910,6 +931,7 @@ int wrnc_cpu_enable(struct wrnc_dev *wrnc, unsigned int index)
 	return wrnc_cpu_reset_set(wrnc, tmp & ~(1 << index));
 }
 
+
 /**
  * It disables a CPU; in other words, it sets the reset line of a CPU.
  * This function is a wrapper of wrnc_cpu_reset_set() that allow you to safely
@@ -924,6 +946,27 @@ int wrnc_cpu_disable(struct wrnc_dev *wrnc, unsigned int index)
 
 	wrnc_cpu_reset_get(wrnc, &tmp);
 	return wrnc_cpu_reset_set(wrnc, tmp | (1 << index));
+}
+
+
+/**
+ * It checks if the CPU is enabled (or not)
+ * @param[in] wrnc device token
+ * @param[in] index CPU index
+ * @param[out] enable 1 if the CPU is enable
+ * @return 0 on success, -1 otherwise and errno is set appropriately
+ */
+int wrnc_cpu_is_enable(struct wrnc_dev *wrnc, unsigned int index,
+			unsigned int *enable)
+{
+	uint32_t tmp, err;
+
+	err = wrnc_cpu_reset_get(wrnc, &tmp);
+	if (err)
+		return -1;
+
+	*enable = (tmp & (1 << index) ? 0 : 1);
+	return 0;
 }
 
 

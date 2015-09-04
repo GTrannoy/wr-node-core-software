@@ -9,8 +9,9 @@ WRNC ?= ../../../
 
 CFLAGS += -Wall -ggdb -I. -I../include -I$(WRNC)/include -I$(WRNC)/lib -I../lib
 CFLAGS += $(EXTRACFLAGS)
-LDLIBS-WRNC := -L$(WRNC)/lib -lwrnc
-LDLIBS += -L../lib -ldemo $(LDLIBS-WRNC)
+
+LDLIBS += -Wl,-Bstatic -L../lib -ldemo -L$(WRNC)/lib -lwrnc
+LDLIBS += -Wl,-Bdynamic
 
 PROGS := demo
 

@@ -34,8 +34,6 @@ struct wrtd_desc {
  */
 void unbag_ts(uint32_t *buf, int offset, struct wr_timestamp *ts);
 int wrtd_validate_acknowledge(struct wrnc_msg *msg);
-int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
-		  int count);
 int wrtd_trig_id_cmp(struct wrtd_trig_id *id1, struct wrtd_trig_id *id2);
 extern int wrtd_trivial_request(struct wrtd_node *dev,
 				struct wrnc_msg *request_msg,

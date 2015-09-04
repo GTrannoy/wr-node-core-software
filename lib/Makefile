@@ -5,15 +5,16 @@
 
 WRNC ?= ../
 
+LIBS = libwrnc.so
 LIB = libwrnc.a
 LOBJ := libwrnc.o
 LOBJ += libwrnc-rt-msg.o
 
-CFLAGS += -Wall -ggdb -I. -I$(WRNC)/include $(EXTRACFLAGS)
+CFLAGS += -Wall -ggdb -fPIC -I. -I$(WRNC)/include $(EXTRACFLAGS)
 LDFLAGS = -L. -lwrnc
 
 
-modules all: $(LIB)
+modules all: $(LIB) $(LIBS)
 
 
 %: %.c $(LIB)
@@ -21,6 +22,9 @@ modules all: $(LIB)
 
 $(LIB): $(LOBJ)
 	ar r $@ $^
+
+$(LIBS): $(LIB)
+	$(CC) -shared  -o $@ -Wl,--whole-archive,-soname,$@ $^ -Wl,--no-whole-archive
 
 clean:
 	rm -f $(LIB) .depend *.o *~

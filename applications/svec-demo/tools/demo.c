@@ -186,10 +186,11 @@ int main(int argc, char *argv[])
 	if (structure) {
 		/* Generate random numbers (cannot use getrandom(2) because
 		   of old system)*/
-		test.field1 = random();
-		test.field2 = random();
+		uint32_t seq = 0;
+		test.field1 = seq++;
+		test.field2 = seq++;
 		for (i = 0; i < DEMO_STRUCT_MAX_ARRAY; i++)
-			test.array[i] = random();
+			test.array[i] = seq++;
 
 		fprintf(stdout, "Generated structure:\n");
 		demo_print_structure(&test);

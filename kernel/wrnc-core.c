@@ -666,6 +666,9 @@ int wrnc_probe(struct fmc_device *fmc)
 
 	/* Enable debug interrupts */
 	fmc->irq = wrnc->base_core + 1;
+
+	/* Enable debug interface interrupts only when we have space
+	   to store it */
 	err = fmc_irq_request(fmc,  wrnc_irq_handler_debug,
 			      (char *)dev_name(&wrnc->cpu[i].dev),
 			      0 /*VIC is used */);
@@ -674,8 +677,13 @@ int wrnc_probe(struct fmc_device *fmc)
 			"Cannot request IRQ 0x%x - we'll not receive debug messages\n",
 			fmc->irq);
 	}
-	fmc_writel(fmc, 0xFFFFFFFF/*(wrnc->n_cpu - 1)*/,
-		   wrnc->base_csr + WRN_CPU_CSR_REG_DBG_IMSK);
+
+	if (dbg_max_msg > 0) {
+		/* Enable interrupts only when we have a buffere where
+		   store messages */
+		fmc_writel(fmc, 0xFFFFFFFF/*(wrnc->n_cpu - 1)*/,
+			   wrnc->base_csr + WRN_CPU_CSR_REG_DBG_IMSK);
+	}
 
 	/* Pin the carrier */
 	if (!try_module_get(fmc->owner))

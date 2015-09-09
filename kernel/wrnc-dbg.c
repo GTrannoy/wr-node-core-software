@@ -33,7 +33,12 @@ static int wrnc_dbg_open(struct inode *inode, struct file *file)
 
 	cpu->cbuf.buf = kmalloc(dbg_max_msg, GFP_KERNEL);
 	if (!cpu->cbuf.buf)
-		return -ENOMEM;
+		if (dbg_max_msg > 0)
+			return -ENOMEM;
+
+	/* when dbg_max_msg is 0 we want to keep the debug interface
+	   available so that programs will not complain */
+
 	cpu->cbuf.head = 0;
 	cpu->cbuf.tail = 0;
 

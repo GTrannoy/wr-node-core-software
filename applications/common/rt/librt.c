@@ -301,9 +301,9 @@ int rt_mq_action_dispatch(unsigned int mq_in_slot, unsigned int is_remote)
 	uint32_t sec, cyc, sec_n, cyc_n;
 #endif
 	struct wrnc_proto_header *header;
-	struct wrnc_msg in_buf;
 	uint32_t p;
 	struct rt_action *action;
+	uint32_t *msg;
 	void *pin;
 	int err = 0;
 
@@ -312,14 +312,14 @@ int rt_mq_action_dispatch(unsigned int mq_in_slot, unsigned int is_remote)
 	if (!(p & ( 1 << mq_in_slot)))
 		return -EAGAIN;
 
-	/* Get the message from the HMQ by claiming it */
-	in_buf = hmq_msg_claim_in(mq_in_slot, 8);
+	/* Get the message from the HMQ */
+	msg = mq_map_in_buffer(0, mq_in_slot);
 #ifdef LIBRT_DEBUG
 	pp_printf("Incoming message\n");
-	rt_print_data(in_buf.data, 8);
+	rt_print_data(msg, 8);
 #endif
-	header = rt_proto_header_get((void *) in_buf.data);
-	pin = rt_proto_payload_get((void *) in_buf.data);
+	header = rt_proto_header_get((void *) msg);
+	pin = rt_proto_payload_get((void *) msg);
 
 	if (header->rt_app_id && header->rt_app_id != version.rt_id) {
 		pp_printf("Not for this application 0x%x\n", header->rt_app_id);

@@ -9,31 +9,11 @@
 #include <errno.h>
 #include <librt.h>
 
-static action_t **rt_actions; /**< Exported actions */
-static struct rt_variable *rt_variables; /**< Exported variables list */
-static struct rt_structure *rt_structures; /**< Exported structures list */
-static unsigned int rt_variables_count, rt_structures_count, rt_action_count;
 
+const char *name = RT_APPLICATION_NAME;
 const struct wrnc_rt_version version = {0, RT_APPLICATION_ID, 0, GIT_VERSION};
+struct rt_application *_app;
 
-
-void rt_variable_export(struct rt_variable *variables, unsigned int count)
-{
-	rt_variables_count = count;
-	rt_variables = variables;
-}
-
-void rt_structure_export(struct rt_structure *structures, unsigned int count)
-{
-	rt_structures_count = count;
-	rt_structures = structures;
-}
-
-void rt_action_export(action_t **actions, unsigned int count)
-{
-	rt_actions = actions;
-	rt_action_count = count;
-}
 
 /**
  * it sets a structure coming from the host
@@ -52,18 +32,18 @@ int rt_structure_setter(struct wrnc_proto_header *hin, void *pin,
 		size = din[offset++];
 #ifdef LIBRT_DEBUG
 		pp_printf("%s Type %d Len %d Addr 0x%x\n", __func__,
-			  index, size, rt_structures[index].struct_ptr);
+			  index, size, _app->structures[index].struct_ptr);
 		delay(100000);
 #endif
-		if (rt_structures[index].len == size) {
-			memcpy(rt_structures[index].struct_ptr,
+		if (_app->structures[index].len == size) {
+			memcpy(_app->structures[index].struct_ptr,
 			       &din[offset], size);
 		}
 #ifdef LIBRT_ERROR
 		else {
 			pp_printf("%s:%d structure len not correct %d != %d\n",
 				  __func__, __LINE__,
-				  rt_structures[index].len, size);
+				  _app->structures[index].len, size);
 		}
 #endif
 		offset += (size / 4); /* Next TLV record */
@@ -95,17 +75,17 @@ int rt_structure_getter(struct wrnc_proto_header *hin, void *pin,
 		dout[offset++] = size;
 #ifdef LIBRT_DEBUG
 		pp_printf("%s Type %d Len %d Addr 0x%x\n", __func__,
-			  index, size, rt_structures[index].struct_ptr);
+			  index, size, _app->structures[index].struct_ptr);
 		delay(100000);
 #endif
-		if (rt_structures[index].len == size) {
-			memcpy(&dout[offset], rt_structures[index].struct_ptr,
+		if (_app->structures[index].len == size) {
+			memcpy(&dout[offset], _app->structures[index].struct_ptr,
 			       size);
 		}
 #ifdef LIBRT_ERROR
 		else {
 			pp_printf("%s: structure len not correct %d != %d\n",
-				  __func__, rt_structures[index].len, size);
+				  __func__, _app->structures[index].len, size);
 		}
 #endif
 		offset += (size / 4); /* Next TLV record */
@@ -150,9 +130,9 @@ int rt_variable_setter(struct wrnc_proto_header *hin, void *pin,
 
 	/* Write all values in the proper place */
 	for (i = 0; i < hin->len; i += 2) {
-		if (din[i] >= rt_variables_count)
+		if (din[i] >= _app->n_variables)
 			continue;
-		var = &rt_variables[din[i]];
+		var = &_app->variables[din[i]];
 		mem = (uint32_t *) var->addr;
 		val = ((din[i + 1] & var->mask) << var->offset);
 		if (var->flags & RT_VARIABLE_FLAG_WO)
@@ -163,7 +143,7 @@ int rt_variable_setter(struct wrnc_proto_header *hin, void *pin,
 #ifdef LIBRT_DEBUG
 		pp_printf("%s index %d/%d | [0x%x] = 0x%08x <- 0x%08x (0x%08x) | index in msg (%d/%d)\n",
 			  __func__,
-			  din[i], rt_variables_count,
+			  din[i], _app->n_variables,
 			  mem, *mem, val, din[i + 1],
 			  i + 1, hin->len - 1);
 		delay(100000);
@@ -201,19 +181,19 @@ int rt_variable_getter(struct wrnc_proto_header *hin, void *pin,
 
 	/* Write all values in the proper place */
 	for (i = 0; i < hout->len; i += 2) {
-		if (din[i] >= rt_variables_count) {
+		if (din[i] >= _app->n_variables) {
 			dout[i] = ~0; /* Report invalid index */
 			continue;
 		}
 		dout[i] = din[i];
-		var = &rt_variables[dout[i]];
+		var = &_app->variables[dout[i]];
 		mem = (uint32_t *) var->addr;
 		val = (*mem >> var->offset) & var->mask;
 		dout[i + 1] = val;
 #ifdef LIBRT_DEBUG
 		pp_printf("%s index %d/%d | [0x%x] = 0x%08x -> 0x%08x | index in msg (%d/%d)\n",
 			  __func__,
-			  dout[i], rt_variables_count,
+			  dout[i], _app->n_variables,
 			  mem, *mem,  dout[i + 1],
 			  i + 1, hin->len - 1);
 		delay(100000);
@@ -250,12 +230,12 @@ static inline int rt_action_run(struct wrnc_proto_header *hin, void *pin)
 	void *pout;
 	int err = 0;
 
-	if (hin->msg_id >= rt_action_count || !rt_actions[hin->msg_id]) {
+	if (hin->msg_id >= _app->n_actions || !_app->actions[hin->msg_id]) {
 		pp_printf("Cannot dispatch ID 0x%x\n", hin->msg_id);
 		return -EINVAL;
 	}
 
-	action = rt_actions[hin->msg_id];
+	action = _app->actions[hin->msg_id];
 
 	if (!(hin->flags & WRNC_PROTO_FLAG_SYNC)) {
 		/* Asynchronous message, then no output */
@@ -290,26 +270,25 @@ static inline int rt_action_run(struct wrnc_proto_header *hin, void *pin)
 
 
 /**
- * It dispatch messages coming from a given HMQ slot
- * @param[in] mq_in_slot message queue to poll for incoming messages
- * @param[in] is_remote 1 if we are usin a remote queue
+ * It dispatch messages coming from a given message queue.
+ * @param[in] mq_in message queue index within mq declared in rt_application
  * @todo provide support for remote queue
  */
-int rt_mq_action_dispatch(unsigned int mq_in_slot, unsigned int is_remote)
+int rt_mq_action_dispatch(unsigned int mq_in)
 {
 #ifdef RTPERFORMANCE
 	uint32_t sec, cyc, sec_n, cyc_n;
 #endif
 	struct wrnc_proto_header *header;
-	uint32_t p;
+	unsigned int mq_in_slot = _app->mq[mq_in].index;
+	unsigned int is_remote = _app->mq[mq_in].flags & RT_MQ_FLAGS_REMOTE;
 	struct rt_action *action;
 	uint32_t *msg;
 	void *pin;
 	int err = 0;
 
 	/* HMQ control slot empty? */
-	p = mq_poll();
-	if (!(p & ( 1 << mq_in_slot)))
+	if (!(mq_poll() & ( 1 << mq_in_slot)))
 		return -EAGAIN;
 
 	/* Get the message from the HMQ */
@@ -357,4 +336,32 @@ void rt_get_time(uint32_t *seconds, uint32_t *cycles)
 {
 	*seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
 	*cycles = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
+}
+
+
+
+/**
+ * Initialize the rt library for an optimal usage
+ */
+void rt_init(struct rt_application *app)
+{
+	int i;
+
+	_app = app;
+
+	pp_printf("Running application '%s'\n", name);
+	if (version.fpga_id) {
+		pp_printf("  compatible only with FPGA '0x%x'\n",
+			  version.fpga_id);
+		/* TODO get app id from FPGA and compare */
+	}
+	pp_printf("  application id            '0x%x'\n", version.rt_id);
+	pp_printf("  application version       '%d'\n", version.rt_version);
+	pp_printf("  source code id            '0x%x'\n", version.git_version);
+	/* Purge all slots */
+	for (i = 0; i < _app->n_mq; ++i) {
+		mq_writel(!!(_app->mq[i].flags & RT_MQ_FLAGS_REMOTE),
+			  MQ_CMD_PURGE,
+			  MQ_OUT(_app->mq[i].index) + MQ_SLOT_COMMAND);
+	}
 }

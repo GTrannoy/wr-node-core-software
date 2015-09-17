@@ -18,6 +18,12 @@
 
 #define RT_VARIABLE_FLAG_REG	(1 << 0)
 
+#define RT_MQ_FLAGS_REMOTE (1 << 0)
+#define RT_MQ_FLAGS_OUTPUT (1 << 1)
+#define RT_MQ_FLAGS_LOCAL (0)
+#define RT_MQ_FLAGS_INPUT (0)
+
+
 #ifdef LIBRT_DEBUG
 static inline void rt_print_data(uint32_t *d, unsigned int count)
 {
@@ -64,8 +70,32 @@ struct rt_structure {
 	/* Maybe other option later in time */
 };
 
+struct rt_mq {
+	uint8_t index;
+	unsigned long flags;
+};
+
+/**
+ * Real-Time Application Descriptor
+ */
+struct rt_application {
+	struct rt_mq *mq; /**< list of used MQ */
+	uint8_t n_mq; /**< number of available MQ */
+
+	struct rt_structure *structures; /**< exported structures */
+	unsigned int n_structures; /**< number or exported structures */
+
+	struct rt_variable *variables; /**< exported variables */
+	unsigned int n_variables; /**< number or exported variables */
+
+	action_t **actions;
+	unsigned int n_actions;
+};
+
+extern void rt_init(struct rt_application *app);
+extern int rt_mq_register(struct rt_mq *mq, unsigned int n);
 extern int rt_mq_action_register(uint32_t id, action_t action);
-extern int rt_mq_action_dispatch(unsigned int in_slot, unsigned int is_remote);
+extern int rt_mq_action_dispatch(unsigned int mq_in);
 
 
 /**
@@ -93,14 +123,10 @@ static inline void rt_send_nack(struct wrnc_proto_header *hin, void *pin,
 
 extern void rt_get_time(uint32_t *seconds, uint32_t *cycles);
 extern void rt_action_export(action_t **actions, unsigned int count);
-extern void rt_variable_export(struct rt_variable *variable,
-			       unsigned int count);
 extern int rt_variable_setter(struct wrnc_proto_header *hin, void *pin,
 			    struct wrnc_proto_header *hout, void *pout);
 extern int rt_variable_getter(struct wrnc_proto_header *hin, void *pin,
 			    struct wrnc_proto_header *hout, void *pout);
-extern void rt_structure_export(struct rt_structure *structures,
-				unsigned int count);
 extern int rt_structure_setter(struct wrnc_proto_header *hin, void *pin,
 			       struct wrnc_proto_header *hout, void *pout);
 extern int rt_structure_getter(struct wrnc_proto_header *hin, void *pin,

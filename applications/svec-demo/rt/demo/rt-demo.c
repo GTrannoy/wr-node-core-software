@@ -17,6 +17,23 @@
 #define GPIO_DDR	0x8 /* Direction Data Register */
 #define GPIO_PSR	0xC /* Status Register */
 
+enum rt_slot_name {
+	DEMO_CMD_IN = 0,
+	DEMO_CMD_OUT,
+};
+
+struct rt_mq mq[] = {
+	[DEMO_CMD_IN] = {
+		.index = 0,
+		.flags = RT_MQ_FLAGS_LOCAL | RT_MQ_FLAGS_INPUT,
+	},
+	[DEMO_CMD_OUT] = {
+		.index = 0,
+		.flags = RT_MQ_FLAGS_LOCAL | RT_MQ_FLAGS_OUTPUT,
+	},
+};
+
+
 static uint32_t out_seq = 0;
 
 static struct demo_structure demo_struct;
@@ -79,6 +96,21 @@ static action_t *demo_actions[] = {
 	[RT_ACTION_RECV_STRUCT_GET] = rt_structure_getter,
 };
 
+
+struct rt_application app = {
+	.mq = mq,
+	.n_mq = 2,
+
+	.structures = demo_structures,
+	.n_structures = __DEMO_STRUCT_MAX,
+
+	.variables = demo_variables,
+	.n_variables = __DEMO_VAR_MAX,
+
+	.actions = demo_actions,
+	.n_actions = 128, /* FIXME replace 128 with correct number */
+};
+
 /**
  * It sends messages over the debug interface
  */
@@ -95,18 +127,13 @@ static void demo_debug_interface(void)
  */
 int main()
 {
+	rt_init(&app);
 
 	demo_debug_interface();
-
-	/* Export a set of variables */
-	rt_variable_export(demo_variables, __DEMO_VAR_MAX);
-	rt_structure_export(demo_structures, __DEMO_STRUCT_MAX);
-	rt_action_export(demo_actions, 128); /* FIXME replace 128 with correct number */
-
 	while (1) {
 		/* Handle all messages incoming from slot DEMO_HMQ_IN
 		   as actions */
-		rt_mq_action_dispatch(DEMO_HMQ_IN, 0);
+		rt_mq_action_dispatch(DEMO_CMD_IN);
 	}
 
 	return 0;

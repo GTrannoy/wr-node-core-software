@@ -19,8 +19,7 @@ class WrncMessageInternal(Structure):
         ("error", c_int),
     ]
 
-
-class WrncMessage(Structure):
+class WrncHeader(Structure):
     _fields_ = [
         ("rt_app_id", c_uint16),
         ("msg_id", c_uint8),
@@ -31,7 +30,12 @@ class WrncMessage(Structure):
         ("__unused",  c_uint8),
         ("trans",  c_uint8),
         ("time",  c_uint32),
-        ("payload", (c_uint32 * (128 - 4)))
+    ]
+
+class WrncMessage(Structure):
+    _fields_ = [
+        ("header", WrncHeader),
+        ("payload", (c_uint32 * (128 - 4))),
     ]
 
 

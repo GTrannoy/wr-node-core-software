@@ -221,6 +221,12 @@ class WrncHmq(Wrnc):
                          c_uint]
         self.libwrnc.wrnc_hmq_filter_add.argtypes = [c_void_p]
         self.libwrnc.wrnc_hmq_filter_clean.argtypes = [c_void_p]
+        self.libwrnc.wrnc_message_pack.argtypes = [POINTER(WrncMessageInternal),
+                                                   POINTER(WrncHeader),
+                                                   c_void_p]
+        self.libwrnc.wrnc_message_unpack.argtypes = [POINTER(WrncMessageInternal),
+                                                    POINTER(WrncHeader),
+                                                    c_void_p]
         # Return
         self.libwrnc.wrnc_hmq_open.restype = c_void_p
         self.libwrnc.wrnc_hmq_close.restype = None
@@ -245,19 +251,20 @@ class WrncHmq(Wrnc):
         self.libwrnc.wrnc_hmq_close(self.hmq)
         super(WrncHmq, self).__def__()
 
-    def send_msg(self, msg_list, timeout=-1):
+    def send_msg(self, header, payload, timeout=-1):
         """
         It sends an asynchronous message
+        @param[in] header message header (len will be overwritte with the
+                   computer payload length)
         @param[in] msg_list list of 32bit words to send
         @param[in] timeout time to wait before returning
         @exception OSError from C library errors
         """
-        msg = WrncMessageInternal()
-        msg.datalen = len(msg_list)
-        msg.data = (c_uint32 * 128)(*msg_list)
-        msg.max_size = len(msg_list)
-
-        self.libwrnc.wrnc_hmq_send(self.hmq, msg)
+        p = (c_uint32 * len(payload))(*payload)
+        fmsg = WrncMessageInternal()
+        header.len = len(payload)
+        self.libwrnc.wrnc_message_pack(fmsg, header, pointer(p))
+        self.libwrnc.wrnc_hmq_send(self.hmq, fmsg)
 
     def recv_msg(self, timeout=-1):
         """
@@ -266,27 +273,39 @@ class WrncHmq(Wrnc):
         @return the synchronous answer as list of 32bit words
         @exception OSError from C library errors
         """
+        # TODO test me when you can
         set_errno(0)
-        msg = self.libwrnc.wrnc_hmq_receive(self.hmq)
-        return None if msg is None else list(msg.data)
+        fmsg = self.libwrnc.wrnc_hmq_receive(self.hmq)
 
-    def sync_msg(self, hmq_out, msg_list, timeout=1000):
+        if fmsg is None:
+            raise OSError()
+
+        h = WrncHeader()
+        p2 = (c_uint32 * 128)()
+        self.libwrnc.wrnc_message_unpack(fmsg, byref(h), byref(p2))
+        return h, list(p)
+
+    def sync_msg(self, header, payload, timeout=1000):
         """
         It sends a synchronous message
         @param[in] hmq_out index of the HMQ output slot
         @param[in] msg_list list of 32bit words to send
         @param[in] timeout time to wait before returning
-        @return the synchronous answer as list of 32bit words
+        @return the synchronous answer as a set of header and payload
         @exception OSError from C library errors
         """
-        msg = WrncMessageInternal()
-        msg.datalen = len(msg_list)
-        msg.data = (c_uint32 * 128)(*msg_list)
-        msg.max_size = len(msg_list)
 
-        self.libwrnc.wrnc_hmq_send_and_receive_sync(self.hmq, hmq_out,
-                                                    msg, timeout)
-        return list(msg.data)
+        p = (c_uint32 * len(payload))(*payload)
+        fmsg = WrncMessageInternal()
+        header.len = len(payload)
+        self.libwrnc.wrnc_message_pack(fmsg, header, pointer(p))
+        self.libwrnc.wrnc_hmq_send_and_receive_sync(self.hmq,
+                                                    header.slot_io,
+                                                    fmsg, timeout)
+        h = WrncHeader()
+        p2 = (c_uint32 * 128)()
+        self.libwrnc.wrnc_message_unpack(fmsg, byref(h), byref(p2))
+        return h, list(p2)
 
 
 class WrncSmem(Wrnc):

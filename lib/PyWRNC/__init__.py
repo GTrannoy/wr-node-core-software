@@ -4,11 +4,14 @@
 @license: GPLv3
 """
 
-from .PyWRNC import WrncCpu, WrncHmq, WrncSmem, WrncDebug
+from .PyWRNC import WrncHeader, WrncMessage, \
+                    WrncCpu, WrncHmq, WrncSmem, WrncDebug
 
 __all__ = (
     "WrncCpu",
     "WrncHmq",
     "WrncSmem",
     "WrncDebug",
+    "WrncHeader",
+    "WrncMessage",
 )

@@ -54,7 +54,8 @@ enum rt_action_recv_standard {
 struct wrnc_proto_header {
 	uint16_t rt_app_id; /**< Real-Time application unique identifier */
 	uint8_t msg_id; /**< Message identifier */
-	uint8_t slot_io; /**< Message Queue IO to use */
+	uint8_t slot_io; /**< Message Queue IO to use
+			    (4bit Input, 4 bit output) */
 	uint32_t seq; /**< sequence number */
 	uint8_t len; /**< message data lenght */
 	uint8_t flags; /**< protocol flags */

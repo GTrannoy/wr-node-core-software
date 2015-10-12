@@ -77,6 +77,7 @@ enum wrnc_error_number {
 	EWRNC_NO_IMPLEMENTATION, /**< a prototype is not implemented */
 	EWRNC_HMQ_CLOSE, /**< The HMQ is closed */
 	EWRNC_INVALID_MESSAGE, /**< Invalid message */
+	EWRNC_HMQ_READ, /**< Error while reading messages */
 	__EWRNC_MAX,
 };
 
@@ -161,6 +162,8 @@ extern int wrnc_hmq_share_set(struct wrnc_dev *wrnc, unsigned int dir,
 			      unsigned int index, unsigned int status);
 extern int wrnc_hmq_share_get(struct wrnc_dev *wrnc, unsigned int dir,
 			      unsigned int index, unsigned int *status);
+extern int wrnc_hmq_receive_n(struct wrnc_hmq *hmq,
+			      struct wrnc_msg *msg, unsigned int n);
 extern struct wrnc_msg *wrnc_hmq_receive(struct wrnc_hmq *hmq);
 extern int wrnc_hmq_send(struct wrnc_hmq *hmq, struct wrnc_msg *msg);
 extern int wrnc_hmq_send_and_receive_sync(struct wrnc_hmq *hmq,

@@ -28,6 +28,7 @@ static char *wrnc_error_str[] = {
 	"Operation not yet implemented",
 	"The HMQ slot is close",
 	"Invalid message",
+	"Error while reading HMQ messages",
 	NULL,
 };
 
@@ -971,6 +972,41 @@ int wrnc_cpu_is_enable(struct wrnc_dev *wrnc, unsigned int index,
 
 
 /**
+ * It gets from the driver a list of messages
+ * @param[in] hmq HMQ device descriptor
+ * @param[in] msg buffer where store incoming messages
+ * @param[in] n maximum number of messages to read
+ * @return number of message read, -1 on error and errno is set appropriately
+ */
+int wrnc_hmq_receive_n(struct wrnc_hmq *hmq,
+		       struct wrnc_msg *msg, unsigned int n)
+{
+	int ret, size, i;
+
+	if (!hmq || hmq->fd < 0) {
+		errno = EWRNC_HMQ_CLOSE;
+		return -1;
+	}
+
+	/* Get a message from the driver */
+	size = sizeof(struct wrnc_msg);
+	ret = read(hmq->fd, msg, size * n);
+	if (ret % sizeof(struct wrnc_msg)) {
+		errno = EWRNC_HMQ_CLOSE;
+		return -1;
+	}
+
+	for (i = 0; i < n; ++i) {
+		msg[i].error = 0;
+		msg[i].offset = 0;
+		msg[i].direction = WRNC_MSG_DIR_RECEIVE;
+	}
+
+	return (ret / size);
+}
+
+
+/**
  * It allocates and returns a message from an output message queue slot.
  * The user of this function is in charge to release the memory.
  * @param[in] hmq HMQ device descriptor
@@ -979,27 +1015,17 @@ int wrnc_cpu_is_enable(struct wrnc_dev *wrnc, unsigned int index,
 struct wrnc_msg *wrnc_hmq_receive(struct wrnc_hmq *hmq)
 {
 	struct wrnc_msg *msg;
-	int n;
-
-	if (!hmq || hmq->fd < 0) {
-		errno = EWRNC_HMQ_CLOSE;
-		return NULL;
-	}
+	int ret;
 
 	msg = malloc(sizeof(struct wrnc_msg));
 	if (!msg)
 		return NULL;
 
-	/* Get a message from the driver */
-	n = read(hmq->fd, msg, sizeof(struct wrnc_msg));
-	if (n != sizeof(struct wrnc_msg)) {
+	ret =  wrnc_hmq_receive_n(hmq, msg, 1);
+	if (ret < 0) {
 		free(msg);
-		return NULL;
+		return -1;
 	}
-
-	msg->error = 0;
-	msg->offset = 0;
-	msg->direction = WRNC_MSG_DIR_RECEIVE;
 
 	return msg;
 }

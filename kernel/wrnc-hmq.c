@@ -508,12 +508,9 @@ static int wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg,
 	/* Assign a sequence number to the message */
 	msg->data[1] = *seq;
 	/* Write data into the slot */
-	for (i = 0; i < msg->datalen && i < hmq->max_width; ++i) {
-		pr_info("%s:%d data[%d] = 0x%x\n", __func__, __LINE__,
-			i, msg->data[i]);
+	for (i = 0; i < msg->datalen && i < hmq->max_width; ++i)
 		fmc_writel(fmc, msg->data[i],
 			   hmq->base_sr + MQUEUE_SLOT_DATA_START + i * 4);
-	}
 
 	/* The slot is ready to be sent to the CPU */
 	fmc_writel(fmc, MQUEUE_CMD_READY | (msg->datalen & 0xFF),

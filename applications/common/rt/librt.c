@@ -239,7 +239,6 @@ static inline int rt_action_run(struct wrnc_proto_header *hin, void *pin)
 
 	if (!(hin->flags & WRNC_PROTO_FLAG_SYNC)) {
 		/* Asynchronous message, then no output */
-		pp_printf("%s:%d\n", __func__, __LINE__);
 		return action(hin, pin, NULL, NULL);
 	}
 

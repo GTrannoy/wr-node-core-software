@@ -1,6 +1,6 @@
-OBJS := rt-fd.o
+OBJS := wrtd-rt-fd.o
 OBJS += ../common/loop-queue.o
-OUTPUT = rt-fd
+OUTPUT = wrtd-rt-fd
 WRNC = ../../../../
 
 EXTRA_CFLAGS += -I../../include

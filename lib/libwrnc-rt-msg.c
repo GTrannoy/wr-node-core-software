@@ -224,6 +224,7 @@ int wrnc_rt_ping(struct wrnc_dev *wrnc,
         err = wrnc_hmq_send_and_receive_sync(hmq, hmq_out, &msg,
 					     wrnc_default_timeout_ms);
 	wrnc_hmq_close(hmq);
+	wrnc_message_unpack(&msg, &hdr, NULL);
 	if (hdr.msg_id != RT_ACTION_SEND_ACK) {
 		errno = EWRNC_INVALID_MESSAGE;
 		return -1;

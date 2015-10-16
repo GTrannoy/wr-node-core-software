@@ -49,6 +49,11 @@ int rt_structure_setter(struct wrnc_proto_header *hin, void *pin,
 		offset += (size / 4); /* Next TLV record */
 	}
 
+	/* Return back new values. Host can compare with what it sent
+	   to spot errors */
+	if (hin->flags & WRNC_PROTO_FLAG_SYNC)
+		return rt_structure_getter(hin, pin, hout, pout);
+
 	return 0;
 }
 

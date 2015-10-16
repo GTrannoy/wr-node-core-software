@@ -245,7 +245,7 @@ static inline int rt_action_run(struct wrnc_proto_header *hin, void *pin)
 		return action(hin, pin, NULL, NULL);
 	}
 
-#ifdef LIBRT_DEBUG
+#ifdef LIBRT_DEBUG_VERBOSE
 	pp_printf("Message Input\n");
 	rt_print_header(hin);
 	rt_print_data(pin, 8);
@@ -260,7 +260,7 @@ static inline int rt_action_run(struct wrnc_proto_header *hin, void *pin)
 		rt_send_nack(hin, pin, &hout, NULL);
 	rt_proto_header_set((void *) out_buf.data, &hout);
 
-#ifdef LIBRT_DEBUG
+#ifdef LIBRT_DEBUG_VERBOSE
 	pp_printf("Message Output\n");
 	rt_print_header(&hout);
 	rt_print_data(pout, 8);
@@ -295,7 +295,7 @@ int rt_mq_action_dispatch(unsigned int mq_in)
 
 	/* Get the message from the HMQ */
 	msg = mq_map_in_buffer(0, mq_in_slot);
-#ifdef LIBRT_DEBUG
+#ifdef LIBRT_DEBUG_VERBOSE
 	pp_printf("Incoming message\n");
 	rt_print_data(msg, 8);
 #endif
@@ -368,4 +368,18 @@ void rt_init(struct rt_application *app)
 			  MQ_CMD_PURGE,
 			  MQ_OUT(_app->mq[i].index) + MQ_SLOT_COMMAND);
 	}
+
+#ifdef LIBRT_DEBUG
+	pp_printf("Exported Variables");
+	for (i = 0; i < _app->n_variables; ++i)
+		pp_printf("[%d] addr 0x%x | mask 0x%x | off %d\n", i,
+			  _app->variables[i].addr,
+			  _app->variables[i].mask,
+			  _app->variables[i].offset);
+	pp_printf("Exported Structures");
+	for (i = 0; i < _app->n_structures; ++i)
+		pp_printf("[%d] addr %p | len %d\n", i,
+			  _app->structures[i].struct_ptr,
+			  _app->structures[i].len);
+#endif
 }

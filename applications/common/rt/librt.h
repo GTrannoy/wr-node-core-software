@@ -23,6 +23,10 @@
 #define RT_MQ_FLAGS_LOCAL (0)
 #define RT_MQ_FLAGS_INPUT (0)
 
+#define RT_VERSION_MAJ(_v) ((_v >> 16) & 0xFFFF)
+#define RT_VERSION_MIN(_v) (_v & 0xFFFF)
+#define RT_VERSION(_a, _b) (((_a & 0xFFFF) << 16) | (_b & 0xFFFF))
+
 
 #ifdef LIBRT_DEBUG
 static inline void rt_print_data(uint32_t *d, unsigned int count)
@@ -79,6 +83,8 @@ struct rt_mq {
  * Real-Time Application Descriptor
  */
 struct rt_application {
+	const char name[16];
+	const struct wrnc_rt_version version;
 	struct rt_mq *mq; /**< list of used MQ */
 	uint8_t n_mq; /**< number of available MQ */
 

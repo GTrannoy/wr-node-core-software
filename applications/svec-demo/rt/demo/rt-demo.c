@@ -98,6 +98,13 @@ static action_t *demo_actions[] = {
 
 
 struct rt_application app = {
+	.name = "svec-demo",
+	.version = {
+		.fpga_id = 0x00000000,
+		.rt_id = 0xbadc0fee,
+		.rt_version = RT_VERSION(1, 0),
+		.git_version = GIT_VERSION
+	},
 	.mq = mq,
 	.n_mq = 2,
 

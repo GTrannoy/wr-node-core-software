@@ -10,8 +10,6 @@
 #include <librt.h>
 
 
-const char *name = RT_APPLICATION_NAME;
-const struct wrnc_rt_version version = {0, RT_APPLICATION_ID, 0, GIT_VERSION};
 struct rt_application *_app;
 
 
@@ -48,6 +46,11 @@ int rt_structure_setter(struct wrnc_proto_header *hin, void *pin,
 #endif
 		offset += (size / 4); /* Next TLV record */
 	}
+
+	/* Return back new values. Host can compare with what it sent
+	   to spot errors */
+	if (hin->flags & WRNC_PROTO_FLAG_SYNC)
+		return rt_structure_getter(hin, pin, hout, pout);
 
 	return 0;
 }
@@ -106,7 +109,7 @@ int rt_version_getter(struct wrnc_proto_header *hin, void *pin,
 
 	hout->msg_id = RT_ACTION_SEND_VERSION;
 	hout->len = sizeof(struct wrnc_rt_version) / 4;
-	memcpy(dout, &version, sizeof(struct wrnc_rt_version));
+	memcpy(dout, &_app->version, sizeof(struct wrnc_rt_version));
 
 	return 0;
 }
@@ -242,7 +245,7 @@ static inline int rt_action_run(struct wrnc_proto_header *hin, void *pin)
 		return action(hin, pin, NULL, NULL);
 	}
 
-#ifdef LIBRT_DEBUG
+#ifdef LIBRT_DEBUG_VERBOSE
 	pp_printf("Message Input\n");
 	rt_print_header(hin);
 	rt_print_data(pin, 8);
@@ -257,7 +260,7 @@ static inline int rt_action_run(struct wrnc_proto_header *hin, void *pin)
 		rt_send_nack(hin, pin, &hout, NULL);
 	rt_proto_header_set((void *) out_buf.data, &hout);
 
-#ifdef LIBRT_DEBUG
+#ifdef LIBRT_DEBUG_VERBOSE
 	pp_printf("Message Output\n");
 	rt_print_header(&hout);
 	rt_print_data(pout, 8);
@@ -292,14 +295,14 @@ int rt_mq_action_dispatch(unsigned int mq_in)
 
 	/* Get the message from the HMQ */
 	msg = mq_map_in_buffer(0, mq_in_slot);
-#ifdef LIBRT_DEBUG
+#ifdef LIBRT_DEBUG_VERBOSE
 	pp_printf("Incoming message\n");
 	rt_print_data(msg, 8);
 #endif
 	header = rt_proto_header_get((void *) msg);
 	pin = rt_proto_payload_get((void *) msg);
 
-	if (header->rt_app_id && header->rt_app_id != version.rt_id) {
+	if (header->rt_app_id && header->rt_app_id != _app->version.rt_id) {
 		pp_printf("Not for this application 0x%x\n", header->rt_app_id);
 		err = -EINVAL;
 		goto out;
@@ -348,19 +351,35 @@ void rt_init(struct rt_application *app)
 
 	_app = app;
 
-	pp_printf("Running application '%s'\n", name);
-	if (version.fpga_id) {
+	pp_printf("Running application '%s'\n", _app->name);
+	if (_app->version.fpga_id) {
 		pp_printf("  compatible only with FPGA '0x%x'\n",
-			  version.fpga_id);
+			  _app->version.fpga_id);
 		/* TODO get app id from FPGA and compare */
 	}
-	pp_printf("  application id            '0x%x'\n", version.rt_id);
-	pp_printf("  application version       '%d'\n", version.rt_version);
-	pp_printf("  source code id            '0x%x'\n", version.git_version);
+	pp_printf("  application id     \t'0x%x'\n", _app->version.rt_id);
+	pp_printf("  application version\t'%d.%d'\n",
+		  RT_VERSION_MAJ(_app->version.rt_version),
+		  RT_VERSION_MIN(_app->version.rt_version));
+	pp_printf("  source code id     \t'0x%x'\n", _app->version.git_version);
 	/* Purge all slots */
 	for (i = 0; i < _app->n_mq; ++i) {
 		mq_writel(!!(_app->mq[i].flags & RT_MQ_FLAGS_REMOTE),
 			  MQ_CMD_PURGE,
 			  MQ_OUT(_app->mq[i].index) + MQ_SLOT_COMMAND);
 	}
+
+#ifdef LIBRT_DEBUG
+	pp_printf("Exported Variables");
+	for (i = 0; i < _app->n_variables; ++i)
+		pp_printf("[%d] addr 0x%x | mask 0x%x | off %d\n", i,
+			  _app->variables[i].addr,
+			  _app->variables[i].mask,
+			  _app->variables[i].offset);
+	pp_printf("Exported Structures");
+	for (i = 0; i < _app->n_structures; ++i)
+		pp_printf("[%d] addr %p | len %d\n", i,
+			  _app->structures[i].struct_ptr,
+			  _app->structures[i].len);
+#endif
 }

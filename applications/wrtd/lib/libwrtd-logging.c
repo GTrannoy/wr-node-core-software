@@ -157,6 +157,7 @@ out_close:
 int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
 		  int count, int poll_timeout)
 {
+	struct wrnc_proto_header hdr;
 	struct wrtd_log_entry *cur = log;
 	struct wrnc_msg *msg;
 	struct pollfd p;
@@ -181,28 +182,40 @@ int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
 		if (!msg)
 			break;
 
-		wrnc_msg_header (msg, &id, &seq);
+		if (hmq_log->index == WRTD_OUT_FD_LOGGING) {
+			/* Output */
+			wrnc_msg_header (msg, &id, &seq);
 
-		if (id != WRTD_REP_LOG_MESSAGE)
-		{
-			free(msg);
-			errno = EWRTD_INVALID_ANSWER_STATE;
-			break;
-		}
+			if (id != WRTD_REP_LOG_MESSAGE)
+			{
+				free(msg);
+				errno = EWRTD_INVALID_ANSWER_STATE;
+				break;
+			}
 
-		wrnc_msg_uint32 (msg, &cur->type);
-		wrnc_msg_int32 (msg, &cur->channel);
-		wrnc_msg_uint32 (msg, &cur->miss_reason);
-		wrtd_msg_trigger_entry(msg, &ent);
+			wrnc_msg_uint32 (msg, &cur->type);
+			wrnc_msg_int32 (msg, &cur->channel);
+			wrnc_msg_uint32 (msg, &cur->miss_reason);
+			wrtd_msg_trigger_entry(msg, &ent);
 
-		cur->ts = ent.ts;
-		cur->seq = ent.seq;
-		cur->id = ent.id;
+			cur->ts = ent.ts;
+			cur->seq = ent.seq;
+			cur->id = ent.id;
 
-		if ( wrnc_msg_check_error(msg) ) {
-			free(msg);
-			errno = EWRTD_INVALID_ANSWER_STATE;
-			break;
+			if ( wrnc_msg_check_error(msg) ) {
+				free(msg);
+				errno = EWRTD_INVALID_ANSWER_STATE;
+				break;
+			}
+		} else {
+			/* Input */
+			wrnc_message_unpack(msg, &hdr, cur);
+			if (hdr.msg_id != WRTD_IN_ACTION_LOG) {
+				free(msg);
+				errno = EWRTD_INVALID_ANSWER_STATE;
+				break;
+			}
+			wrtd_timestamp_endianess_fix(&cur->ts);
 		}
 
 		remaining--;

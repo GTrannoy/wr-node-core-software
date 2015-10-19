@@ -115,15 +115,16 @@ static int wrtd_in_trigger_log(int type, int miss_reason,
  */
 static inline void send_trigger (struct wrtd_trigger_entry *ent)
 {
-    volatile struct wrtd_trigger_message *msg = mq_map_out_buffer(1, WRTD_REMOTE_OUT_TDC);
+	volatile struct wrtd_trigger_message *msg;
 
-    msg->triggers[coalesce_count].id = ent->id;
-    msg->triggers[coalesce_count].seq = ent->seq;
-    msg->triggers[coalesce_count].ts = ent->ts;
+	msg =mq_map_out_buffer(1, WRTD_REMOTE_OUT_TDC);
+	msg->triggers[coalesce_count].id = ent->id;
+	msg->triggers[coalesce_count].seq = ent->seq;
+	msg->triggers[coalesce_count].ts = ent->ts;
 
-    loop_queue_push(&ent->id, ent->seq, &ent->ts);
+	loop_queue_push(&ent->id, ent->seq, &ent->ts);
 
-    coalesce_count++;
+	coalesce_count++;
 }
 
 

@@ -32,6 +32,8 @@ const char *wrtd_errors[] = {
 	"Trigger not found",
 	"No trigger condition",
 	"Invalid pulse width",
+	"Invalid input real-time application",
+	"Invalid output real-time application"
 };
 
 
@@ -92,6 +94,7 @@ void wrtd_exit()
 static struct wrtd_node *wrtd_open(uint32_t device_id, unsigned int is_lun)
 {
 	struct wrtd_desc *wrtd;
+	struct wrnc_rt_version version;
 	int err;
 
 	wrtd = malloc(sizeof(struct wrtd_desc));
@@ -117,6 +120,15 @@ static struct wrtd_node *wrtd_open(uint32_t device_id, unsigned int is_lun)
 				 WRTD_OUT_TDC_LOGGING, 1);
 	if (err)
 		goto out;
+
+	err = wrtd_in_version((struct wrtd_node *)wrtd, &version);
+	if (err)
+		goto out;
+
+	if (version.rt_id != WRTD_IN_RT_ID) {
+		errno = EWRTD_INVALID_IN_APP;
+		goto out;
+	}
 
 	return (struct wrtd_node *)wrtd;
 

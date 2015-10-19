@@ -28,6 +28,7 @@ struct wrnc_thread_desc {
 	int n_cpu;
 	int slot_index[MAX_SLOT];
 	int n_slot;
+	int share;
 };
 
 static unsigned int  cnt, n, cnt_dbg, N;
@@ -46,6 +47,7 @@ static void help()
 	fprintf(stderr, "-d <CPU index>  show debug messages for given CPU\n");
 	fprintf(stderr, "-N   number of total debug messages\n");
 	fprintf(stderr, "-Q   show debug messages for all found WRN CPUs\n");
+	fprintf(stderr, "-s   share all HMQ with other users\n");
 	fprintf(stderr, "-h   show this help\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr,
@@ -222,6 +224,8 @@ void *message_thread(void *arg)
 
 	/* Build the polling structures */
 	for (i = 0; i < th_data->n_slot; ++i) {
+		wrnc_hmq_share_set(wrnc, 0 , th_data->slot_index[i], 1);
+
 		hmq[i] = wrnc_hmq_open(wrnc, th_data->slot_index[i],
 				    WRNC_HMQ_OUTCOMING);
 		if (!hmq[i]) {
@@ -275,7 +279,7 @@ int main(int argc, char *argv[])
 	struct wrnc_thread_desc th_data[MAX_DEV], *last;
 	unsigned long i;
 	unsigned int di = 0;
-	int show_all_debug = 0;
+	int show_all_debug = 0, share = 0;
 	pthread_t tid_msg[MAX_DEV], tid_dbg[MAX_DEV];
 	int err;
 	char c;
@@ -284,10 +288,13 @@ int main(int argc, char *argv[])
 
 	memset(th_data, 0, sizeof(struct wrnc_thread_desc) * MAX_DEV);
 
-	while ((c = getopt (argc, argv, "Qhi:D:n:N:td:")) != -1) {
+	while ((c = getopt (argc, argv, "Qhi:D:n:N:td:s")) != -1) {
 		switch (c) {
 		default:
 			help();
+			break;
+		case 's':
+			share = 1;
 			break;
 		case 'i':
 		/* Save slot index for each device id */
@@ -340,6 +347,10 @@ int main(int argc, char *argv[])
 			wrnc_strerror(errno));
 		exit(1);
 	}
+
+	/* Set global sharing option */
+	for (i = 0; i < di; ++i)
+		th_data[i].share = share;
 
 	if(show_all_debug) {
 		char **list = wrnc_list();

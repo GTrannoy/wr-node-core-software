@@ -507,8 +507,8 @@ static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
 	hmq->max_width = WRNC_SLOT_CFG(WIDTH, val);
 	hmq->max_depth = WRNC_SLOT_CFG(ENTRIES, val);
 
-	dev_info(&hmq->dev, " 0x%x -> %d %d\n",
-		 val, hmq->max_width, hmq->max_depth);
+	dev_dbg(&hmq->dev, " 0x%x -> %d %d\n",
+		val, hmq->max_width, hmq->max_depth);
 	spin_lock_init(&hmq->lock);
 	/* Flush the content of the slot */
 	fmc_writel(fmc, MQUEUE_CMD_PURGE,

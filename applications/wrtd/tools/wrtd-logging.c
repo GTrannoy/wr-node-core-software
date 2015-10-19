@@ -65,8 +65,11 @@ static void *logging_thread(void *arg)
 
 	while (i < th_data->n_read || th_data->n_read == 0) {
 		count = wrtd_log_read(hlog, &log, 1, -1);
-		if (count <= 0)
+		if (count <= 0) {
+			fprintf(stderr, "Cannot read message: %s\n",
+				wrtd_strerror(errno));
 			break;
+		}
 
 		fprintf(stdout, "Device      %s\n",
 			th_data->core == WRTD_CORE_IN ? "input" : "output");

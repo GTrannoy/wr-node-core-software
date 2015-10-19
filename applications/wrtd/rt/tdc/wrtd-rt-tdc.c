@@ -274,6 +274,8 @@ static int wrtd_in_trigger_sw(struct wrnc_proto_header *hin, void *pin,
 
 	/* Send trigger */
 	send_trigger(&ent);
+
+	return 0;
 }
 
 int wr_enable_lock(int enable)
@@ -393,14 +395,14 @@ static struct rt_variable wrtd_in_variables[] = {
 	},
 };
 
-#define __WRTD_IN_ACTION_MAX 128 // FIXME
-static action_t *wrtd_in_actions[__WRTD_IN_ACTION_MAX] = {
+static action_t *wrtd_in_actions[] = {
 	[RT_ACTION_RECV_PING] = rt_recv_ping,
 	[RT_ACTION_RECV_VERSION] = rt_version_getter,
 	[RT_ACTION_RECV_FIELD_SET] = rt_variable_setter,
 	[RT_ACTION_RECV_FIELD_GET] = rt_variable_getter,
 	[RT_ACTION_RECV_STRUCT_SET] = rt_structure_setter,
 	[RT_ACTION_RECV_STRUCT_GET] = rt_structure_getter,
+	[WRTD_IN_ACTION_SW_TRIG] = wrtd_in_trigger_sw,
 };
 
 enum rt_slot_name {

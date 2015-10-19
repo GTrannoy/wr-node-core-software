@@ -278,28 +278,34 @@ int wrtd_in_trigger_software(struct wrtd_node *dev,
 			     struct wrtd_trigger_entry *trigger)
 {
    	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrtd_trigger_entry ltrig = *trigger;
 	struct wrnc_msg msg;
-	uint32_t *buf = (uint32_t *)trigger;
-	int err, i;
+	struct wrnc_proto_header hdr;
+	int err;
 
 	if (trigger == NULL) {
 		errno = EWRTD_INVALID_TRIG_ID;
 		return -1;
 	}
 
-	/* Build the message */
-	msg.datalen = 2 + (sizeof(struct wrtd_trigger_entry) / 4);
-	msg.data[0] = WRTD_CMD_TDC_SOFTWARE_TRIGGER;
-	msg.data[1] = 0;
-	for (i = 2; i < msg.datalen; ++i)
-		msg.data[i] = buf[i - 2];
+	memset(&msg, 0, sizeof(struct wrnc_msg));
+	memset(&hdr, 0, sizeof(struct wrnc_proto_header));
+	hdr.msg_id = WRTD_IN_ACTION_SW_TRIG;
+	hdr.slot_io = (WRTD_IN_TDC_CONTROL << 4) | (WRTD_OUT_TDC_CONTROL & 0xF);
+	hdr.len = sizeof(struct wrtd_trigger_entry) / 4;
+	hdr.flags = WRNC_PROTO_FLAG_SYNC;
+
+	wrtd_timestamp_endianess_fix(&ltrig.ts);
+	wrnc_message_pack(&msg, &hdr, &ltrig);
 
 	/* Send the message and get answer */
 	err = wrtd_in_send_and_receive_sync(wrtd, &msg);
 	if (err)
 		return err;
-
-	return wrtd_validate_acknowledge(&msg);
+	wrnc_message_unpack(&msg, &hdr, NULL);
+	if (hdr.msg_id != RT_ACTION_SEND_ACK)
+		return -1;
+	return 0;
 }
 
 

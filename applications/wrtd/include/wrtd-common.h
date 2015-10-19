@@ -96,6 +96,10 @@
 #define FD_HASH_ENTRIES 64
 #define FD_MAX_QUEUE_PULSES 16
 
+enum wrtd_in_actions {
+	WRTD_IN_ACTION_SW_TRIG = __RT_ACTION_RECV_STANDARD_NUMBER,
+};
+
 enum wrtd_in_variables_indexes {
 	IN_VAR_CHAN_ENABLE = 0,
 	IN_VAR_DEVICE_TIME_S,

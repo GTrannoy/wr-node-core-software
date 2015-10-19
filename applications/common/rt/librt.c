@@ -244,11 +244,12 @@ static inline int rt_action_run(struct wrnc_proto_header *hin, void *pin)
 		/* Asynchronous message, then no output */
 		return action(hin, pin, NULL, NULL);
 	}
-
-#ifdef LIBRT_DEBUG_VERBOSE
+#ifdef LIBRT_DEBUG
 	pp_printf("Message Input\n");
 	rt_print_header(hin);
+#ifdef LIBRT_DEBUG_VERBOSE
 	rt_print_data(pin, 8);
+#endif
 #endif
 	/* Synchronous message */
 	out_buf = rt_mq_claim_out(hin);
@@ -260,10 +261,12 @@ static inline int rt_action_run(struct wrnc_proto_header *hin, void *pin)
 		rt_send_nack(hin, pin, &hout, NULL);
 	rt_proto_header_set((void *) out_buf.data, &hout);
 
-#ifdef LIBRT_DEBUG_VERBOSE
+#ifdef LIBRT_DEBUG
 	pp_printf("Message Output\n");
 	rt_print_header(&hout);
+#ifdef LIBRT_DEBUG_VERBOSE
 	rt_print_data(pout, 8);
+#endif
 #endif
 	mq_msg_send(&hout);
 

@@ -21,7 +21,7 @@ struct wrnc_rt_version {
 	uint32_t git_version; /**< git commit SHA1 of the compilation time */
 };
 
-enum rt_action_recv_standard {
+enum rt_action_standard {
 	RT_ACTION_RECV_PING = 0,
 	RT_ACTION_RECV_FIELD_SET,
 	RT_ACTION_RECV_FIELD_GET,

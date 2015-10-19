@@ -98,6 +98,7 @@
 
 enum wrtd_in_actions {
 	WRTD_IN_ACTION_SW_TRIG = __RT_ACTION_RECV_STANDARD_NUMBER,
+	WRTD_IN_ACTION_LOG,
 };
 
 enum wrtd_in_variables_indexes {

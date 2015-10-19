@@ -19,7 +19,6 @@
 
 #include "rt.h"
 #include "wrtd-common.h"
-#include "wrtd-serializers.h"
 #include "hw/fmctdc-direct.h"
 #include "hw/tdc_regs.h"
 #include "loop-queue.h"
@@ -72,34 +71,40 @@ static inline int wr_is_timing_ok()
 
 
 /**
- * Send logging message to the host
+ * It sends a log entry to the host system
  */
-static void log_trigger(int type, int miss_reason,
-			struct wrtd_in_channel *st, struct wr_timestamp *ts,
-			struct wrtd_trigger_entry *ent)
+static int wrtd_in_trigger_log(int type, int miss_reason,
+			       struct wrtd_in_channel *st,
+			       struct wrtd_trigger_entry *ent)
 {
-	uint32_t id = WRTD_REP_LOG_MESSAGE;
-	uint32_t seq = 0;
+	struct wrnc_msg out_buf;
+	struct wrtd_log_entry *log;
+	struct wrnc_proto_header hdr = {
+		.rt_app_id = 0,
+		.msg_id = WRTD_IN_ACTION_LOG,
+		.slot_io = WRTD_OUT_TDC_LOGGING,
+		.seq = seq,
+		.len = sizeof(struct wrtd_log_entry) / 4,
+		.flags = 0x0,
+		.trans = 0x0,
+		.time = 0x0,
+	};
 
 	if (!(st->config.log_level & type))
 		return;
 
-	struct wrnc_msg buf = hmq_msg_claim_out (WRTD_OUT_TDC_LOGGING, 16);
-	wrnc_msg_header (&buf, &id, &seq);
-	wrnc_msg_int32 (&buf, &type);
-	wrnc_msg_int32 (&buf, &st->n);
-	wrnc_msg_int32 (&buf, &miss_reason);
+	out_buf = rt_mq_claim_out(&hdr);
+	log = rt_proto_payload_get((struct wrtd_log_entry *) out_buf.data);
+	log->type = type;
+	log->channel = st->n;
+	log->miss_reason = miss_reason;
+	log->seq = ent->seq;
+	log->id = ent->id;
+	log->ts = ent->ts;
+	rt_proto_header_set((void *) out_buf.data, &hdr);
+	rt_mq_msg_send(&out_buf);
 
-	if (ent) {
-		wrtd_msg_trigger_entry (&buf, ent);
-	} else {
-		struct wrtd_trig_id fake_id;
-		wrtd_msg_timestamp (&buf, ts);
-		wrtd_msg_trig_id (&buf, &fake_id);
-		wrnc_msg_uint32 (&buf, &st->stats.total_pulses);
-	}
-
-	hmq_msg_send (&buf);
+	return 0;
 }
 
 
@@ -150,14 +155,16 @@ static inline void flush_tx ()
 static inline void do_channel(int channel, struct wr_timestamp *ts)
 {
 	struct wrtd_in_channel *ch = &wrtd_in_channels[channel];
-	struct wrtd_trigger_entry ent;
+	struct wrtd_trigger_entry ent = {
+		.ts = *ts,
+	};
 
 	/* Apply timebase offset to align TDC time with WR timebase */
 	ts_sub(ts, &ch->config.timebase_offset);
 	ch->stats.last_tagged = *ts;
 
 	/* Log raw value if needed */
-	log_trigger(WRTD_LOG_RAW, 0, ch, ts, NULL);
+	wrtd_in_trigger_log(WRTD_LOG_RAW, 0, ch, &ent);
 
 	ch->stats.total_pulses++;
 
@@ -171,7 +178,7 @@ static inline void do_channel(int channel, struct wr_timestamp *ts)
 
 	if (!wr_is_timing_ok()) {
 		ch->stats.miss_no_timing++;
-		log_trigger(WRTD_LOG_MISSED, WRTD_MISS_NO_WR, ch, NULL, &ent);
+		wrtd_in_trigger_log(WRTD_LOG_MISSED, WRTD_MISS_NO_WR, ch, &ent);
 		return;
 	}
 
@@ -187,7 +194,7 @@ static inline void do_channel(int channel, struct wr_timestamp *ts)
 	ch->stats.last_sent = ent;
 
 	send_trigger(&ent);
-	log_trigger(WRTD_LOG_SENT, 0, ch, NULL, &ent);
+	wrtd_in_trigger_log(WRTD_LOG_SENT, 0, ch, &ent);
 
 	ch->config.flags |= WRTD_LAST_VALID;
 }

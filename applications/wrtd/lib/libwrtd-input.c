@@ -102,7 +102,7 @@ int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 	state->tagged_pulses = chan.stats.total_pulses;
 	state->sent_triggers = chan.stats.sent_pulses;
 	state->last_sent = chan.stats.last_sent;
-	wrtd_timestamp_endianess_fix(&state->last_sent);
+	wrtd_timestamp_endianess_fix(&state->last_sent.ts);
 
 	state->dead_time.seconds = 0;
 	state->dead_time.frac = 0;

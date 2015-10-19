@@ -65,11 +65,12 @@ static void help()
  */
 static int dump_message(struct wrnc_dev *wrnc, struct wrnc_hmq *hmq)
 {
+	struct wrnc_proto_header h;
 	struct wrnc_msg *wmsg;
         time_t tm;
-	char str[128], stime[64];
+	char stime[64];
 	struct tm *gm;
-	int j;
+	int i;
 
 	if (timestamp) {
 		tm = time(NULL);
@@ -84,17 +85,25 @@ static int dump_message(struct wrnc_dev *wrnc, struct wrnc_hmq *hmq)
 		return -1;
 	}
 
-	/* Print message */
-	switch (wmsg->data[0]) {
-        case 0xdeadbeef:
-		for (j = 0; j < 128 - 1 && j < wmsg->datalen; ++j)
-			str[j] = wmsg->data[j + 1];
-		str[j - 1] = '\0';
-		fprintf(stdout, " %s\n", str);
-		break;
-	default:
-		fprintf(stdout, " unknown message ID 0x%x\n", wmsg->data[0]);
-		break;
+	wrnc_message_unpack(wmsg, &h, NULL);
+
+	fprintf(stdout, "\n    ---- header ----\n");
+	fprintf(stdout, "    app_id 0x%x | msg_id %d | slot_io 0x%x | seq %d\n",
+		  h.rt_app_id, h.msg_id, h.slot_io, h.seq);
+	fprintf(stdout, "    len %d | flags 0x%x | trans 0x%x | time %d\n",
+		  h.len, h.flags, h.trans, h.time);
+
+	if (h.len) {
+		uint32_t payload[h.len];
+
+		wrnc_message_unpack(wmsg, &h, payload);
+		fprintf(stdout, "    ---- payload -----");
+		for (i = 0; i < h.len; ++i) {
+			if (i % 4 == 0)
+				fprintf(stdout, "\n    %04d :", i);
+			fprintf(stdout, " 0x%08x", payload[i]);
+		}
+		fprintf(stdout, "\n");
 	}
 
 	free(wmsg);

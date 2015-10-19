@@ -14,6 +14,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <time.h>
+#include <libgen.h>
 
 
 #define MAX_DEV 4
@@ -80,7 +81,7 @@ static int dump_message(struct wrnc_dev *wrnc, struct wrnc_hmq *hmq)
 		strftime(stime, 64,"%T", gm);
 		fprintf(stdout, "[%s] ", stime);
 	}
-	fprintf(stdout, "%s-hmq-i-%02d :", wrnc_name_get(wrnc), hmq->index);
+	fprintf(stdout, "%s :", basename(hmq->syspath));
 	wmsg = wrnc_hmq_receive(hmq);
 	if (!wmsg) {
 		fprintf(stdout, " error : %s\n", wrnc_strerror(errno));

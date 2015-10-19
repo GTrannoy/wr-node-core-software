@@ -10,6 +10,9 @@
 #ifndef __WRTD_COMMON_H
 #define __WRTD_COMMON_H
 
+#define WRTD_IN_RT_ID  0x347D0000
+#define WRTD_OUT_RT_ID 0x347D0001
+
 /* WR Node CPU Core indices */
 #define WRTD_CPU_TDC 0			/* Core 0 controls the TDC mezzanine */
 #define WRTD_CPU_FD 1			/* Core 1 controls the FD mezzanine */

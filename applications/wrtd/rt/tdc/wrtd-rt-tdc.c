@@ -438,7 +438,7 @@ struct rt_application app = {
 	.name = "wrtd-input",
 	.version = {
 		.fpga_id = 0x115790de,
-		.rt_id = 0xbadc0fee,
+		.rt_id = WRTD_IN_RT_ID,
 		.rt_version = RT_VERSION(2, 0),
 		.git_version = GIT_VERSION
 	},

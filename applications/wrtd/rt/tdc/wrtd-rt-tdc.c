@@ -433,16 +433,16 @@ struct rt_application app = {
 		.git_version = GIT_VERSION
 	},
 	.mq = mq,
-	.n_mq = 2,
+	.n_mq = ARRAY_SIZE(mq),
 
 	.structures = wrtd_in_structures,
-	.n_structures = __WRTD_IN_STRUCT_MAX,
+	.n_structures = ARRAY_SIZE(wrtd_in_structures),
 
 	.variables = wrtd_in_variables,
-	.n_variables = __WRTD_IN_VAR_MAX,
+	.n_variables = ARRAY_SIZE(wrtd_in_variables),
 
 	.actions = wrtd_in_actions,
-	.n_actions = __WRTD_IN_ACTION_MAX,
+	.n_actions = ARRAY_SIZE(wrtd_in_actions),
 };
 
 

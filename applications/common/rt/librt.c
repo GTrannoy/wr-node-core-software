@@ -9,7 +9,7 @@
 #include <errno.h>
 #include <librt.h>
 
-
+uint32_t msg_seq = 0;
 struct rt_application *_app;
 
 
@@ -253,13 +253,17 @@ static inline int rt_action_run(struct wrnc_proto_header *hin, void *pin)
 #endif
 	/* Synchronous message */
 	out_buf = rt_mq_claim_out(hin);
+	/* Do not write directly the header on the buffer because it does not
+	 work for fields size different than 32bit */
 	pout = rt_proto_payload_get((void *) out_buf.data);
 	memcpy(&hout, hin, sizeof(struct wrnc_proto_header));
 
 	err = action(hin, pin, &hout, pout);
 	if (err)
 		rt_send_nack(hin, pin, &hout, NULL);
+
 	rt_proto_header_set((void *) out_buf.data, &hout);
+	rt_mq_msg_send(&out_buf);
 
 #ifdef LIBRT_DEBUG
 	pp_printf("Message Output\n");
@@ -268,8 +272,6 @@ static inline int rt_action_run(struct wrnc_proto_header *hin, void *pin)
 	rt_print_data(pout, 8);
 #endif
 #endif
-	mq_msg_send(&hout);
-
 	return err;
 }
 

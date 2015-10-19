@@ -109,18 +109,6 @@ static inline struct wrnc_msg hmq_msg_claim_in(int slot, int max_size)
 
 
 /**
- * It send the message associate to the given header
- * @param[in] h header of the message to be sent
- */
-static inline void mq_msg_send(struct wrnc_proto_header *h)
-{
-	int remote = !!(h->flags & WRNC_PROTO_FLAG_REMOTE);
-
-	mq_send(remote, (h->slot_io & 0xF),
-		h->len + (sizeof(struct wrnc_proto_header) / 4));
-}
-
-/**
  * It enqueue the message in the slot, and it will be sent as soon as possible
  */
 static inline void hmq_msg_send(struct wrnc_msg *buf)

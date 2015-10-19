@@ -52,6 +52,8 @@ static inline void rt_print_header(struct wrnc_proto_header *h)
 }
 #endif
 
+extern uint32_t msg_seq;
+
 #define RT_VARIABLE_FLAG_WO (1 << 0)
 /**
  * Description of a RealTime variable that we want to export to user-space
@@ -142,5 +144,26 @@ extern int rt_recv_ping(struct wrnc_proto_header *hin, void *pin,
 			struct wrnc_proto_header *hout, void *pout);
 extern int rt_version_getter(struct wrnc_proto_header *hin, void *pin,
 			     struct wrnc_proto_header *hout, void *pout);
+
+
+/**
+ * It send the message associate to the given header
+ * @param[in] msg message to send
+ */
+static inline void rt_mq_msg_send(struct wrnc_msg *msg)
+{
+	struct wrnc_proto_header *hdr;
+
+	hdr = rt_proto_header_get((void *)msg->data);
+
+	/* When we are not using sync messages, we use the global
+	   sequence number */
+	if (!(hdr->flags & WRNC_PROTO_FLAG_SYNC))
+		hdr->seq = msg_seq++;
+
+	mq_send(!!(hdr->flags & WRNC_PROTO_FLAG_REMOTE),
+		(hdr->slot_io & 0xF),
+		hdr->len + (sizeof(struct wrnc_proto_header) / 4));
+}
 
 #endif /* __LIBRT_H__ */

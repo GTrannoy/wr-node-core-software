@@ -753,20 +753,14 @@ int wrtd_in_base_time(struct wrtd_node *dev, struct wr_timestamp *ts)
 /**
  * It gets the output version
  * @param[in] dev device token
- * @param[out] ts output device base time
+ * @param[out] version the RT application version
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrtd_in_version(struct wrtd_node *dev, uint32_t *gitsha1)
+int wrtd_in_version(struct wrtd_node *dev, struct wrnc_rt_version *version)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_rt_version version;
 	int err;
 
-	err = wrnc_rt_version_get(wrtd->wrnc, &version,
-				  WRTD_IN_TDC_CONTROL, WRTD_OUT_TDC_CONTROL);
-	if (err)
-		return err;
-	*gitsha1 = version.git_version;
-
-	return 0;
+	return wrnc_rt_version_get(wrtd->wrnc, version,
+				   WRTD_IN_TDC_CONTROL, WRTD_OUT_TDC_CONTROL);
 }

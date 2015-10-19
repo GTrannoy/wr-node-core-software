@@ -244,7 +244,8 @@ extern int wrtd_in_has_trigger(struct wrtd_node *dev, unsigned int input,
 			       unsigned int *assigned);
 extern int wrtd_in_ping(struct wrtd_node *dev);
 extern int wrtd_in_base_time(struct wrtd_node *dev, struct wr_timestamp *ts);
-extern int wrtd_in_version(struct wrtd_node *dev, uint32_t *gitsha1);
+extern int wrtd_in_version(struct wrtd_node *dev,
+			   struct wrnc_rt_version *version);
 extern int wrtd_in_dead_time_get(struct wrtd_node *dev, unsigned int input,
 				 uint64_t *dead_time_ps);
 extern int wrtd_in_delay_get(struct wrtd_node *dev, unsigned int input,

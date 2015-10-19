@@ -27,6 +27,7 @@
 #define RT_VERSION_MIN(_v) (_v & 0xFFFF)
 #define RT_VERSION(_a, _b) (((_a & 0xFFFF) << 16) | (_b & 0xFFFF))
 
+#define ARRAY_SIZE(_a) (sizeof(_a) / sizeof(_a[0]))
 
 #ifdef LIBRT_DEBUG
 static inline void rt_print_data(uint32_t *d, unsigned int count)

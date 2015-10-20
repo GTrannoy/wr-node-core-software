@@ -12,6 +12,7 @@
 #include <getopt.h>
 #include <poll.h>
 #include <inttypes.h>
+#include <libgen.h>
 #include <pthread.h>
 #include <libwrnc.h>
 #include <libwrtd.h>
@@ -165,6 +166,12 @@ int main(int argc, char *argv[])
 	}
 	th_data[1].wrtd = th_data[0].wrtd;
 
+	if (!wrtd_version_is_valid(th_data[0].wrtd)) {
+		fprintf(stderr, "Cannot run %s: %s\n",
+			basename(argv[0]), wrtd_strerror(errno));
+		goto out;
+	}
+
 	if (show_log) {
 		show_logging_level(th_data[WRTD_CORE_IN].wrtd, WRTD_CORE_IN);
 		show_logging_level(th_data[WRTD_CORE_OUT].wrtd, WRTD_CORE_OUT);
@@ -185,6 +192,7 @@ int main(int argc, char *argv[])
 	for (i = 0; i < N_LOG; i++)
 		pthread_join(tid[i], NULL);
 
+out:
 	wrtd_close(th_data[0].wrtd);
 	exit(0);
 }

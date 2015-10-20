@@ -175,6 +175,7 @@ extern int wrtd_white_rabbit_sync(struct wrtd_node *dev,
  * Set of utilities
  * @{
  */
+extern int wrtd_version_is_valid(struct wrtd_node *dev);
 extern const char *wrtd_strerror(int err);
 extern void wrtd_ts_to_pico(struct wr_timestamp *ts, uint64_t *pico);
 extern void wrtd_pico_to_ts(uint64_t *pico, struct wr_timestamp *ts);

@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <string.h>
 #include <getopt.h>
+#include <libgen.h>
 #include <libwrtd.h>
 
 void help()
@@ -78,6 +79,12 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
+	if (!wrtd_version_is_valid(wrtd)) {
+		fprintf(stderr, "Cannot run %s: %s\n",
+			basename(argv[0]), wrtd_strerror(errno));
+		goto out;
+	}
+
 	while (n--) {
 		/* Get base time here to reduce the delay between the
 		   two requests */
@@ -128,6 +135,7 @@ int main(int argc, char *argv[])
 		usleep(period);
 	}
 
+out:
 	wrtd_close(wrtd);
 	exit(0);
 }

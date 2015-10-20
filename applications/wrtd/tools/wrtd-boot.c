@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <inttypes.h>
+#include <libgen.h>
 #include <libwrnc.h>
 #include <libwrtd.h>
 
@@ -204,6 +205,12 @@ int main(int argc, char *argv[])
 	if (err)
 		exit(1);
 
+	if (!wrtd_version_is_valid(wrtd)) {
+		fprintf(stderr, "Cannot run %s: %s\n",
+			basename(argv[0]), wrtd_strerror(errno));
+		goto out;
+	}
+
 	if (setoff) {
 		/* Inform the input real-time channels about the offset */
 		for (i = 0; i < TDC_NUM_CHANNELS; ++i) {
@@ -226,13 +233,13 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	wrtd_close(wrtd);
-
 	if (cerr)
 		fprintf(stderr, "White Rabbit Trigger Distribution programmed but with %d problems\n", cerr);
 	else
 		fprintf(stdout,
 			"White Rabbit Trigger Distribution node succesfully programmed\n");
 
+out:
+	wrtd_close(wrtd);
 	exit(0);
 }

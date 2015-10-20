@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <string.h>
 #include <getopt.h>
+#include <libgen.h>
 #include <libwrnc.h>
 #include <libwrtd.h>
 
@@ -606,6 +607,12 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
+	if (!wrtd_version_is_valid(wrtd)) {
+		fprintf(stderr, "Cannot run %s: %s\n",
+			basename(argv[0]), wrtd_strerror(errno));
+		goto out;
+	}
+
 	for (i = 0; cmds[i].handler; i++) {
  		if(!strcmp(cmds[i].name, cmd)) {
 			err = cmds[i].handler(wrtd, chan, argc - optind,
@@ -624,7 +631,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Error while executing command '%s': %s\n",
 			cmd, wrtd_strerror(errno));
 
+out:
 	wrtd_close(wrtd);
-
 	exit(0);
 }

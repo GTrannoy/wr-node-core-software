@@ -10,8 +10,6 @@
 #include <libwrnc.h>
 #include "libwrtd-internal.h"
 
-#include "wrtd-serializers.h"
-
 /**
  * Internal helper to send and recevie synchronous messages to/from the TDC
  */
@@ -820,7 +818,6 @@ int wrtd_in_base_time(struct wrtd_node *dev, struct wr_timestamp *ts)
 int wrtd_in_version(struct wrtd_node *dev, struct wrnc_rt_version *version)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	int err;
 
 	return wrnc_rt_version_get(wrtd->wrnc, version,
 				   WRTD_IN_TDC_CONTROL, WRTD_OUT_TDC_CONTROL);

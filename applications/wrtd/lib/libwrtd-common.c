@@ -85,6 +85,32 @@ void wrtd_exit()
 
 
 /**
+ * Check if the RT-app running version is compatible with the current
+ * library
+ * @param[in] dev device token
+ * @return 1 if the version is correct, 0 otherwise. On error you get 0
+ *         and errno is appropriately set
+ */
+int wrtd_version_is_valid(struct wrtd_node *dev)
+{
+	struct wrnc_rt_version version;
+	int err;
+
+	errno = 0;
+	err = wrtd_in_version(dev, &version);
+	if (err)
+		return 0;
+
+	if (version.rt_id != WRTD_IN_RT_ID) {
+		errno = EWRTD_INVALID_IN_APP;
+		return 0;
+	}
+
+	return 1;
+}
+
+
+/**
  * It opens and initialize the configuration for the given device
  * @param[in] device_id device identifier
  * @param[in] is_lun 1 if device_id is a LUN
@@ -94,7 +120,6 @@ void wrtd_exit()
 static struct wrtd_node *wrtd_open(uint32_t device_id, unsigned int is_lun)
 {
 	struct wrtd_desc *wrtd;
-	struct wrnc_rt_version version;
 	int err;
 
 	wrtd = malloc(sizeof(struct wrtd_desc));
@@ -120,15 +145,6 @@ static struct wrtd_node *wrtd_open(uint32_t device_id, unsigned int is_lun)
 				 WRTD_OUT_TDC_LOGGING, 1);
 	if (err)
 		goto out;
-
-	err = wrtd_in_version((struct wrtd_node *)wrtd, &version);
-	if (err)
-		goto out;
-
-	if (version.rt_id != WRTD_IN_RT_ID) {
-		errno = EWRTD_INVALID_IN_APP;
-		goto out;
-	}
 
 	return (struct wrtd_node *)wrtd;
 

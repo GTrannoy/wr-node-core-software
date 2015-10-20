@@ -212,6 +212,31 @@ static ssize_t wrnc_show_count(struct device *dev,
 
 
 /**
+ * It returns the maximum number of messages in the WRNC queue
+ */
+static ssize_t wrnc_show_count_max(struct device *dev,
+				   struct device_attribute *attr,
+				   char *buf)
+{
+	struct wrnc_hmq *hmq = to_wrnc_hmq(dev);
+
+	return sprintf(buf, "%d\n", hmq->max_depth);
+}
+
+
+/**
+ * It returns the maximum number bytes per message
+ */
+static ssize_t wrnc_show_width_max(struct device *dev,
+				   struct device_attribute *attr,
+				   char *buf)
+{
+	struct wrnc_hmq *hmq = to_wrnc_hmq(dev);
+
+	return sprintf(buf, "%d\n", hmq->max_width * 4);
+}
+
+/**
  * Show the current share status of the HMQ slot
  */
 static ssize_t wrnc_show_share(struct device *dev,
@@ -262,6 +287,8 @@ static ssize_t wrnc_store_share(struct device *dev,
 DEVICE_ATTR(full, S_IRUGO, wrnc_show_full, NULL);
 DEVICE_ATTR(empty, S_IRUGO, wrnc_show_empty, NULL);
 DEVICE_ATTR(count, S_IRUGO, wrnc_show_count, NULL);
+DEVICE_ATTR(count_max, S_IRUGO, wrnc_show_count_max, NULL);
+DEVICE_ATTR(width_max, S_IRUGO, wrnc_show_width_max, NULL);
 DEVICE_ATTR(shared_by_users, (S_IRUGO | S_IWUSR | S_IWGRP |  S_IWOTH),
 	    wrnc_show_share, wrnc_store_share);
 
@@ -269,6 +296,8 @@ static struct attribute *wrnc_hmq_attr[] = {
 	&dev_attr_full.attr,
 	&dev_attr_empty.attr,
 	&dev_attr_count.attr,
+	&dev_attr_count_max.attr,
+	&dev_attr_width_max.attr,
 	&dev_attr_shared_by_users.attr,
 	NULL,
 };

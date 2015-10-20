@@ -1024,7 +1024,7 @@ struct wrnc_msg *wrnc_hmq_receive(struct wrnc_hmq *hmq)
 	ret =  wrnc_hmq_receive_n(hmq, msg, 1);
 	if (ret < 0) {
 		free(msg);
-		return -1;
+		return NULL;
 	}
 
 	return msg;

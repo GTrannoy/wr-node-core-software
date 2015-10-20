@@ -109,13 +109,13 @@ struct rt_application app = {
 	.n_mq = 2,
 
 	.structures = demo_structures,
-	.n_structures = __DEMO_STRUCT_MAX,
+	.n_structures = ARRAY_SIZE(demo_structures),
 
 	.variables = demo_variables,
-	.n_variables = __DEMO_VAR_MAX,
+	.n_variables = ARRAY_SIZE(demo_variables),
 
 	.actions = demo_actions,
-	.n_actions = 128, /* FIXME replace 128 with correct number */
+	.n_actions = ARRAY_SIZE(demo_actions),
 };
 
 /**

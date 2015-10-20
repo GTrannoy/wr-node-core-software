@@ -32,8 +32,8 @@ const char *wrtd_errors[] = {
 	"Trigger not found",
 	"No trigger condition",
 	"Invalid pulse width",
-	"Invalid input real-time application",
-	"Invalid output real-time application"
+	"Invalid input real-time application version",
+	"Invalid output real-time application version"
 };
 
 
@@ -88,8 +88,8 @@ void wrtd_exit()
  * Check if the RT-app running version is compatible with the current
  * library
  * @param[in] dev device token
- * @return 1 if the version is correct, 0 otherwise. On error you get 0
- *         and errno is appropriately set
+ * @return 1 if the version is correct, 0 otherwise and errno is
+ *         appropriately set
  */
 int wrtd_version_is_valid(struct wrtd_node *dev)
 {

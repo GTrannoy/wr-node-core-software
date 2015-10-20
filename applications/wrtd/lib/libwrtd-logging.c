@@ -271,20 +271,23 @@ static int wrtd_log_level_set(struct wrtd_node *dev, unsigned int channel,
 			.size = sizeof(struct wrtd_in_channel),
 			.structure = &chan,
 		};
+		struct wrnc_proto_header hdr = {
+			.slot_io = (WRTD_IN_TDC_CONTROL << 4) |
+				   (WRTD_OUT_TDC_CONTROL & 0xF),
+			.flags = WRNC_PROTO_FLAG_SYNC,
+		};
 		int err;
 
 		if (channel >= TDC_NUM_CHANNELS) {
 			errno = EWRTD_INVALID_CHANNEL;
 			return -1;
 		}
-		err = wrnc_rt_structure_get(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
-					    WRTD_OUT_TDC_CONTROL, &tlv, 1);
+		err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
 		if (err)
 			return err;
 
 		chan.config.log_level = log_level;
-		return wrnc_rt_structure_set(wrtd->wrnc, WRTD_IN_TDC_CONTROL,
-					     WRTD_OUT_TDC_CONTROL, &tlv, 1, 1);
+		return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
 	}
 }
 

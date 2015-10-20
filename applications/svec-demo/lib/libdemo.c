@@ -153,9 +153,13 @@ int demo_lemo_dir_set(struct demo_node *dev, uint32_t value)
 {
 	struct demo_desc *demo = (struct demo_desc *)dev;
 	uint32_t fields[] = {DEMO_VAR_LEMO_DIR, value};
+	struct wrnc_proto_header hdr = {
+		.slot_io = (DEMO_HMQ_IN << 4) |
+			   (DEMO_HMQ_OUT & 0xF),
+		.len = 2,
+	};
 
-	return wrnc_rt_variable_set(demo->wrnc, DEMO_HMQ_IN, DEMO_HMQ_OUT,
-				    fields, sizeof(fields) / 4 / 2, 1);
+	return wrnc_rt_variable_set(demo->wrnc, &hdr, fields, 1);
 }
 
 int demo_lemo_set(struct demo_node *dev, uint32_t value)
@@ -163,9 +167,13 @@ int demo_lemo_set(struct demo_node *dev, uint32_t value)
 	struct demo_desc *demo = (struct demo_desc *)dev;
 	uint32_t fields[] = {DEMO_VAR_LEMO_SET, value,
 			     DEMO_VAR_LEMO_CLR, ~value};
+	struct wrnc_proto_header hdr = {
+		.slot_io = (DEMO_HMQ_IN << 4) |
+			   (DEMO_HMQ_OUT & 0xF),
+		.len = 4,
+	};
 
-	return wrnc_rt_variable_set(demo->wrnc, DEMO_HMQ_IN, DEMO_HMQ_OUT,
-				    fields, sizeof(fields) / 4 / 2, 0);
+	return wrnc_rt_variable_set(demo->wrnc, &hdr, fields, 2);
 }
 
 
@@ -204,13 +212,15 @@ int demo_led_set(struct demo_node *dev, uint32_t value, enum demo_color color)
 	uint32_t real_value = demo_apply_color(value, color);
 	uint32_t fields[] = {DEMO_VAR_LED_SET, real_value,
 			     DEMO_VAR_LED_CLR, ~real_value};
-
-	return wrnc_rt_variable_set(demo->wrnc, DEMO_HMQ_IN, DEMO_HMQ_OUT,
-				    fields, sizeof(fields) / 4 / 2, 0);
+	struct wrnc_proto_header hdr = {
+		.slot_io = (DEMO_HMQ_IN << 4) |
+			   (DEMO_HMQ_OUT & 0xF),
+		.len = 6,
+	};
+	return wrnc_rt_variable_set(demo->wrnc, &hdr, fields, 2);
 }
 
 
-#define DEMO_STATUS_N_VARIABLES 3
 /**
  * It gets the status of the DEMO program
  */
@@ -220,10 +230,15 @@ int demo_status_get(struct demo_node *dev, struct demo_status *status)
 	uint32_t fields[] = {DEMO_VAR_LEMO_STA, 0,
 			     DEMO_VAR_LED_STA, 0,
 			     DEMO_VAR_LEMO_DIR, 0};
+	struct wrnc_proto_header hdr = {
+		.slot_io = (DEMO_HMQ_IN << 4) |
+			   (DEMO_HMQ_OUT & 0xF),
+		.flags = WRNC_PROTO_FLAG_SYNC,
+		.len = 6,
+	};
 	int err;
 
-	err = wrnc_rt_variable_get(demo->wrnc, DEMO_HMQ_IN, DEMO_HMQ_OUT,
-				   fields, DEMO_STATUS_N_VARIABLES);
+	err = wrnc_rt_variable_get(demo->wrnc, &hdr, fields, 3);
 	if (err)
 		return err;
 
@@ -252,9 +267,13 @@ int demo_test_struct_get(struct demo_node *dev, struct demo_structure *test)
 		.size = sizeof(struct demo_structure),
 		.structure = test,
 	};
+	struct wrnc_proto_header hdr = {
+		.slot_io = (DEMO_HMQ_IN << 4) |
+			   (DEMO_HMQ_OUT & 0xF),
+		.flags = WRNC_PROTO_FLAG_SYNC,
+	};
 
-	return wrnc_rt_structure_get(demo->wrnc, DEMO_HMQ_IN, DEMO_HMQ_OUT,
-				     &tlv, 1);
+	return wrnc_rt_structure_get(demo->wrnc, &hdr, &tlv, 1);
 }
 
 int demo_test_struct_set(struct demo_node *dev, struct demo_structure *test)
@@ -265,7 +284,10 @@ int demo_test_struct_set(struct demo_node *dev, struct demo_structure *test)
 		.size = sizeof(struct demo_structure),
 		.structure = test,
 	};
+	struct wrnc_proto_header hdr = {
+		.slot_io = (DEMO_HMQ_IN << 4) |
+			   (DEMO_HMQ_OUT & 0xF),
+	};
 
-	return wrnc_rt_structure_set(demo->wrnc, DEMO_HMQ_IN, DEMO_HMQ_OUT,
-				     &tlv, 1, 0);
+	return wrnc_rt_structure_set(demo->wrnc, &hdr, &tlv, 1);
 }

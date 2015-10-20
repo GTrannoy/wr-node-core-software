@@ -238,21 +238,17 @@ extern int wrnc_rt_version_get(struct wrnc_dev *wrnc,
 extern int wrnc_rt_ping(struct wrnc_dev *wrnc,
 			unsigned int hmq_in, unsigned int hmq_out);
 extern int wrnc_rt_variable_set(struct wrnc_dev *wrnc,
-				unsigned int hmq_in, unsigned int hmq_out,
-				uint32_t *variables,
-				unsigned int n_variables,
-				unsigned int sync);
+				struct wrnc_proto_header *hdr,
+				uint32_t *var, unsigned int n_var);
 extern int wrnc_rt_variable_get(struct wrnc_dev *wrnc,
-				unsigned int hmq_in, unsigned int hmq_out,
-				uint32_t *variables,
-				unsigned int n_variables);
+				struct wrnc_proto_header *hdr,
+				uint32_t *var, unsigned int n_var);
 extern int wrnc_rt_structure_set(struct wrnc_dev *wrnc,
-				 unsigned int hmq_in, unsigned int hmq_out,
+				 struct wrnc_proto_header *hdr,
 				 struct wrnc_structure_tlv *tlv,
-				 unsigned int n_tlv,
-				 unsigned int sync);
+				 unsigned int n_tlv);
 extern int wrnc_rt_structure_get(struct wrnc_dev *wrnc,
-				 unsigned int hmq_in, unsigned int hmq_out,
+				 struct wrnc_proto_header *hdr,
 				 struct wrnc_structure_tlv *tlv,
 				 unsigned int n_tlv);
 /**@}*/

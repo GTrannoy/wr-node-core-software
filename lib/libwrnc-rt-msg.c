@@ -242,36 +242,27 @@ int wrnc_rt_ping(struct wrnc_dev *wrnc,
  * Real implementation to read/write variables
  */
 static inline int wrnc_rt_variable(struct wrnc_dev *wrnc,
-				   unsigned int hmq_in, unsigned int hmq_out,
-				   uint8_t msg_id_in, uint8_t msg_id_out,
+				   struct wrnc_proto_header *hdr,
 				   uint32_t *variables,
-				   unsigned int n_variables,
-				   unsigned int sync)
+				   unsigned int n_variables)
 {
-	struct wrnc_proto_header hdr;
 	struct wrnc_msg msg;
 	struct wrnc_hmq *hmq;
 	int err;
 
-	hmq = wrnc_hmq_open(wrnc, hmq_in, WRNC_HMQ_INCOMING);
+	hmq = wrnc_hmq_open(wrnc, (hdr->slot_io >> 4 & 0xF), WRNC_HMQ_INCOMING);
 	if (!hmq)
 		return -1;
 
 	memset(&msg, 0, sizeof(struct wrnc_msg));
-	memset(&hdr, 0, sizeof(struct wrnc_proto_header));
-	hdr.msg_id = msg_id_in;
-	hdr.slot_io = (hmq->index << 4) | (hmq_out & 0xF);
-	hdr.len = n_variables * 2;
-	hdr.flags = sync ? WRNC_PROTO_FLAG_SYNC : 0;
 
 	/* Send asynchronous message, we do not wait for answers  */
-	wrnc_message_pack(&msg, &hdr, variables);
-	if (hdr.flags & WRNC_PROTO_FLAG_SYNC) {
-		err = wrnc_hmq_send_and_receive_sync(hmq, hmq_out, &msg, 1000);
-		wrnc_message_unpack(&msg, &hdr, variables);
-		/* Check if it is the answer that we are expecting */
-		if (!err && hdr.msg_id != msg_id_out)
-			err = -1;
+	wrnc_message_pack(&msg, hdr, variables);
+	if (hdr->flags & WRNC_PROTO_FLAG_SYNC) {
+		err = wrnc_hmq_send_and_receive_sync(hmq, (hdr->slot_io & 0xF),
+						     &msg, 1000);
+		if (!err)
+			wrnc_message_unpack(&msg, hdr, variables);
 	} else {
 		err = wrnc_hmq_send(hmq, &msg);
 	}
@@ -300,24 +291,34 @@ static inline int wrnc_rt_variable(struct wrnc_dev *wrnc,
  * values for the requested variable after the set operation. You can use
  * this to verify. You can use synchrounous messages to verify that you
  * variable are properly set.
+ * This function will change the header content, in particular it will change
+ * the following fields: msg_id, len
  * @param[in] wrnc device token
- * @param[in] hmq_in input slot index [0, 15]
- * @param[in] hmq_out output slot index [0, 15]
- * @param[in|out] variables
- * @param[in] n_variables number of variables to set. In other words,
+ * @param[in|out] hdr header to send on input, header received on output
+ * @param[in|out] var variables to get on input, variables values on output
+ * @param[in] n_var number of variables to set. In other words,
  *            the number of indexes you have in the 'variables' fields.
  * @param[in] sync set if you want a synchronous message
  */
 int wrnc_rt_variable_set(struct wrnc_dev *wrnc,
-			 unsigned int hmq_in, unsigned int hmq_out,
-			 uint32_t *variables,
-			 unsigned int n_variables,
-			 unsigned int sync)
+			 struct wrnc_proto_header *hdr,
+			 uint32_t *var,
+			 unsigned int n_var)
 {
-	return wrnc_rt_variable(wrnc, hmq_in, hmq_out,
-				RT_ACTION_RECV_FIELD_SET,
-				RT_ACTION_SEND_FIELD_GET,
-				variables, n_variables, sync);
+	int err;
+
+	hdr->msg_id = RT_ACTION_RECV_FIELD_SET;
+
+	err = wrnc_rt_variable(wrnc, hdr, var, n_var);
+	if (err)
+		return err;
+	if ((hdr->flags & WRNC_PROTO_FLAG_SYNC) &&
+	    hdr->msg_id != RT_ACTION_SEND_FIELD_GET) {
+		errno = EWRNC_INVALID_MESSAGE;
+		return -1;
+	}
+
+	return 0;
 }
 
 
@@ -337,22 +338,34 @@ int wrnc_rt_variable_set(struct wrnc_dev *wrnc,
  * This kind of message is always synchronous. The 'variables' field will be
  * overwritten by the syncrhonous answer; the answer contains the read back
  * values for the requested variables.
+ * This function will change the header content, in particular it will change
+ * the following fields: msg_id, flags, len
  * @param[in] wrnc device token
- * @param[in] hmq_in input slot index [0, 15]
- * @param[in] hmq_out output slot index [0, 15]
- * @param[in|out] variables
- * @param[in] n_variables number of variables to set. In other words,
+ * @param[in|out] hdr header to send on input, header received on output
+ * @param[in|out] var variables to get on input, variables values on output
+ * @param[in] n_var number of variables to set. In other words,
  *            the number of indexes you have in the 'variables' fields
  */
 int wrnc_rt_variable_get(struct wrnc_dev *wrnc,
-			 unsigned int hmq_in, unsigned int hmq_out,
-			 uint32_t *variables,
-			 unsigned int n_variables)
+			 struct wrnc_proto_header *hdr,
+			 uint32_t *var,
+			 unsigned int n_var)
 {
-	return wrnc_rt_variable(wrnc, hmq_in, hmq_out,
-				RT_ACTION_RECV_FIELD_GET,
-				RT_ACTION_SEND_FIELD_GET,
-				variables, n_variables, 1);
+	int err;
+
+	hdr->msg_id = RT_ACTION_RECV_FIELD_GET;
+	/* Getting variables is always synchronous */
+	hdr->flags |= WRNC_PROTO_FLAG_SYNC;
+
+        err = wrnc_rt_variable(wrnc, hdr, var, n_var);
+	if (err)
+		return err;
+	if (hdr->msg_id != RT_ACTION_SEND_FIELD_GET) {
+		errno = EWRNC_INVALID_MESSAGE;
+		return -1;
+	}
+
+	return 0;
 }
 
 
@@ -360,38 +373,30 @@ int wrnc_rt_variable_get(struct wrnc_dev *wrnc,
  * Real implementation to read/write structures
  */
 static int wrnc_rt_structure(struct wrnc_dev *wrnc,
-			     unsigned int hmq_in, unsigned int hmq_out,
-			     uint8_t msg_id_in, uint8_t msg_id_out,
+			     struct wrnc_proto_header *hdr,
 			     struct wrnc_structure_tlv *tlv,
-			     unsigned int n_tlv,
-			     unsigned int sync)
+			     unsigned int n_tlv)
 {
-	struct wrnc_proto_header hdr;
 	struct wrnc_msg msg;
 	struct wrnc_hmq *hmq;
 	int err, i;
 
-	hmq = wrnc_hmq_open(wrnc, hmq_in, WRNC_HMQ_INCOMING);
+	hmq = wrnc_hmq_open(wrnc, (hdr->slot_io >> 4 & 0xF), WRNC_HMQ_INCOMING);
 	if (!hmq)
 		return -1;
 
 	memset(&msg, 0, sizeof(struct wrnc_msg));
-	memset(&hdr, 0, sizeof(struct wrnc_proto_header));
-	hdr.msg_id = msg_id_in;
-	hdr.slot_io = (hmq->index << 4) | (hmq_out & 0xF);
-	hdr.flags = sync ? WRNC_PROTO_FLAG_SYNC : 0;
 
 	/* Send asynchronous message, we do not wait for answers  */
 	for (i = 0; i < n_tlv; ++i)
-		wrnc_message_structure_push(&msg, &hdr, &tlv[i]);
+		wrnc_message_structure_push(&msg, hdr, &tlv[i]);
 
-	if (hdr.flags & WRNC_PROTO_FLAG_SYNC) {
-		err = wrnc_hmq_send_and_receive_sync(hmq, hmq_out, &msg, 1000);
-		for (i = 0; i < n_tlv; ++i)
-			wrnc_message_structure_pop(&msg, &hdr, &tlv[i]);
-		/* Check if it is the answer that we are expecting */
-		if (!err && hdr.msg_id != msg_id_out)
-			err = -1;
+	if (hdr->flags & WRNC_PROTO_FLAG_SYNC) {
+		err = wrnc_hmq_send_and_receive_sync(hmq, (hdr->slot_io & 0xF),
+						     &msg, 1000);
+		if (!err)
+			for (i = 0; i < n_tlv; ++i)
+				wrnc_message_structure_pop(&msg, hdr, &tlv[i]);
 	} else {
 		err = wrnc_hmq_send(hmq, &msg);
 	}
@@ -402,36 +407,62 @@ static int wrnc_rt_structure(struct wrnc_dev *wrnc,
 
 
 /**
- * It sends/receives a set of structures within TLV records
+ * It sends/receives a set of structures within TLV records.
+ * This function will change the header content, in particular it will change
+ * the following fields: msg_id, len
  * @param[in] wrnc device token
- * @param[in] hmq_in input slot index [0, 15]
- * @param[in] hmq_out output slot index [0, 15]
- * @param[in|out] structures
+ * @param[in|out] hdr header to send on input, header received on output
+ * @param[in|out] tlv structures to get on input, structures values on output
+ * @param[in] n_tlv number of tlv structures
  */
 int wrnc_rt_structure_set(struct wrnc_dev *wrnc,
-			  unsigned int hmq_in, unsigned int hmq_out,
-			  struct wrnc_structure_tlv *tlv, unsigned int n_tlv,
-			  unsigned int sync)
+			  struct wrnc_proto_header *hdr,
+			  struct wrnc_structure_tlv *tlv,
+			  unsigned int n_tlv)
 {
-	return wrnc_rt_structure(wrnc, hmq_in, hmq_out,
-				 RT_ACTION_RECV_STRUCT_SET,
-				 RT_ACTION_SEND_STRUCT_GET,
-				 tlv, n_tlv, sync);
+	int err;
+
+	hdr->msg_id = RT_ACTION_RECV_STRUCT_SET;
+
+	err = wrnc_rt_structure(wrnc, hdr, tlv, n_tlv);
+	if (err)
+		return err;
+	if ((hdr->flags & WRNC_PROTO_FLAG_SYNC) &&
+	    hdr->msg_id != RT_ACTION_SEND_STRUCT_GET) {
+		errno = EWRNC_INVALID_MESSAGE;
+		return -1;
+	}
+
+	return 0;
 }
 
 /**
- * It receives a set of structures within TLV records
+ * It receives a set of structures within TLV records.
+ * This function will change the header content, in particular it will change
+ * the following fields: msg_id, flags, len
  * @param[in] wrnc device token
- * @param[in] hmq_in input slot index [0, 15]
- * @param[in] hmq_out output slot index [0, 15]
- * @param[in|out] structures
+ * @param[in|out] hdr header to send on input, header received on output
+ * @param[in|out] tlv structures to get on input, structures values on output
+ * @param[in] n_tlv number of tlv structures
  */
 int wrnc_rt_structure_get(struct wrnc_dev *wrnc,
-			  unsigned int hmq_in, unsigned int hmq_out,
-			  struct wrnc_structure_tlv *tlv, unsigned int n_tlv)
+			  struct wrnc_proto_header *hdr,
+			  struct wrnc_structure_tlv *tlv,
+			  unsigned int n_tlv)
 {
-	return wrnc_rt_structure(wrnc, hmq_in, hmq_out,
-				 RT_ACTION_RECV_STRUCT_GET,
-				 RT_ACTION_SEND_STRUCT_GET,
-				 tlv, n_tlv, 1);
+	int err;
+
+	hdr->msg_id = RT_ACTION_RECV_STRUCT_GET;
+	/* Getting variables is always synchronous */
+	hdr->flags |= WRNC_PROTO_FLAG_SYNC;
+
+        err = wrnc_rt_structure(wrnc, hdr, tlv, n_tlv);
+	if (err)
+		return err;
+	if (hdr->msg_id != RT_ACTION_SEND_STRUCT_GET) {
+		errno = EWRNC_INVALID_MESSAGE;
+		return -1;
+	}
+
+	return 0;
 }

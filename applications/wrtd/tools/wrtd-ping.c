@@ -28,7 +28,8 @@ void help()
 int main(int argc, char *argv[])
 {
 	struct wrtd_node *wrtd;
-	uint32_t dev_id = 0, n = 1, vi, vo;
+	uint32_t dev_id = 0, n = 1, vo;
+	struct wrnc_rt_version vi;
 	uint64_t period = 0;
 	struct wr_timestamp tsi, tso;
 	int err, time = 0, version = 0;
@@ -110,9 +111,17 @@ int main(int argc, char *argv[])
 			fprintf(stdout,
 				"\tbase time\ts:%"PRIu64" t:%d f:%d\n",
 				tsi.seconds, tsi.ticks, tsi.frac);
-		if (version)
-			fprintf(stdout,
-				"\tversion\t\t%x\n", vi);
+		if (version) {
+			fprintf(stdout, "\tRealTime Application Version:");
+			fprintf(stdout, "\tfpga_id\t\t%x\n",
+				vi.fpga_id);
+			fprintf(stdout, "\trt_id\t\t%x\n",
+				vi.rt_id);
+			fprintf(stdout, "\trt_version\t\t%x\n",
+				vi.rt_version);
+			fprintf(stdout, "\tgit_version\t\t%x\n",
+				vi.git_version);
+		}
 	skip_input:
 		/* check output */
 		err = wrtd_out_ping(wrtd);

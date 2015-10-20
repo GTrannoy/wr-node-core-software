@@ -10,6 +10,7 @@
 
 #include <string.h>
 
+#define ARRAY_SIZE(_a) (sizeof(_a) / sizeof(_a[0]))
 
 /**
  * It describes the version running on the embedded CPU

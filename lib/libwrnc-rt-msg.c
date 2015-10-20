@@ -183,6 +183,8 @@ int wrnc_rt_version_get(struct wrnc_dev *wrnc, struct wrnc_rt_version *version,
         err = wrnc_hmq_send_and_receive_sync(hmq, hmq_out, &msg,
 					     wrnc_default_timeout_ms);
 	wrnc_hmq_close(hmq);
+	if (err)
+		return err;
 
 	wrnc_message_unpack(&msg, &hdr, version);
 	if (hdr.msg_id != RT_ACTION_SEND_VERSION) {
@@ -223,6 +225,8 @@ int wrnc_rt_ping(struct wrnc_dev *wrnc,
 	/* Send the message and get answer */
         err = wrnc_hmq_send_and_receive_sync(hmq, hmq_out, &msg,
 					     wrnc_default_timeout_ms);
+	if (err)
+		return err;
 	wrnc_hmq_close(hmq);
 	wrnc_message_unpack(&msg, &hdr, NULL);
 	if (hdr.msg_id != RT_ACTION_SEND_ACK) {

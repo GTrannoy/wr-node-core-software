@@ -574,24 +574,24 @@ int wrtd_out_pulse_width_set(struct wrtd_node *dev, unsigned int output,
  * The function will round the value, so it may happen that you read back a
  * different value. The reason is that the RT application measure the dead
  * time in ticks, which are 8ns steps. So this function will internally
- * convert the dead time in ticks.
+ * convert the dead time in ticks. The function accept pico-seconds only to
+ * be consistent with the API.
  * @param[in] dev device token
  * @param[in] output index (0-based) of output channel
- * @param[in] dead_time_ns dead time in nano-seconds
+ * @param[in] dead_time_ps dead time in pico-seconds
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_out_dead_time_set(struct wrtd_node *dev, unsigned int output,
-			   uint64_t dead_time_ns)
+			   uint64_t dead_time_ps)
 {
 	struct wrnc_msg msg = wrnc_msg_init(5);
-	uint32_t id, seq = 0, ticks = dead_time_ns / 8;
+	uint32_t id, seq = 0, ticks = dead_time_ps / 8000;
 
 	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
 
-	dead_time_ns /= 8; /* Convert in ticks*/
 	id = WRTD_CMD_FD_CHAN_DEAD_TIME;
 	wrnc_msg_header (&msg, &id, &seq);
 	wrnc_msg_uint32 (&msg, &output);

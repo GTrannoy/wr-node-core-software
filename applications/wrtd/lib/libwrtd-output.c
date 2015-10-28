@@ -604,7 +604,7 @@ int wrtd_out_dead_time_set(struct wrtd_node *dev, unsigned int output,
 /**
  * @param[in] dev pointer to open node device.
  * @param[in] handle trigger where act on
- * @param[in] delay_ps delay in pico-seconds
+ * @param[in] delay_ps delay in pico-seconds in range [0, 999999999000]
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_out_trig_condition_delay_set(struct wrtd_node *dev,

@@ -7,7 +7,8 @@ DESTDIR ?= /usr/local
 
 WRNC ?= ../../../
 
-CFLAGS += -Wall -ggdb -I. -I../include -I$(WRNC)/include -I$(WRNC)/lib -I../lib
+CFLAGS += -Wall -Werror -ggdb
+CFLAGS += -I. -I../include -I$(WRNC)/include -I$(WRNC)/lib -I../lib
 CFLAGS += $(EXTRACFLAGS)
 CFLAGS += $(EXTRACFLAGS)
 LDLIBS += -Wl,-Bstatic -L../lib -lwrtd -L$(WRNC)/lib -lwrnc

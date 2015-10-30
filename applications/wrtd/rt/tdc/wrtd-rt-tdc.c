@@ -94,7 +94,7 @@ static int wrtd_in_trigger_log(int type, int miss_reason,
 		return;
 
 	out_buf = rt_mq_claim_out(&hdr);
-	log = rt_proto_payload_get((struct wrtd_log_entry *) out_buf.data);
+	log = (struct wrtd_log_entry *)rt_proto_payload_get(out_buf.data);
 	log->type = type;
 	log->channel = st->n;
 	log->miss_reason = miss_reason;

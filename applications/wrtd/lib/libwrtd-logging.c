@@ -109,7 +109,7 @@ static struct wrnc_hmq *wrtd_log_open(struct wrtd_node *dev,
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrnc_msg_filter filter = {
-		.operation = WRNC_MSG_FILTER_AND,
+		.operation = WRNC_MSG_FILTER_EQ,
 		.word_offset = 3, /* channel field */
 		.mask = 0xFFFF, /* entire field */
 		.value = channel, /* required channel */
@@ -130,6 +130,10 @@ static struct wrnc_hmq *wrtd_log_open(struct wrtd_node *dev,
 		return NULL;
 
 	if (channel > -1) {
+		if (core == WRTD_CORE_IN) {
+			/* On input side we have the header */
+			filter.word_offset = 6;
+		}
 		/* the user want to filter per channel */
 		err = wrnc_hmq_filter_add(hmq, &filter);
 		if (err)

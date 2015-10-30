@@ -10,7 +10,8 @@ LIB = libwrnc.a
 LOBJ := libwrnc.o
 LOBJ += libwrnc-rt-msg.o
 
-CFLAGS += -Wall -ggdb -fPIC -I. -I$(WRNC)/include $(EXTRACFLAGS)
+CFLAGS += -Wall -Werror -ggdb -fPIC
+CFLAGS += -I. -I$(WRNC)/include $(EXTRACFLAGS)
 LDFLAGS = -L. -lwrnc
 
 

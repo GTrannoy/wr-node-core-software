@@ -22,6 +22,7 @@ static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 struct wrtd_log_th {
 	struct wrtd_node *wrtd;
 	enum wrtd_core core;
+	int channel;
 	int n_read;
 };
 
@@ -33,6 +34,8 @@ static void help()
 	fprintf(stderr, "-D device id\n");
 	fprintf(stderr, "-n number of messages to read (0 means infinite)\n");
 	fprintf(stderr, "-s show current logging level for all channels\n");
+	fprintf(stderr, "-o output channel [0, %d]\n", FD_NUM_CHANNELS - 1);
+	fprintf(stderr, "-i input channel [0, %d]\n", TDC_NUM_CHANNELS - 1);
 	exit(1);
 }
 
@@ -42,16 +45,19 @@ static void *logging_thread(void *arg)
 	struct wrtd_log_th *th_data = arg;
 	struct wrnc_hmq *hlog;
 	struct wrtd_log_entry log;
-
 	int i, count;
 
 	/* Open logging interfaces */
 	switch (th_data->core) {
 	case WRTD_CORE_IN:
-		hlog = wrtd_in_log_open(th_data->wrtd, -1);
+		fprintf(stdout, "Open INPUT logging interface, channel: %d\n",
+			th_data->channel);
+		hlog = wrtd_in_log_open(th_data->wrtd, th_data->channel);
 		break;
 	case WRTD_CORE_OUT:
-		hlog = wrtd_out_log_open(th_data->wrtd, -1);
+		fprintf(stdout, "Open OUTPUT logging interface, channel: %d\n",
+			th_data->channel);
+		hlog = wrtd_out_log_open(th_data->wrtd, th_data->channel);
 		break;
 	default:
 		fprintf(stderr, "Unknow core %d\n", th_data->core);
@@ -130,7 +136,9 @@ int main(int argc, char *argv[])
 	uint32_t dev_id = 0;
 	char c;
 
-	while ((c = getopt (argc, argv, "hD:n:s")) != -1) {
+	th_data[0].channel = -1;
+	th_data[1].channel = -1;
+	while ((c = getopt (argc, argv, "hD:n:so:i:")) != -1) {
 		switch (c) {
 		default:
 			help();
@@ -144,6 +152,12 @@ int main(int argc, char *argv[])
 			break;
 		case 's':
 			show_log = 1;
+			break;
+		case 'o':
+			sscanf(optarg, "%d", &th_data[1].channel);
+			break;
+		case 'i':
+			sscanf(optarg, "%d", &th_data[0].channel);
 			break;
 		}
 	}

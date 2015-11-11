@@ -667,26 +667,45 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 		return err;
 
 	/*
-	 * Wait our synchronous answer. If after 1000ms we don't receive
+	 * Wait our synchronous answer. If after timeout we don't receive
 	 * an answer, something is seriously broken
 	 */
+	msg.timeout_ms = msg.timeout_ms ? msg.timeout_ms : hmq_sync_timeout;
 	to = wait_event_interruptible_timeout(hmq_out->q_msg,
 					      hmq_out->flags & WRNC_FLAG_HMQ_SYNC_READY,
-					      msecs_to_jiffies(hmq_sync_timeout));
+					      msecs_to_jiffies(msg.timeout_ms));
 
 	spin_lock_irqsave(&hmq_out->lock, flags);
 	hmq_out->flags &= ~WRNC_FLAG_HMQ_SYNC_READY;
 	msg_ans = hmq_out->sync_answer;
 	spin_unlock_irqrestore(&hmq_out->lock, flags);
 
-	if (unlikely(to <= 0)) {
-		if (to == 0)
-			dev_err(&hmq->dev,
-				 "The real time application is taking too much time to answer. Something is broken\n");
+	/* On error, or timeout, clear the message.
+	 * This should not happen, so optimize
+	 */
+	if (unlikely(to <= 0))
 		memset(&msg_ans, 0, sizeof(struct wrnc_msg));
-	}
 
-	return copy_to_user(msg.msg, &msg_ans, sizeof(struct wrnc_msg));
+	/* On timeout print an error message.
+	 * This should not happen, so optimize
+	 */
+	if (unlikely(to == 0))
+		dev_err(&hmq->dev,
+			"The real time application is taking too much time to answer (more than %dms). Something is broken\n",
+			msg.timeout_ms);
+
+	/* Return the error code on error, or update with remaining time
+	 * Errors should not happen, so optimize
+	 */
+	if (unlikely(to < 0))
+		return to;
+	else
+		msg.timeout_ms = jiffies_to_msecs(to);
+
+	err = copy_to_user(msg.msg, &msg_ans, sizeof(struct wrnc_msg));
+	if (err)
+		return err;
+	return copy_to_user(uarg, &msg, sizeof(struct wrnc_msg_sync));
 }
 
 

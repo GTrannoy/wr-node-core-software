@@ -32,7 +32,7 @@ static inline int wrtd_out_send_and_receive_sync(struct wrtd_desc *wrtd,
 
 	wrnc_hmq_close(hmq);
 
-	return err;
+	return err < 0 ? err : 0; /* Ignore timeout */
 }
 
 static int wrtd_out_trivial_request (struct wrtd_node *dev, struct wrnc_msg *request_msg)

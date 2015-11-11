@@ -33,7 +33,7 @@ static inline int wrtd_in_send_and_receive_sync(struct wrtd_desc *wrtd,
 					     WRTD_DEFAULT_TIMEOUT);
 	wrnc_hmq_close(hmq);
 
-	return err;
+	return err < 0 ? err : 0; /* Ignore timeout */
 }
 
 

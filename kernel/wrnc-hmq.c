@@ -516,6 +516,9 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 /**
  * It writes a message to a FPGA HMQ. Note that you have to take
  * the HMQ spinlock before call this function
+ * @param[in] hmq queue where send the message
+ * @param[in] msg the message to send
+ * @param[out] the sequence number used to send the message
  */
 static int wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg,
 			     uint32_t *seq)
@@ -625,15 +628,10 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 
 	/* Send the message */
 	spin_lock_irqsave(&hmq->lock, flags);
-	err = wrnc_message_push(hmq, &msg_req, &seq);
+	err = wrnc_message_push(hmq, &msg_req, &hmq_out->waiting_seq);
 	spin_unlock_irqrestore(&hmq->lock, flags);
 	if (err)
 		return err;
-
-	/* Set message sequance to wait */
-	spin_lock_irqsave(&hmq_out->lock, flags);
-	hmq_out->waiting_seq = seq;
-	spin_unlock_irqrestore(&hmq_out->lock, flags);
 
 	/*
 	 * Wait our synchronous answer. If after 1000ms we don't receive

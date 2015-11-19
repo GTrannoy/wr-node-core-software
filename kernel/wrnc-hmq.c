@@ -48,6 +48,10 @@ static int hmq_in_no_irq_wait = 10;
 module_param_named(hmq_in_no_irq_wait_us, hmq_in_no_irq_wait, int, 0444);
 MODULE_PARM_DESC(hmq_in_no_irq_wait, "Time (us) to wait after sending a message from the host to the core in a no-interrupt context. Default 10us");
 
+static int hmq_max_irq_loop = 5;
+module_param_named(max_irq_loop, hmq_max_irq_loop, int, 0644);
+MODULE_PARM_DESC(max_irq_loop, "Maximum number of messages to read per interrupt per hmq");
+
 static int wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg,
 			     uint32_t *seq);
 
@@ -930,7 +934,6 @@ static void wrnc_irq_handler_output(struct wrnc_hmq *hmq)
 	wake_up_interruptible(&hmq->q_msg);
 }
 
-#define MAX_DISPATCH_IRQ_LOOP 5
 /**
  * It handles HMQ interrupts. It checks if any of the slot has a pending
  * interrupt. If the interrupt is pending it will handle it, otherwise it
@@ -974,7 +977,7 @@ irqreturn_t wrnc_irq_handler(int irq_core_base, void *arg)
 	 */
 	status = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_SLOT_STATUS);
 	status &= wrnc->irq_mask;
-	if (status && n_disp < MAX_DISPATCH_IRQ_LOOP)
+	if (status && n_disp < hmq_max_irq_loop)
 		goto dispatch_irq;
 
 	fmc_irq_ack(fmc);

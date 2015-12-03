@@ -44,5 +44,6 @@ void adf4002_configure(int r_div, int n_div, int mon_output)
  
     adf4002_write(0 | (r_div << 2));
     adf4002_write(1 | (n_div << 8));
+
     adf4002_write(2 | (7<<15) | (7<<18) | (0<<7) | ( mon_output << 4));
 }

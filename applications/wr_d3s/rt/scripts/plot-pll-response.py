@@ -7,7 +7,7 @@ t=[]
 phase=[]
 y=[]
 
-for l in open("resp.dat","rb").readlines():
+for l in open("../d3s/test.dat","rb").readlines():
     tok = l.split()
     t.append(int(tok[0]))
     phase.append(int(tok[1]))

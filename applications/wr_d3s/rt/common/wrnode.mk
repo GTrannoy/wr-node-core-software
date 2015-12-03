@@ -1,5 +1,5 @@
 # and don't touch the rest unless you know what you're doing.
-CROSS_COMPILE ?= /user/twlostow/apps/gcc-lm32/bin/lm32-elf-
+CROSS_COMPILE ?= /opt/gcc-lm32/bin/lm32-elf-
 INSTALL_PREFIX ?= .
 
 CC =		$(CROSS_COMPILE)gcc

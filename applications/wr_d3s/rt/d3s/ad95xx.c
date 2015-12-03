@@ -242,7 +242,7 @@ int ad9516_init()
 
 	ad9516_set_vco_divider(3); 
 
-	ad9516_set_output_divider(0, 1, 0);  	// OUT1. 500 MHz for the DDS
+	ad9516_set_output_divider(0, 1, 1);  	// OUT1. 500 MHz for the DDS
 	ad9516_set_output_divider(6, 4, 0);  	// OUT6. 125 MHz for the FPGA
 	ad9516_set_output_divider(8, 4, 0);  	// OUT6. 125 MHz for the UFL debug connectors
 

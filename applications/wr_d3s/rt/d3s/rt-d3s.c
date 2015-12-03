@@ -22,7 +22,7 @@
 #include "gqueue.h"
 #include "rt-d3s.h"
 
-#define RESP_LOG_BUF_SIZE 64
+#define RESP_LOG_BUF_SIZE 16
 
 #define DDS_SNAP_LAG_SAMPLES 3
 #define DDS_ACC_BITS 43
@@ -30,6 +30,7 @@
 
 
 
+#define DDS_TUNE_GAIN 1024
 
 struct resp_log_state
 {
@@ -222,7 +223,7 @@ void init()
     d3s_reset();
 
 	/* Set up the phase detector to work at ~15 MHz (44 MHz / 3) */
-    adf4002_configure(2,2,4);
+    adf4002_configure(2,2,0);
 
     resp_log_init(&rsplog);
 
@@ -246,14 +247,16 @@ int dds_pi_update(struct dds_loop_state *state, int phase_error)
 
     state->integ += err;
 
-    int y = (state->kp * err + state->ki * state->integ) >> 10;
+    int y = (state->kp * err + state->ki * state->integ) >> 14;
+
+    dp_writel(y & 0xffffff, DDS_REG_TUNE_VAL);
 
     resp_log_update(&rsplog, phase_error, y);
-
 
     eabs = abs(err);
     esamples++;
     
+
     if( !state->locked )
     {
         if(  abs(err) <= state->lock_threshold)
@@ -350,6 +353,7 @@ static inline int dds_poll_next_sample(uint32_t *pd_data)
 {
 	uint32_t v;
         v = dp_readl(DDS_REG_PD_DATA);
+
         if (!( v & DDS_PD_DATA_VALID))
             return 0;
         
@@ -395,7 +399,6 @@ static inline void dds_master_update(struct dds_loop_state *state)
         /* clear valid flag */
         int y = dds_pi_update(state, pd_data & 0xffff);
 
-        dp_writel(y, DDS_REG_TUNE_VAL);
 
 	state->last_tune = y;
 
@@ -417,7 +420,7 @@ int pf_cnt = 0;
 
 void dds_slave_got_fixup(struct dds_loop_state *state, struct wr_d3s_remote_message *msg)
 {
-    
+
     if( state->stream_id != msg->stream_id)
     	return; // not a stream we're interested in
 
@@ -545,7 +548,7 @@ int64_t calculate_phase_correction(struct dds_loop_state *state)
 
     uint64_t acc = 0;
     uint64_t samples_per_tune = 125 * state->sampling_divider;
-    uint64_t phase_per_sample = samples_per_tune * ( state->base_tune + (state->last_tune * 4096 ) ) ; // fixme: gain 
+    uint64_t phase_per_sample = samples_per_tune * ( state->base_tune + (state->last_tune * DDS_TUNE_GAIN ) ) ; // fixme: gain 
 
     acc = phase_per_sample * (uint64_t) (state->current_sample_idx + 1);
     acc += state->fixup_phase;
@@ -565,7 +568,7 @@ int lost_samples = 0;
 
 void dds_slave_update(struct dds_loop_state *state)
 {
-    uint32_t pd_data;
+	uint32_t pd_data;
 
     trc_start();
 
@@ -685,8 +688,8 @@ void dds_loop_update(struct dds_loop_state *state)
 void dds_loop_start(struct dds_loop_state *state)
 {
     state->integ = 0;
-    state->kp = 3000;
-    state->ki = 3;
+    state->kp = 100 << 4;
+    state->ki = 1;
     state->locked = 0;
     state->lock_samples = 10000;
     state->delock_samples = 1000;
@@ -717,7 +720,7 @@ void dds_loop_start(struct dds_loop_state *state)
     }
 
     /* Tuning gain = 1 */
-    dp_writel(1<<12, DDS_REG_GAIN);
+    dp_writel(DDS_TUNE_GAIN, DDS_REG_GAIN);
 }
 
 void rf_counter_init(struct rf_counter_state *state, struct dds_loop_state *loop);
@@ -916,7 +919,7 @@ void rf_counter_update(struct rf_counter_state *state)
 		state->fixup_ready = 0;
 		state->state = RF_COUNTER_SLAVE_RESYNC;
 
-    		uint64_t tune = ( state->dds->base_tune + (state->dds->last_tune * 4096 ) ) ; // fixme: gain 
+    		uint64_t tune = ( state->dds->base_tune + (state->dds->last_tune * DDS_TUNE_GAIN ) ) ; // fixme: gain 
 
 		uint32_t delay_clks = (state->dds->slave_delay * state->dds->sampling_divider * 125);
 
@@ -1073,8 +1076,25 @@ void main_loop()
 
     dds_loop.enabled = 0;
 
+    int t_last = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
+
+    dp_writel(10000000, DDS_REG_FREQ_MEAS_GATE);
+
+    esamples = 0;
+
     for(;;)
     {
+	int t_cur = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
+
+	if(t_cur != t_last)
+	{
+	    t_last = t_cur;
+//	    pp_printf("es = %d %d\n", esamples, dds_loop.enabled);
+//	    pp_printf("rf in = %d\n", dp_readl(DDS_REG_FREQ_MEAS_RF_IN));
+//	    pp_printf("dds freq = %d\n", dp_readl(DDS_REG_FREQ_MEAS_DDS));
+
+	}
+
         do_rx(&dds_loop);
         dds_loop_update (&dds_loop);
         wr_update_link();

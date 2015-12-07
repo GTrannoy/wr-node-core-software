@@ -8,7 +8,7 @@ DESTDIR ?= /usr/local
 WRNC ?= ../../../
 
 CFLAGS += -Wall -ggdb -I. -I../include -I$(WRNC)/lib -I$(WRNC)/kernel -I../lib $(EXTRACFLAGS) -I../../../include/
-LDLIBS += -L../lib -L$(WRNC)/lib -lwrnc
+LDLIBS += -L../lib $(WRNC)/lib/libwrnc.a
 
 PROGS := wr-d3s-ctl
 

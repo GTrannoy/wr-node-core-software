@@ -1,4 +1,4 @@
-OBJS = rt-d3s.o ad95xx.o adf4002.o
+OBJS = ad95xx.o adf4002.o rt-d3s.o #main.o master_loop.o wr.o
 OUTPUT = rt-d3s
 
 include ../common/wrnode.mk

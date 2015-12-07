@@ -4,6 +4,18 @@
 #include "rt.h"
 #include "hw/dds_regs.h"
 
+// number of DDS samples by which the phase snapshot is delayed
+#define DDS_SNAP_LAG_SAMPLES 3
+
+// DDS accumulator bits
+#define DDS_ACC_BITS 43
+
+// Mask for the above bits
+#define DDS_ACC_MASK ((1ULL << (DDS_ACC_BITS) ) - 1)
+
+// DDS tuning gain (value written to GAIN register of the DDS core)
+#define DDS_TUNE_GAIN 1024
+
 /* Sets/clears the GPIO bits selected by the mask */
 static inline void gpior_set(uint32_t mask, int value)
 {

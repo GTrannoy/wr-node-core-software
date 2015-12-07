@@ -263,10 +263,11 @@ int dds_pi_update(struct dds_loop_state *state, int phase_error)
             state->lock_counter++;
             if(state->lock_counter == state->lock_samples)
             {
-		pp_printf("[master] RF lock acquired\n");
+				pp_printf("[master] RF lock acquired\n");
                 state->locked = 1;
                 state->lock_id++;
                 state->lock_counter = 0;
+                smem_rf_ok = 1;
             }
         }
     } else { // locked==1
@@ -278,6 +279,7 @@ int dds_pi_update(struct dds_loop_state *state, int phase_error)
 		pp_printf("[master] RF lock lost\n");
                 state->locked = 0;
                 state->lock_counter = 0;
+                smem_rf_ok = 0;
             }
 
         }
@@ -1012,6 +1014,7 @@ int wr_is_timing_ok()
 
 void main_loop()
 {
+    smem_rf_ok = 0;
     wr_state = WR_LINK_OFFLINE;
     wr_enable_lock(0);
 

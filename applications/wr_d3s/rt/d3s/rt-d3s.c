@@ -21,6 +21,7 @@
 
 #include "gqueue.h"
 #include "rt-d3s.h"
+#include "shared_vars.h"
 
 #define RESP_LOG_BUF_SIZE 16
 
@@ -422,9 +423,9 @@ void dds_slave_got_fixup(struct dds_loop_state *state, struct wr_d3s_remote_mess
 
     if(state->lock_id != msg->lock_id)
     {
-	pp_printf("Master has relocked. Restarting loop.\n");
-	state->slave_state = SLAVE_WAIT_CONFIG;
-
+		pp_printf("Master has relocked. Restarting loop.\n");
+		state->slave_state = SLAVE_WAIT_CONFIG;
+		smem_rf_ok = 0;
         dds_loop_start(&dds_loop);
 	rf_counter_init(&rf_cnt, &dds_loop);
     
@@ -910,7 +911,8 @@ void rf_counter_update(struct rf_counter_state *state)
 
 	    if(cr & DDS_RF_CNT_TRIGGER_DONE)
 	    {
-		    state->state = RF_COUNTER_SLAVE_READY;
+                smem_rf_ok = 1;
+			    state->state = RF_COUNTER_SLAVE_READY;
 	    }
 
 

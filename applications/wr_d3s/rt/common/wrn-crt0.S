@@ -132,7 +132,7 @@ _crt0:
     mvhi    r3, hi(_ebss)
     ori     r3, r3, lo(_ebss)
     sub     r3, r3, r1
-/*    calli   memset */
+//    calli   memset 
     mvi     r1, 0
     mvi     r2, 0
     mvi     r3, 0

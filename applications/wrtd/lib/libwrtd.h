@@ -303,7 +303,8 @@ extern int wrtd_out_trig_enable(struct wrtd_node *dev,
 				struct wrtd_trigger_handle *handle, int enable);
 extern int wrtd_out_ping(struct wrtd_node *dev);
 extern int wrtd_out_base_time(struct wrtd_node *dev, struct wr_timestamp *ts);
-extern int wrtd_out_version(struct wrtd_node *dev, uint32_t *gitsha1);
+extern int wrtd_out_version(struct wrtd_node *dev,
+			    struct wrnc_rt_version *version);
 extern int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
 				     unsigned int output,
 				     enum wrtd_trigger_mode mode);

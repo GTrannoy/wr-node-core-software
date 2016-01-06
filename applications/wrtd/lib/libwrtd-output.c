@@ -847,21 +847,9 @@ int wrtd_out_has_trigger(struct wrtd_node *dev, unsigned int output,
 int wrtd_out_ping(struct wrtd_node *dev)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg = wrnc_msg_init(3);
-	uint32_t id, seq = 0;
-	int err;
 
-	id = WRTD_CMD_FD_PING;
-	wrnc_msg_header(&msg, &id, &seq);
-
-	/* Send the message and get answer */
-	err = wrtd_out_send_and_receive_sync(wrtd, &msg);
-        if (err) {
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
-
-	return wrtd_validate_acknowledge(&msg);
+	return wrnc_rt_ping(wrtd->wrnc, WRTD_IN_FD_CONTROL,
+			    WRTD_OUT_FD_CONTROL);
 }
 
 /**
@@ -873,30 +861,21 @@ int wrtd_out_ping(struct wrtd_node *dev)
 int wrtd_out_base_time(struct wrtd_node *dev, struct wr_timestamp *ts)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg = wrnc_msg_init(6); /* FIXME cannot use 2 */
-	uint32_t id, seq = 0;
+	uint32_t variables[] = {OUT_VAR_DEVICE_TIME_S, 0,
+				OUT_VAR_DEVICE_TIME_T, 0};
+	struct wrnc_proto_header hdr = {
+		.slot_io = (WRTD_IN_FD_CONTROL << 4) |
+			   (WRTD_OUT_FD_CONTROL & 0xF),
+		.flags = WRNC_PROTO_FLAG_SYNC,
+		.len = 4,
+	};
 	int err;
 
-	id = WRTD_CMD_FD_BASE_TIME;
-	wrnc_msg_header(&msg, &id, &seq);
-
-	/* Send the message and get answer */
-	err = wrtd_out_send_and_receive_sync(wrtd, &msg);
-        if (err) {
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
-
-	/* Deserialize and check the answer */
-	wrnc_msg_header(&msg, &id, &seq);
-
-	if(id != WRTD_REP_BASE_TIME_ID)
-	{
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
-
-	wrtd_msg_timestamp(&msg, ts);
+	err = wrnc_rt_variable_get(wrtd->wrnc, &hdr, variables, 2);
+	if (err)
+		return err;
+	ts->seconds = variables[1];
+	ts->ticks = variables[3];
 
 	return 0;
 }
@@ -905,36 +884,13 @@ int wrtd_out_base_time(struct wrtd_node *dev, struct wr_timestamp *ts)
 /**
  * It gets the output version
  * @param[in] dev device token
- * @param[out] ts output device base time
+ * @param[out] version the RT application version
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrtd_out_version(struct wrtd_node *dev, uint32_t *gitsha1)
+int wrtd_out_version(struct wrtd_node *dev, struct wrnc_rt_version *version)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg = wrnc_msg_init(6); /* FIXME cannot use 2 */
-	uint32_t id, seq = 0;
-	int err;
 
-	id = WRTD_CMD_FD_VERSION;
-	wrnc_msg_header(&msg, &id, &seq);
-
-	/* Send the message and get answer */
-	err = wrtd_out_send_and_receive_sync(wrtd, &msg);
-        if (err) {
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
-
-	/* Deserialize and check the answer */
-	wrnc_msg_header(&msg, &id, &seq);
-
-	if(id != WRTD_REP_VERSION)
-	{
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
-
-	wrnc_msg_uint32(&msg, gitsha1);
-
-	return 0;
+	return wrnc_rt_version_get(wrtd->wrnc, version,
+				   WRTD_IN_FD_CONTROL, WRTD_OUT_FD_CONTROL);
 }

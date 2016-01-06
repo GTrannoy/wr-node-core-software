@@ -359,4 +359,97 @@ struct wrtd_in {
 	uint32_t dead_time; /**< TDC dead time, in 8ns ticks */
 };
 
+
+enum wrtd_out_state_machine_steps {
+    OUT_ST_IDLE = 0,
+    OUT_ST_ARMED,
+    OUT_ST_TEST_PENDING,
+    OUT_ST_CONDITION_HIT,
+};
+
+
+/**
+ * Rule defining the behaviour of a trigger output upon reception of a
+ * trigger message with matching ID
+ */
+struct lrt_output_rule {
+	uint32_t delay_cycles; /**< Delay to add to the timestamp enclosed
+				  within the trigger message */
+	uint16_t delay_frac;
+	uint16_t state; /**< State of the rule (empty, disabled,
+			   conditional action, condition, etc.) */
+	struct lrt_output_rule *cond_ptr; /**< Pointer to conditional action.
+					     Used for rules that define
+					     triggering conditions. */
+	uint32_t latency_worst; /**< Worst-case latency (in 8ns ticks)*/
+	uint32_t latency_avg_sum; /**< Average latency accumulator and
+				     number of samples */
+	uint32_t latency_avg_nsamples;
+	int hits; /**< Number of times the rule has successfully produced
+		     a pulse */
+	int misses; /**< Number of times the rule has missed a pulse
+		       (for any reason) */
+};
+
+#define ENTRY_FLAG_VALID (1 << 0)
+
+/* Structure describing a single pulse in the Fine Delay software output queue */
+struct pulse_queue_entry {
+/* Trigger that produced the pulse */
+	struct wrtd_trigger_entry trig;
+/* Origin timestamp cycles count (for latency statistics) */
+	int origin_cycles;
+/* Rule that produced the pulse */
+	struct lrt_output_rule *rule;
+};
+
+/* Pulse FIFO for a single Fine Delay output */
+struct lrt_pulse_queue {
+	struct pulse_queue_entry data[FD_MAX_QUEUE_PULSES];
+	int head, tail, count;
+};
+
+struct wrtd_out_channel_stats {
+	unsigned int hits;
+	unsigned int miss_timeout;
+	unsigned int miss_deadtime;
+	unsigned int miss_overflow;
+	unsigned int miss_no_timing;
+
+	struct wrtd_trigger_entry last_executed; /**< Last enqueued trigger
+						    (i.e. the last one that
+						    entered the output queue) */
+	struct wrtd_trigger_entry last_enqueued; /**< Last timestamp value
+						    written to output config */
+	struct wr_timestamp last_programmed; /**< Last timestamp value written
+						to output config */
+	struct wrtd_trigger_entry last_lost;
+};
+
+struct wrtd_out_channel_config {
+	uint8_t idle; /**< Idle flag */
+	uint8_t state; /**< Arm state */
+	uint8_t mode; /**< Trigger mode */
+	uint8_t flags; /**< Flags (logging, etc) */
+	uint32_t log_level; /**< Current logging level */
+	uint32_t dead_time; /**< Dead time (8ns cycles) */
+	uint32_t width_cycles; /**< Pulse width (8ns cycles) */
+};
+
+struct wrtd_out_channel_private {
+	struct lrt_pulse_queue queue; /**< Output pulse queue */
+	struct lrt_output_rule *pending_trig; /**< Pending conditonal trigger */
+	struct wr_timestamp prev_pulse; /**< Last enqueued trigger + delay
+					   (for dead time checking). */
+};
+
+struct wrtd_out_channel {
+	uint32_t base_addr;
+	int n;
+	struct wrtd_out_channel_stats stats;
+	struct wrtd_out_channel_config config;
+	struct wrtd_out_channel_private priv;
+};
+
+
 #endif

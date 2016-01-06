@@ -141,10 +141,19 @@ int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 			 struct wrtd_output_state *state)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg = wrnc_msg_init(20);
-	int err, dummy = 0;
-	uint32_t seq = 0, id;
-	uint32_t dead_time_ticks, pulse_width_ticks;
+	struct wrtd_out_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = OUT_STRUCT_CHAN_0 + output,
+		.size = sizeof(struct wrtd_out_channel)
+		      - sizeof(struct wrtd_out_channel_private),
+		.structure = &chan,
+	};
+	struct wrnc_proto_header hdr = {
+		.slot_io = (WRTD_IN_FD_CONTROL << 4) |
+			   (WRTD_OUT_FD_CONTROL & 0xF),
+		.flags = WRNC_PROTO_FLAG_SYNC,
+	};
+	int err;
 
 	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
@@ -156,63 +165,37 @@ int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 		return -1;
 	}
 
-	/* Build the message */
-	id = WRTD_CMD_FD_CHAN_GET_STATE;
-	wrnc_msg_header (&msg, &id, &seq);
-   	wrnc_msg_uint32 (&msg, &output);
+	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	if (err)
+		return err;
 
-	/* Send the message and get answer */
-	err = wrtd_out_send_and_receive_sync(wrtd, &msg);
-	if (err) {
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
+	/* Copy to state structure */
+	state->output = chan.n;
+	state->executed_pulses = chan.stats.hits;
+	state->missed_pulses_late = chan.stats.miss_timeout;
+	state->missed_pulses_deadtime = chan.stats.miss_deadtime;
+	state->missed_pulses_overflow = chan.stats.miss_overflow;
+	state->missed_pulses_no_timing = chan.stats.miss_no_timing;
 
-	/* Deserialize and check the answer */
-	wrnc_msg_header(&msg, &id, &seq);
+	state->last_executed = chan.stats.last_executed;
+	state->last_enqueued = chan.stats.last_enqueued;
+	/* state->last_received =  TODO;*/
+	state->last_lost = chan.stats.last_lost;
 
-	if(id != WRTD_REP_STATE)
-	{
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
-
-	wrnc_msg_int32(&msg, &state->output);
-
-	wrnc_msg_uint32(&msg, &state->executed_pulses);
-	wrnc_msg_uint32(&msg, &state->missed_pulses_late);
-	wrnc_msg_uint32(&msg, &state->missed_pulses_deadtime);
-	wrnc_msg_uint32(&msg, &state->missed_pulses_overflow);
-	wrnc_msg_uint32(&msg, &state->missed_pulses_no_timing);
-
-	wrtd_msg_trigger_entry(&msg, &state->last_executed);
-	wrtd_msg_trigger_entry(&msg, &state->last_enqueued);
-	wrtd_msg_trigger_entry(&msg, &state->last_received);
-	wrtd_msg_trigger_entry(&msg, &state->last_lost);
-
-	wrnc_msg_int32(&msg, &dummy);
-	wrnc_msg_int32(&msg, &dummy);
-	wrnc_msg_int32(&msg, (int *) &state->mode);
-	wrnc_msg_uint32(&msg, &state->flags);
-	wrnc_msg_uint32(&msg, &state->log_level);
-	wrnc_msg_uint32(&msg, &dead_time_ticks);
-	wrnc_msg_uint32(&msg, &pulse_width_ticks);
-	wrnc_msg_uint32(&msg, &state->received_messages);
-	wrnc_msg_uint32(&msg, &state->received_loopback);
-
-	/* Check for deserialization errors (buffer underflow/overflow) */
-	if ( wrnc_msg_check_error(&msg) ) {
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
+	state->mode = chan.config.mode;
+	state->flags = chan.config.flags;
+	state->log_level = chan.config.log_level;
+	/* TODO */
+	/* state->received_messages */
+	/* state->received_loopback */
 
 	state->pulse_width.seconds = 0;
 	state->pulse_width.frac = 0;
-	state->pulse_width.ticks = pulse_width_ticks;
+	state->pulse_width.ticks = chan.config.width_cycles;
 
 	state->dead_time.seconds = 0;
 	state->dead_time.frac = 0;
-	state->dead_time.ticks = dead_time_ticks;
+	state->dead_time.ticks = chan.config.dead_time;
 
 	return 0;
 }
@@ -229,7 +212,18 @@ int wrtd_out_enable(struct wrtd_node *dev, unsigned int output,
 		    int enable)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg;
+	struct wrtd_out_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = OUT_STRUCT_CHAN_0 + output,
+		.size = sizeof(struct wrtd_out_channel)
+		      - sizeof(struct wrtd_out_channel_private),
+		.structure = &chan,
+	};
+	struct wrnc_proto_header hdr = {
+		.slot_io = (WRTD_IN_FD_CONTROL << 4) |
+			   (WRTD_OUT_FD_CONTROL & 0xF),
+		.flags = WRNC_PROTO_FLAG_SYNC,
+	};
 	int err;
 
 	if (output >= FD_NUM_CHANNELS) {
@@ -237,19 +231,21 @@ int wrtd_out_enable(struct wrtd_node *dev, unsigned int output,
 		return -1;
 	}
 
-	/* Build the message */
-	msg.datalen = 4;
-	msg.data[0] = WRTD_CMD_FD_CHAN_ENABLE;
-	msg.data[1] = 0;
-	msg.data[2] = output;
-	msg.data[3] = !!enable;
-
-	/* Send the message and get answer */
-	err = wrtd_out_send_and_receive_sync(wrtd, &msg);
+	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
 	if (err)
 		return err;
 
-	return wrtd_validate_acknowledge(&msg);
+	if (enable) {
+		chan.config.flags |= WRTD_ENABLED;
+	} else {
+		chan.config.flags &= ~(WRTD_ENABLED | WRTD_ARMED |
+				       WRTD_TRIGGERED | WRTD_LAST_VALID);
+		chan.config.state = OUT_ST_IDLE;
+		/* run pulse_queue_init ( &out->queue ); on RT side */
+		/* set variable fd_ch_writel(out, FD_DCR_MODE, FD_REG_DCR); */
+	}
+
+	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
 }
 
 
@@ -532,38 +528,38 @@ int wrtd_out_pulse_width_set(struct wrtd_node *dev, unsigned int output,
 			   uint64_t width_ps)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg msg = wrnc_msg_init (16);
-	int err, tmp = 0;
-	uint32_t seq = 0, id;
+	struct wrtd_out_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = OUT_STRUCT_CHAN_0 + output,
+		.size = sizeof(struct wrtd_out_channel)
+		      - sizeof(struct wrtd_out_channel_private),
+		.structure = &chan,
+	};
+	struct wrnc_proto_header hdr = {
+		.slot_io = (WRTD_IN_FD_CONTROL << 4) |
+			   (WRTD_OUT_FD_CONTROL & 0xF),
+		.flags = WRNC_PROTO_FLAG_SYNC,
+	};
+	int err;
 
 	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
 
-	if (width_ps < 1000ULL * 250 || width_ps >= 1000ULL * 1000 * 1000 * 1000 )
-	{
+	if (width_ps < 1000ULL * 250 ||
+	    width_ps >= 1000ULL * 1000 * 1000 * 1000) {
 		errno = EWRTD_INVALID_PULSE_WIDTH;
 		return -1;
 	}
 
-	/* Build the message */
-	id = WRTD_CMD_FD_CHAN_SET_WIDTH;
-	wrnc_msg_header (&msg, &id, &seq);
-   	wrnc_msg_uint32 (&msg, &output);
+	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	if (err)
+		return err;
 
-   	tmp = width_ps / 8000ULL;
+	chan.config.width_cycles = width_ps / 8000ULL;
 
-   	wrnc_msg_int32 (&msg, &tmp);
-
-	/* Send the message and get answer */
-	err = wrtd_out_send_and_receive_sync(wrtd, &msg);
-	if (err) {
-		errno = EWRTD_INVALID_ANSWER_STATE;
-		return -1;
-	}
-
-	return wrtd_validate_acknowledge(&msg);
+	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
 }
 
 
@@ -584,20 +580,33 @@ int wrtd_out_pulse_width_set(struct wrtd_node *dev, unsigned int output,
 int wrtd_out_dead_time_set(struct wrtd_node *dev, unsigned int output,
 			   uint64_t dead_time_ps)
 {
-	struct wrnc_msg msg = wrnc_msg_init(5);
-	uint32_t id, seq = 0, ticks = dead_time_ps / 8000;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrtd_out_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = OUT_STRUCT_CHAN_0 + output,
+		.size = sizeof(struct wrtd_out_channel)
+		      - sizeof(struct wrtd_out_channel_private),
+		.structure = &chan,
+	};
+	struct wrnc_proto_header hdr = {
+		.slot_io = (WRTD_IN_FD_CONTROL << 4) |
+			   (WRTD_OUT_FD_CONTROL & 0xF),
+		.flags = WRNC_PROTO_FLAG_SYNC,
+	};
+	int err;
 
 	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
 
-	id = WRTD_CMD_FD_CHAN_DEAD_TIME;
-	wrnc_msg_header (&msg, &id, &seq);
-	wrnc_msg_uint32 (&msg, &output);
-	wrnc_msg_uint32 (&msg, &ticks);
+	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	if (err)
+		return err;
 
-	return wrtd_out_trivial_request (dev, &msg);
+	chan.config.dead_time = dead_time_ps / 8000;
+
+	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
 }
 
 
@@ -665,21 +674,38 @@ int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
 			      unsigned int output,
 			      enum wrtd_trigger_mode mode)
 {
-	struct wrnc_msg msg  = wrnc_msg_init(4);
-	uint32_t seq = 0, id, m = mode;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrtd_out_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = OUT_STRUCT_CHAN_0 + output,
+		.size = sizeof(struct wrtd_out_channel)
+		      - sizeof(struct wrtd_out_channel_private),
+		.structure = &chan,
+	};
+	struct wrnc_proto_header hdr = {
+		.slot_io = (WRTD_IN_FD_CONTROL << 4) |
+			   (WRTD_OUT_FD_CONTROL & 0xF),
+		.flags = WRNC_PROTO_FLAG_SYNC,
+	};
+	int err;
 
 	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
 
-	/* Build the message */
-	id = WRTD_CMD_FD_CHAN_SET_MODE;
-	wrnc_msg_header(&msg, &id, &seq);
-	wrnc_msg_uint32(&msg, &output);
-	wrnc_msg_uint32(&msg, &m);
+	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	if (err)
+		return err;
 
-	return wrtd_out_trivial_request (dev, &msg);
+	chan.config.mode = mode;
+	chan.config.flags &= (WRTD_TRIGGERED | WRTD_LAST_VALID);
+	if (chan.config.mode == WRTD_TRIGGER_MODE_SINGLE) {
+		chan.config.flags &= ~WRTD_ARMED;
+		chan.config.state = OUT_ST_IDLE;
+	}
+
+	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
 }
 
 
@@ -692,20 +718,40 @@ int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
  */
 int wrtd_out_arm(struct wrtd_node *dev, unsigned int output, int armed)
 {
-	struct wrnc_msg msg = wrnc_msg_init(4);
-	uint32_t seq = 0, id = WRTD_CMD_FD_CHAN_ARM;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrtd_out_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = OUT_STRUCT_CHAN_0 + output,
+		.size = sizeof(struct wrtd_out_channel)
+		      - sizeof(struct wrtd_out_channel_private),
+		.structure = &chan,
+	};
+	struct wrnc_proto_header hdr = {
+		.slot_io = (WRTD_IN_FD_CONTROL << 4) |
+			   (WRTD_OUT_FD_CONTROL & 0xF),
+		.flags = WRNC_PROTO_FLAG_SYNC,
+	};
+	int err;
 
 	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
 
-	/* Build the message */
-	wrnc_msg_header(&msg, &id, &seq);
-	wrnc_msg_uint32(&msg, &output);
-	wrnc_msg_int32(&msg, &armed);
+	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	if (err)
+		return err;
 
-	return wrtd_out_trivial_request (dev, &msg);
+	chan.config.flags &= ~WRTD_TRIGGERED;
+	if (armed) {
+		chan.config.flags |= WRTD_ARMED;
+		chan.config.state = OUT_ST_ARMED;
+	} else {
+		chan.config.flags &= ~WRTD_ARMED;
+		chan.config.state = OUT_ST_IDLE;
+	}
+
+	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
 }
 
 
@@ -716,19 +762,37 @@ int wrtd_out_arm(struct wrtd_node *dev, unsigned int output, int armed)
  */
 int wrtd_out_counters_reset(struct wrtd_node *dev, unsigned int output)
 {
-	struct wrnc_msg msg = wrnc_msg_init(3);
-	uint32_t seq = 0, id = WRTD_CMD_FD_CHAN_RESET_COUNTERS;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrtd_out_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = OUT_STRUCT_CHAN_0 + output,
+		.size = sizeof(struct wrtd_out_channel)
+		      - sizeof(struct wrtd_out_channel_private),
+		.structure = &chan,
+	};
+	struct wrnc_proto_header hdr = {
+		.slot_io = (WRTD_IN_FD_CONTROL << 4) |
+			   (WRTD_OUT_FD_CONTROL & 0xF),
+		.flags = WRNC_PROTO_FLAG_SYNC,
+	};
+	int err;
 
 	if (output >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
 		return -1;
 	}
 
-	/* Build the message */
-	wrnc_msg_header(&msg, &id, &seq);
-	wrnc_msg_uint32(&msg, &output);
+	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	if (err)
+		return err;
 
-	return wrtd_out_trivial_request (dev, &msg);
+	chan.stats.miss_timeout = 0;
+	chan.stats.miss_deadtime = 0;
+	chan.stats.miss_no_timing = 0;
+	chan.stats.miss_overflow = 0;
+	chan.config.flags &= ~WRTD_LAST_VALID;
+
+	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
 }
 
 

@@ -27,13 +27,7 @@
 
 #include <librt.h>
 
-#define OUT_ST_IDLE 0
-#define OUT_ST_ARMED 1
-#define OUT_ST_TEST_PENDING 2
-#define OUT_ST_CONDITION_HIT 3
-
 #define OUT_TIMEOUT 10
-
 
 static const uint32_t version = GIT_VERSION;
 static uint32_t promiscuous_mode = 0;
@@ -110,30 +104,6 @@ int wr_is_timing_ok()
 
 
 
-/**
- * Rule defining the behaviour of a trigger output upon reception of a
- * trigger message with matching ID
- */
-struct lrt_output_rule {
-	uint32_t delay_cycles; /**< Delay to add to the timestamp enclosed
-				  within the trigger message */
-	uint16_t delay_frac;
-	uint16_t state; /**< State of the rule (empty, disabled,
-			   conditional action, condition, etc.) */
-	struct lrt_hash_entry *cond_ptr; /**< Pointer to conditional action.
-					     Used for rules that define
-					     triggering conditions. */
-	uint32_t latency_worst; /**< Worst-case latency (in 8ns ticks)*/
-	uint32_t latency_avg_sum; /**< Average latency accumulator and
-				     number of samples */
-	uint32_t latency_avg_nsamples;
-	int hits; /**< Number of times the rule has successfully produced
-		     a pulse */
-	int misses; /**< Number of times the rule has missed a pulse
-		       (for any reason) */
-};
-
-#define ENTRY_FLAG_VALID (1 << 0)
 /**
  * Trigger handled by this real-time application
  */
@@ -323,22 +293,6 @@ int rtfd_trigger_entry_rules_count(unsigned int ch)
 }
 
 
-/* Structure describing a single pulse in the Fine Delay software output queue */
-struct pulse_queue_entry {
-/* Trigger that produced the pulse */
-	struct wrtd_trigger_entry trig;
-/* Origin timestamp cycles count (for latency statistics) */
-	int origin_cycles;
-/* Rule that produced the pulse */
-	struct lrt_output_rule *rule;
-};
-
-/* Pulse FIFO for a single Fine Delay output */
-struct lrt_pulse_queue
-{
-	struct pulse_queue_entry data[FD_MAX_QUEUE_PULSES];
-	int head, tail, count;
-};
 
 /* State of a single Trigger Output */
 struct lrt_output {
@@ -394,7 +348,8 @@ struct lrt_trigger_handle {
 };
 
 /* Output state array */
-static struct lrt_output outputs[FD_NUM_CHANNELS];
+static struct lrt_output outputs[1];
+static struct wrtd_out_channel wrtd_out_channels[FD_NUM_CHANNELS];
 /* Received message counters */
 static int rx_ebone = 0, rx_loopback = 0;
 /* Last received trigger (i.e. last received packet from Etherbone). */
@@ -882,31 +837,6 @@ static inline void ctl_nack( uint32_t seq, int err )
     hmq_msg_send (&buf);
 }
 
-static inline void ctl_chan_enable (uint32_t seq, struct wrnc_msg *ibuf)
-{
-	int ch, enabled;
-
-	wrnc_msg_int32(ibuf, &ch);
-	wrnc_msg_int32(ibuf, &enabled);
-
-	struct lrt_output *out = &outputs[ch];
-
-
-	if(enabled) {
-		out->flags |= WRTD_ENABLED;
-	} else {
-		out->flags &= ~(WRTD_ENABLED | WRTD_ARMED | WRTD_TRIGGERED | WRTD_LAST_VALID);
-		out->state = OUT_ST_IDLE;
-		/* clear the pulse queue and disable the physical output */
-		pulse_queue_init ( &out->queue );
-		fd_ch_writel(out, FD_DCR_MODE, FD_REG_DCR);
-	}
-
-//	pp_printf("chan-enable %d %d flags %x\n", ch, enabled, out->flags);
-
-	ctl_ack (seq);
-}
-
 
 static inline void ctl_trig_assign (uint32_t seq, struct wrnc_msg *ibuf)
 {
@@ -1136,31 +1066,6 @@ static inline void ctl_chan_get_trigger_state (uint32_t seq, struct wrnc_msg *ib
 	send_hash_entry (seq, handle.channel, 1, handle.cond ? handle.cond : handle.trig );
 }
 
-static inline void ctl_chan_reset_counters (uint32_t seq, struct wrnc_msg *ibuf)
-{
-	int ch;
-	wrnc_msg_int32(ibuf, &ch);
-
-	struct lrt_output *st = &outputs[ch];
-
-	st->hits = 0;
-	st->miss_timeout = 0;
-	st->miss_deadtime = 0;
-	st->miss_no_timing = 0;
-	st->miss_overflow = 0;
-	st->flags &= ~WRTD_LAST_VALID;
-
-	ctl_ack (seq);
-}
-
-static inline void ctl_chan_set_dead_time (uint32_t seq, struct wrnc_msg *ibuf)
-{
-	int ch;
-	wrnc_msg_int32(ibuf, &ch);
-	wrnc_msg_int32(ibuf, &outputs[ch].dead_time);
-	ctl_ack(seq);
-}
-
 
 static inline void ctl_base_time (uint32_t seq, struct wrnc_msg *ibuf)
 {
@@ -1203,53 +1108,6 @@ static inline void ctl_chan_set_delay (uint32_t seq, struct wrnc_msg *ibuf)
 	ctl_ack(seq);
 }
 
-static inline void ctl_chan_get_state (uint32_t seq, struct wrnc_msg *ibuf)
-{
-	int ch;
-
-	wrnc_msg_int32(ibuf, &ch);
-
-	struct lrt_output *st = &outputs[ch];
-	struct wrnc_msg obuf = ctl_claim_out_buf();
-
-	uint32_t id_state = WRTD_REP_STATE;
-
-	if(st->state != OUT_ST_IDLE)
-		st->flags |= WRTD_ARMED;
-
-
-	st->flags &= ~WRTD_NO_WR;
-
-	if( !wr_is_timing_ok() )
-		st->flags |= WRTD_NO_WR;
-
-	/* Create the response */
-	wrnc_msg_header(&obuf, &id_state, &seq);
-	wrnc_msg_int32(&obuf, &ch);
-
-	wrnc_msg_int32(&obuf, &st->hits);
-	wrnc_msg_int32(&obuf, &st->miss_timeout);
-	wrnc_msg_int32(&obuf, &st->miss_deadtime);
-	wrnc_msg_int32(&obuf, &st->miss_overflow);
-	wrnc_msg_int32(&obuf, &st->miss_no_timing);
-
-	wrtd_msg_trigger_entry(&obuf, &st->last_executed);
-	wrtd_msg_trigger_entry(&obuf, &st->last_enqueued);
-	wrtd_msg_trigger_entry(&obuf, &last_received);
-	wrtd_msg_trigger_entry(&obuf, &st->last_lost);
-
-	wrnc_msg_int32(&obuf, &st->idle);
-	wrnc_msg_int32(&obuf, &st->state);
-	wrnc_msg_int32(&obuf, &st->mode);
-	wrnc_msg_uint32(&obuf, &st->flags);
-	wrnc_msg_uint32(&obuf, &st->log_level);
-	wrnc_msg_int32(&obuf, &st->dead_time);
-	wrnc_msg_int32(&obuf, &st->width_cycles);
-	wrnc_msg_int32(&obuf, &rx_ebone);
-	wrnc_msg_int32(&obuf, &rx_loopback);
-
-	hmq_msg_send (&obuf);
-}
 
 static inline void ctl_software_trigger (uint32_t seq, struct wrnc_msg *ibuf)
 {
@@ -1311,73 +1169,6 @@ static inline void ctl_software_trigger (uint32_t seq, struct wrnc_msg *ibuf)
 }
 
 
-static inline void ctl_chan_set_mode (uint32_t seq, struct wrnc_msg *ibuf)
-{
-	int ch;
-	wrnc_msg_int32(ibuf, &ch);
-
-	struct lrt_output *st = &outputs[ch];
-	wrnc_msg_int32(ibuf, &st->mode);
-
-	st->flags &= ( WRTD_TRIGGERED | WRTD_LAST_VALID) ;
-	if( st->mode == WRTD_TRIGGER_MODE_SINGLE ) {
-		st->flags &= ~WRTD_ARMED;
-		st->state = OUT_ST_IDLE;
-	}
-
-
-	ctl_ack(seq);
-}
-
-static inline void ctl_chan_set_width (uint32_t seq, struct wrnc_msg *ibuf)
-{
-	int ch;
-	wrnc_msg_int32(ibuf, &ch);
-
-	struct lrt_output *st = &outputs[ch];
-	wrnc_msg_int32(ibuf, &st->width_cycles);
-
-	ctl_ack(seq);
-}
-
-
-static inline void ctl_chan_arm (uint32_t seq, struct wrnc_msg *ibuf)
-{
-	int ch, armed;
-	wrnc_msg_int32(ibuf, &ch);
-	wrnc_msg_int32(ibuf, &armed);
-
-	struct lrt_output *st = &outputs[ch];
-
-	st->flags &= ~WRTD_TRIGGERED;
-
-	if(armed) {
-		st->flags |= WRTD_ARMED;
-		st->state = OUT_ST_ARMED;
-	} else {
-		st->flags &= ~WRTD_ARMED;
-		st->state = OUT_ST_IDLE;
-	}
-	ctl_ack(seq);
-}
-
-static inline void ctl_chan_set_log_level (uint32_t seq, struct wrnc_msg *ibuf)
-{
-	int ch, i;
-	wrnc_msg_int32(ibuf, &ch);
-
-	struct lrt_output *st = &outputs[ch];
-	wrnc_msg_uint32(ibuf, &st->log_level);
-
-	ctl_ack(seq);
-
-	/* Set promiscuous_mode - so it's enable if at least one channel
-	   has enable it */
-	promiscuous_mode = 0;
-	for (i = 0; i < FD_NUM_CHANNELS; i++)
-		promiscuous_mode |= (outputs[i].log_level & WRTD_LOG_PROMISC);
-}
-
 /* Receives command messages and call matching command handlers */
 static inline void do_control()
 {
@@ -1408,20 +1199,7 @@ static inline void do_control()
 	_CMD(WRTD_CMD_FD_TRIG_SET_DELAY,		ctl_chan_set_delay)
 	_CMD(WRTD_CMD_FD_TRIG_GET_BY_ID,		ctl_chan_get_trigger_by_id)
 	_CMD(WRTD_CMD_FD_TRIG_GET_STATE,		ctl_chan_get_trigger_state)
-
-	_CMD(WRTD_CMD_FD_CHAN_RESET_COUNTERS,		ctl_chan_reset_counters)
-	_CMD(WRTD_CMD_FD_CHAN_ENABLE,			ctl_chan_enable)
-	_CMD(WRTD_CMD_FD_CHAN_SET_MODE,			ctl_chan_set_mode)
-	_CMD(WRTD_CMD_FD_CHAN_ARM,			ctl_chan_arm)
-	_CMD(WRTD_CMD_FD_CHAN_GET_STATE,		ctl_chan_get_state)
-	_CMD(WRTD_CMD_FD_CHAN_SET_LOG_LEVEL,		ctl_chan_set_log_level)
-	_CMD(WRTD_CMD_FD_CHAN_SET_WIDTH,		ctl_chan_set_width)
-
 	_CMD(WRTD_CMD_FD_READ_HASH,			ctl_read_hash)
-	_CMD(WRTD_CMD_FD_BASE_TIME,                     ctl_base_time)
-	_CMD(WRTD_CMD_FD_CHAN_DEAD_TIME,                ctl_chan_set_dead_time)
-	_CMD(WRTD_CMD_FD_VERSION,                       ctl_version)
-
 	default:
 	break;
 	}
@@ -1465,24 +1243,24 @@ void init_outputs()
  */
 static struct rt_structure wrtd_out_structures[] = {
 	[OUT_STRUCT_CHAN_0] = {
-		.struct_ptr = &outputs[0],
-		.len = sizeof(struct lrt_output),
+		.struct_ptr = &wrtd_out_channels[0],
+		.len = sizeof(struct wrtd_out_channel)
+		     - sizeof(struct wrtd_out_channel_private),
 	},
 	[OUT_STRUCT_CHAN_1] = {
-		.struct_ptr = &outputs[1],
-		.len = sizeof(struct lrt_output),
+		.struct_ptr = &wrtd_out_channels[1],
+		.len = sizeof(struct wrtd_out_channel)
+		     - sizeof(struct wrtd_out_channel_private),
 	},
 	[OUT_STRUCT_CHAN_2] = {
-		.struct_ptr = &outputs[2],
-		.len = sizeof(struct lrt_output),
+		.struct_ptr = &wrtd_out_channels[2],
+		.len = sizeof(struct wrtd_out_channel)
+		     - sizeof(struct wrtd_out_channel_private),
 	},
 	[OUT_STRUCT_CHAN_3] = {
-		.struct_ptr = &outputs[3],
-		.len = sizeof(struct lrt_output),
-	},
-	[OUT_STRUCT_CHAN_4] = {
-		.struct_ptr = &outputs[4],
-		.len = sizeof(struct lrt_output),
+		.struct_ptr = &wrtd_out_channels[3],
+		.len = sizeof(struct wrtd_out_channel)
+		     - sizeof(struct wrtd_out_channel_private),
 	},
 };
 
@@ -1576,6 +1354,7 @@ void init(void)
 
 int main(void)
 {
+	pp_printf("struct len %d vs %d\n", wrtd_out_structures[1].len, sizeof(struct wrtd_out_channel));
 	init();
 	rt_init(&app);
 

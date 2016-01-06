@@ -25,6 +25,8 @@
 #include "loop-queue.h"
 #include "wrtd-serializers.h"
 
+#include <librt.h>
+
 #define OUT_ST_IDLE 0
 #define OUT_ST_ARMED 1
 #define OUT_ST_TEST_PENDING 2
@@ -60,49 +62,42 @@ int wr_time_ready()
 	return 1;
 }
 
-int wr_enable_lock( int enable )
+int wr_enable_lock(int enable)
 {
 	if(enable)
-		dp_writel ( FD_TCR_WR_ENABLE, FD_REG_TCR );
+		dp_writel(FD_TCR_WR_ENABLE, FD_REG_TCR);
 	else
-		dp_writel ( 0, FD_REG_TCR);
-
-	return 0;
+		dp_writel(0, FD_REG_TCR);
 }
 
-void wr_update_link()
+/**
+ * It updates the White-Rabbit link status
+ */
+void wr_update_link(void)
 {
-	switch(wr_state)
-	{
-		case WR_LINK_OFFLINE:
-			if ( wr_link_up() )
-			{
-				wr_state = WR_LINK_ONLINE;
-			}
-			break;
-
-		case WR_LINK_ONLINE:
-			if (wr_time_ready())
-			{
-				wr_state = WR_LINK_SYNCING;
-				wr_enable_lock(1);
-			}
-			break;
-
-		case WR_LINK_SYNCING:
-			if (wr_time_locked())
-			{
-				pp_printf("WR link up!\n");
-				wr_state = WR_LINK_SYNCED;
-			}
-			break;
-
-		case WR_LINK_SYNCED:
-			break;
+	switch(wr_state) {
+	case WR_LINK_OFFLINE:
+		if (wr_link_up())
+			wr_state = WR_LINK_ONLINE;
+		break;
+	case WR_LINK_ONLINE:
+		if (wr_time_ready()) {
+			wr_state = WR_LINK_SYNCING;
+			wr_enable_lock(1);
+		}
+		break;
+	case WR_LINK_SYNCING:
+		if (wr_time_locked()) {
+			pp_printf("WR link up!\n");
+			wr_state = WR_LINK_SYNCED;
+		}
+		break;
+	case WR_LINK_SYNCED:
+		break;
 	}
 
-	if( wr_state != WR_LINK_OFFLINE && !wr_link_up() )
-	{
+	if( wr_state != WR_LINK_OFFLINE && !wr_link_up() ) {
+		pp_printf("rt-out: WR sync lost\n");
 		wr_state = WR_LINK_OFFLINE;
 		wr_enable_lock(0);
 	}
@@ -1167,11 +1162,6 @@ static inline void ctl_chan_set_dead_time (uint32_t seq, struct wrnc_msg *ibuf)
 }
 
 
-static inline void ctl_ping (uint32_t seq, struct wrnc_msg *ibuf)
-{
-	ctl_ack(seq);
-}
-
 static inline void ctl_base_time (uint32_t seq, struct wrnc_msg *ibuf)
 {
 	struct wrnc_msg buf = ctl_claim_out_buf();
@@ -1429,7 +1419,6 @@ static inline void do_control()
 
 	_CMD(WRTD_CMD_FD_READ_HASH,			ctl_read_hash)
 	_CMD(WRTD_CMD_FD_BASE_TIME,                     ctl_base_time)
-	_CMD(WRTD_CMD_FD_PING,                          ctl_ping)
 	_CMD(WRTD_CMD_FD_CHAN_DEAD_TIME,                ctl_chan_set_dead_time)
 	_CMD(WRTD_CMD_FD_VERSION,                       ctl_version)
 
@@ -1440,6 +1429,18 @@ static inline void do_control()
 	/* Drop the message once handled */
 	mq_discard(0, WRTD_IN_FD_CONTROL);
 }
+
+
+/**
+ * It generate a software trigger accorging to the trigger entry coming
+ * from the user space.
+ */
+static int wrtd_out_trigger_sw(struct wrnc_proto_header *hin, void *pin,
+			       struct wrnc_proto_header *hout, void *pout)
+{
+	return 0;
+}
+
 
 void init_outputs()
 {
@@ -1459,14 +1460,106 @@ void init_outputs()
 }
 
 
-void init()
+/**
+ * Data structures to export to host system
+ */
+static struct rt_structure wrtd_out_structures[] = {
+	[OUT_STRUCT_CHAN_0] = {
+		.struct_ptr = &outputs[0],
+		.len = sizeof(struct lrt_output),
+	},
+	[OUT_STRUCT_CHAN_1] = {
+		.struct_ptr = &outputs[1],
+		.len = sizeof(struct lrt_output),
+	},
+	[OUT_STRUCT_CHAN_2] = {
+		.struct_ptr = &outputs[2],
+		.len = sizeof(struct lrt_output),
+	},
+	[OUT_STRUCT_CHAN_3] = {
+		.struct_ptr = &outputs[3],
+		.len = sizeof(struct lrt_output),
+	},
+	[OUT_STRUCT_CHAN_4] = {
+		.struct_ptr = &outputs[4],
+		.len = sizeof(struct lrt_output),
+	},
+};
+
+static struct rt_variable wrtd_out_variables[] = {
+	[OUT_VAR_DEVICE_TIME_S] = {
+		.addr = CPU_LR_BASE + WRN_CPU_LR_REG_TAI_SEC,
+		.mask = 0xFFFFFFFF,
+		.offset = 0,
+	},
+	[OUT_VAR_DEVICE_TIME_T] = {
+		.addr = CPU_LR_BASE + WRN_CPU_LR_REG_TAI_CYCLES,
+		.mask = 0xFFFFFFFF,
+		.offset = 0,
+	},
+};
+
+static action_t *wrtd_out_actions[] = {
+	[RT_ACTION_RECV_PING] = rt_recv_ping,
+	[RT_ACTION_RECV_VERSION] = rt_version_getter,
+	[RT_ACTION_RECV_FIELD_SET] = rt_variable_setter,
+	[RT_ACTION_RECV_FIELD_GET] = rt_variable_getter,
+	[RT_ACTION_RECV_STRUCT_SET] = rt_structure_setter,
+	[RT_ACTION_RECV_STRUCT_GET] = rt_structure_getter,
+	[WRTD_OUT_ACTION_SW_TRIG] = wrtd_out_trigger_sw,
+};
+
+enum rt_slot_name {
+	OUT_CMD_IN = 0,
+	OUT_CMD_OUT,
+	OUT_LOG,
+};
+
+struct rt_mq mq[] = {
+	[OUT_CMD_IN] = {
+		.index = 1,
+		.flags = RT_MQ_FLAGS_LOCAL | RT_MQ_FLAGS_INPUT,
+	},
+	[OUT_CMD_OUT] = {
+		.index = 1,
+		.flags = RT_MQ_FLAGS_LOCAL | RT_MQ_FLAGS_OUTPUT,
+	},
+	[OUT_LOG] = {
+		.index = 3,
+		.flags = RT_MQ_FLAGS_LOCAL | RT_MQ_FLAGS_OUTPUT,
+	},
+};
+
+struct rt_application app = {
+	.name = "wrtd-output",
+	.version = {
+		.fpga_id = 0x115790de,
+		.rt_id = WRTD_OUT_RT_ID,
+		.rt_version = RT_VERSION(2, 0),
+		.git_version = GIT_VERSION
+	},
+	.mq = mq,
+	.n_mq = ARRAY_SIZE(mq),
+
+	.structures = wrtd_out_structures,
+	.n_structures = ARRAY_SIZE(wrtd_out_structures),
+
+	.variables = wrtd_out_variables,
+	.n_variables = ARRAY_SIZE(wrtd_out_variables),
+
+	.actions = wrtd_out_actions,
+	.n_actions = ARRAY_SIZE(wrtd_out_actions),
+};
+
+
+void init(void)
 {
 	int i;
 
+	pp_printf("Running %s from commit 0x%x.\n", __FILE__, version);
 	rx_ebone = 0;
 	rx_loopback = 0;
 	promiscuous_mode = 0;
-
 	memset(&last_received, 0, sizeof(struct wrtd_trigger_entry));
 	tlist_count = 0;
 	wr_state = WR_LINK_OFFLINE;
@@ -1481,15 +1574,15 @@ void init()
 	pp_printf("rt-fd firmware initialized.\n");
 }
 
-int main()
+int main(void)
 {
-	pp_printf("Running %s from commit 0x%x.\n", __FILE__, version);
 	init();
+	rt_init(&app);
 
-	for(;;) {
-		do_rx();
-		do_outputs();
-		do_control();
+	while (1) {
+//		do_rx();
+//		do_outputs();
+		rt_mq_action_dispatch(OUT_CMD_IN);
 		wr_update_link();
 	}
 

@@ -103,6 +103,10 @@ enum wrtd_in_actions {
 	WRTD_IN_ACTION_SW_TRIG = __RT_ACTION_RECV_STANDARD_NUMBER,
 	WRTD_IN_ACTION_LOG,
 };
+enum wrtd_out_actions {
+	WRTD_OUT_ACTION_SW_TRIG = __RT_ACTION_RECV_STANDARD_NUMBER,
+	WRTD_OUT_ACTION_LOG,
+};
 
 enum wrtd_in_variables_indexes {
 	IN_VAR_CHAN_ENABLE = 0,
@@ -121,6 +125,20 @@ enum wrtd_in_structures_indexes {
 	IN_STRUCT_CHAN_3,
 	IN_STRUCT_CHAN_4,
 	__WRTD_IN_STRUCT_MAX,
+};
+enum wrtd_out_variables_indexes {
+	OUT_VAR_DEVICE_TIME_S=0,
+	OUT_VAR_DEVICE_TIME_T,
+	__WRTD_OUT_VAR_MAX,
+};
+enum wrtd_out_structures_indexes {
+	OUT_STRUCT_DEVICE = 0,
+	OUT_STRUCT_CHAN_0,
+	OUT_STRUCT_CHAN_1,
+	OUT_STRUCT_CHAN_2,
+	OUT_STRUCT_CHAN_3,
+	OUT_STRUCT_CHAN_4,
+	__WRTD_OUT_STRUCT_MAX,
 };
 
 /**

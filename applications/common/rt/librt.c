@@ -39,8 +39,8 @@ int rt_structure_setter(struct wrnc_proto_header *hin, void *pin,
 		}
 #ifdef LIBRT_ERROR
 		else {
-			pp_printf("%s:%d structure len not correct %d != %d\n",
-				  __func__, __LINE__,
+			pp_printf("%s:%d structure %d len not correct %d != %d\n",
+				  __func__, __LINE__, index,
 				  _app->structures[index].len, size);
 		}
 #endif
@@ -87,8 +87,8 @@ int rt_structure_getter(struct wrnc_proto_header *hin, void *pin,
 		}
 #ifdef LIBRT_ERROR
 		else {
-			pp_printf("%s: structure len not correct %d != %d\n",
-				  __func__, _app->structures[index].len, size);
+			pp_printf("%s: structure %d len not correct %d != %d\n",
+				  __func__, index, _app->structures[index].len, size);
 		}
 #endif
 		offset += (size / 4); /* Next TLV record */

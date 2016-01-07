@@ -105,6 +105,8 @@ enum wrtd_in_actions {
 };
 enum wrtd_out_actions {
 	WRTD_OUT_ACTION_SW_TRIG = __RT_ACTION_RECV_STANDARD_NUMBER,
+	WRTD_OUT_ACTION_TRIG_IDX,
+	WRTD_OUT_ACTION_TRIG_ORD,
 	WRTD_OUT_ACTION_LOG,
 };
 
@@ -129,6 +131,8 @@ enum wrtd_in_structures_indexes {
 enum wrtd_out_variables_indexes {
 	OUT_VAR_DEVICE_TIME_S=0,
 	OUT_VAR_DEVICE_TIME_T,
+	OUT_VAR_DEVICE_COUNTER_MESG,
+	OUT_VAR_DEVICE_COUNTER_LOOP,
 	__WRTD_OUT_VAR_MAX,
 };
 enum wrtd_out_structures_indexes {
@@ -137,7 +141,6 @@ enum wrtd_out_structures_indexes {
 	OUT_STRUCT_CHAN_1,
 	OUT_STRUCT_CHAN_2,
 	OUT_STRUCT_CHAN_3,
-	OUT_STRUCT_CHAN_4,
 	__WRTD_OUT_STRUCT_MAX,
 };
 
@@ -378,20 +381,16 @@ struct lrt_output_rule {
 	uint16_t delay_frac;
 	uint16_t state; /**< State of the rule (empty, disabled,
 			   conditional action, condition, etc.) */
-	struct lrt_output_rule *cond_ptr; /**< Pointer to conditional action.
-					     Used for rules that define
-					     triggering conditions. */
+	uint32_t cond_ptr; /**< index pointing do the condition trigger */
 	uint32_t latency_worst; /**< Worst-case latency (in 8ns ticks)*/
 	uint32_t latency_avg_sum; /**< Average latency accumulator and
 				     number of samples */
 	uint32_t latency_avg_nsamples;
-	int hits; /**< Number of times the rule has successfully produced
-		     a pulse */
-	int misses; /**< Number of times the rule has missed a pulse
-		       (for any reason) */
+	uint32_t hits; /**< Number of times the rule has successfully produced
+			  a pulse */
+	uint32_t misses; /**< Number of times the rule has missed a pulse
+			    (for any reason) */
 };
-
-#define ENTRY_FLAG_VALID (1 << 0)
 
 /* Structure describing a single pulse in the Fine Delay software output queue */
 struct pulse_queue_entry {
@@ -408,6 +407,14 @@ struct lrt_pulse_queue {
 	struct pulse_queue_entry data[FD_MAX_QUEUE_PULSES];
 	int head, tail, count;
 };
+
+struct wrtd_out_trigger {
+	unsigned int flags;
+	struct wrtd_trig_id id; /**< trigger identifier */
+	struct lrt_output_rule ocfg[FD_NUM_CHANNELS]; /**< specific rule
+							 for each channel*/
+};
+#define ENTRY_FLAG_VALID (1 << 0)
 
 struct wrtd_out_channel_stats {
 	unsigned int hits;

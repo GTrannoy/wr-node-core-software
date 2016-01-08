@@ -114,6 +114,7 @@ unsigned int tlist_count = 0; /**< number of valid trigger entry
 static struct wrtd_out_channel wrtd_out_channels[FD_NUM_CHANNELS]; /**< Output
 								      state
 								      array */
+static struct wrtd_out wrtd_out_device;
 
 int trigger_search(struct wrtd_out_trigger **tlist,
 		   struct wrtd_trig_id *id,
@@ -586,7 +587,7 @@ static void filter_trigger(struct wrtd_trigger_entry *trig)
 	int j;
 
 	log_trigger(WRTD_LOG_PROMISC, 0, NULL, trig);
-	last_received = *trig;
+	wrtd_out_device.last_received = *trig;
 #ifdef RTDEBUG
 	pp_printf("%s:%d Trigger %d:%d:%d - entry %p\n",
 		  __func__, __LINE__,
@@ -613,14 +614,14 @@ void do_rx(void)
 			filter_trigger (&msg->triggers[i]);
 
 		mq_discard (1, WRTD_REMOTE_IN_FD);
-		rx_ebone++;
+		wrtd_out_device.counter_etherbone++;
 	}
 
 	struct wrtd_trigger_entry *ent = loop_queue_pop();
 
 	if (ent) {
 		filter_trigger (ent);
-		rx_loopback++;
+		wrtd_out_device.counter_loopback++;
 	}
 }
 
@@ -791,7 +792,12 @@ err:
  * the function init()
  */
 static struct rt_structure wrtd_out_structures[__WRTD_OUT_STRUCT_MAX
-					       + FD_HASH_ENTRIES];
+					       + FD_HASH_ENTRIES] = {
+	[OUT_STRUCT_DEVICE] = {
+		.struct_ptr = &wrtd_out_device,
+		.len = sizeof(struct wrtd_out),
+	},
+};
 
 static struct rt_variable wrtd_out_variables[] = {
 	[OUT_VAR_DEVICE_TIME_S] = {
@@ -801,16 +807,6 @@ static struct rt_variable wrtd_out_variables[] = {
 	},
 	[OUT_VAR_DEVICE_TIME_T] = {
 		.addr = CPU_LR_BASE + WRN_CPU_LR_REG_TAI_CYCLES,
-		.mask = 0xFFFFFFFF,
-		.offset = 0,
-	},
-	[OUT_VAR_DEVICE_COUNTER_MESG] = {
-		.addr = (uint32_t)&rx_ebone,
-		.mask = 0xFFFFFFFF,
-		.offset = 0,
-	},
-	[OUT_VAR_DEVICE_COUNTER_LOOP] = {
-		.addr = (uint32_t)&rx_loopback,
 		.mask = 0xFFFFFFFF,
 		.offset = 0,
 	},
@@ -886,6 +882,9 @@ void init(void)
 	tlist_count = 0;
 	wr_state = WR_LINK_OFFLINE;
 	wr_enable_lock(0);
+
+	/* device */
+	memset(&wrtd_out_device, 0, sizeof(struct wrtd_out));
 
 	/* Channels */
 	for (i = 0; i < FD_NUM_CHANNELS; i++) {

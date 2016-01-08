@@ -158,6 +158,7 @@ int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 			 struct wrtd_output_state *state)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrtd_out out;
 	struct wrtd_out_channel chan;
 	struct wrnc_structure_tlv tlv = {
 		.index = OUT_STRUCT_CHAN_0 + output,
@@ -166,8 +167,6 @@ int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 		.structure = &chan,
 	};
 	struct wrnc_proto_header hdr = hdr_base_sync;
-	uint32_t variables[] = {OUT_VAR_DEVICE_COUNTER_MESG, 0,
-				OUT_VAR_DEVICE_COUNTER_LOOP, 0};
 	int err;
 
 	if (output >= FD_NUM_CHANNELS) {
@@ -194,7 +193,6 @@ int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 
 	state->last_executed = chan.stats.last_executed;
 	state->last_enqueued = chan.stats.last_enqueued;
-	/* state->last_received =  TODO;*/
 	state->last_lost = chan.stats.last_lost;
 
 	state->mode = chan.config.mode;
@@ -209,11 +207,16 @@ int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 	state->dead_time.frac = 0;
 	state->dead_time.ticks = chan.config.dead_time;
 
-	err = wrnc_rt_variable_get(wrtd->wrnc, &hdr, variables, 1);
+	hdr.len = 0; /* reset len */
+	tlv.index = OUT_STRUCT_DEVICE;
+	tlv.size = sizeof(struct wrtd_out);
+	tlv.structure = &out;
+	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
 	if (err)
 		return err;
-	state->received_messages = variables[1];
-	state->received_loopback = variables[3];
+	state->received_messages = out.counter_etherbone;
+	state->received_loopback = out.counter_loopback;
+	state->last_received = out.last_received;
 
 	return 0;
 }

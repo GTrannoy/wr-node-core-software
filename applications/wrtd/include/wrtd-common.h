@@ -131,8 +131,6 @@ enum wrtd_in_structures_indexes {
 enum wrtd_out_variables_indexes {
 	OUT_VAR_DEVICE_TIME_S=0,
 	OUT_VAR_DEVICE_TIME_T,
-	OUT_VAR_DEVICE_COUNTER_MESG,
-	OUT_VAR_DEVICE_COUNTER_LOOP,
 	__WRTD_OUT_VAR_MAX,
 };
 enum wrtd_out_structures_indexes {
@@ -471,5 +469,10 @@ struct wrtd_out_channel {
 	struct wrtd_out_channel_private priv;
 };
 
+struct wrtd_out {
+	uint32_t counter_loopback;
+	uint32_t counter_etherbone;
+	struct wrtd_trigger_entry last_received;
+};
 
 #endif

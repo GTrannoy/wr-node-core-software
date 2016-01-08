@@ -103,8 +103,7 @@ int wr_is_timing_ok()
 
 
 struct wrtd_out_trigger triggers[FD_HASH_ENTRIES]; /**< list of triggers */
-struct wrtd_out_trigger *ord_tlist[FD_HASH_ENTRIES]; /**< list of triggers
-						      ordered by 'id' */
+struct wrtd_out_trigger *ht[FD_HASH_ENTRIES]; /* hash table */
 unsigned int tlist_count = 0; /**< number of valid trigger entry
 					in tlist */
 static struct wrtd_out_channel wrtd_out_channels[FD_NUM_CHANNELS]; /**< Output
@@ -112,67 +111,53 @@ static struct wrtd_out_channel wrtd_out_channels[FD_NUM_CHANNELS]; /**< Output
 								      array */
 static struct wrtd_out wrtd_out_device;
 
-int trigger_search(struct wrtd_out_trigger **tlist,
-		   struct wrtd_trig_id *id,
-		   unsigned int min, unsigned int max,
-		   unsigned int *mid)
+
+
+static void print_hash_table(void)
 {
-	int cmp;
-#if 0
-	/* Binary search */
-	while (max > min)
-	{
-		*mid = min + (max - min) / 2;
-		cmp = memcmp(&tlist[*mid]->id, id, sizeof(struct wrtd_trig_id));
-		if(cmp == 0)
-			return 1;
-		else if (cmp < 0)
-			min = *mid + 1;
-		else
-			max = *mid - 1;
+	int i;
+
+	pp_printf("%s <><><><><><>\n", __func__);
+	for (i = 0; i < FD_HASH_ENTRIES; ++i) {
+		delay(100000);
+		if (ht[i]) {
+			pp_printf("%s [%d]=%d:%d:%d - %p\n", __func__,
+				  i, ht[i]->id.system,
+				  ht[i]->id.source_port,
+				  ht[i]->id.trigger,
+				  &ht[i]);
+		} else {
+			pp_printf("%s [%d]=--:--:-- - %p\n", __func__,
+				  i);
+		}
 	}
+	pp_printf("%s ==========\n", __func__);
+}
 
-	/* When we do not find our element, then mid + 1 is the ideal position
-	 for a the new entry */
-	*mid++;
-#else
-
-	  /* FIXME Temporary HACK to be able to use memcmp
-	     (smem not byte addressable - VHDL problem) */
-	  volatile struct wrtd_trig_id tmp;
-	  tmp.system = id->system;
-	  tmp.source_port = id->source_port;
-	  tmp.trigger = id->trigger;
-
-	  for (*mid = min; *mid < max; (*mid)++) {
-		  cmp = memcmp(&tlist[*mid]->id, &tmp, sizeof(struct wrtd_trig_id));
-		  if (cmp == 0)
-			  return 1;
-		  else if (cmp > 0)
-			  break;
-	  }
-
-#endif
-
-#ifdef RTDEBUG
-	pp_printf("%s:%d %d %d %d %d - trig ID %d:%d:%d == %d:%d:%d ?\n",
-		  __func__, __LINE__,
-		  cmp, min, *mid, max,
-		  tlist[*mid]->id.system, tlist[*mid]->id.source_port, tlist[*mid]->id.trigger,
-		  id->system, id->source_port, id->trigger);
-#endif
-	return 0;
+static inline int trig_eq(struct wrtd_trig_id *id1, struct wrtd_trig_id *id2)
+{
+	return id1->system == id2->system &&
+		id1->source_port == id2->source_port &&
+		id1->trigger == id2->trigger;
 }
 
 
-struct wrtd_out_trigger *rtfd_trigger_entry_find(struct wrtd_trig_id *id)
+static int wrtd_out_hash_table_find(struct wrtd_trig_id *tid)
 {
-	unsigned int index;
-	int ret;
+	int hidx;
 
-	ret = trigger_search(ord_tlist, id, 0, tlist_count, &index);
+	for (hidx = wrtd_hash_func(tid); hidx < FD_HASH_ENTRIES; hidx++)
+		if (trig_eq(tid, &ht[hidx]->id))
+			return hidx;
 
-	return ret ? ord_tlist[index] : NULL;
+        return -1;
+}
+
+static inline struct wrtd_out_trigger *rtfd_trigger_entry_find(struct wrtd_trig_id *tid)
+{
+	int hidx = wrtd_out_hash_table_find(tid);
+
+	return hidx >= 0 ? ht[hidx] : NULL;
 }
 
 
@@ -577,6 +562,7 @@ void enqueue_trigger(int output, struct lrt_output_rule *rule,
 
 }
 
+
 static void filter_trigger(struct wrtd_trigger_entry *trig)
 {
 	struct wrtd_out_trigger *ent = rtfd_trigger_entry_find(&trig->id);
@@ -679,69 +665,78 @@ static int wrtd_out_trigger_sw(struct wrnc_proto_header *hin, void *pin,
 	return 0;
 }
 
-/**
- * Clear order array by removing unused triggers
- */
-static inline void wrtd_out_trigger_order_remove(void)
-{
-	int i, k;
 
-	pp_printf("%s >> qua (%d)\n", __func__, tlist_count);
-	for (i = 0; i < tlist_count; i++) {
-		pp_printf("%s --- qua (%d/%d)\n", __func__, i, tlist_count);
-		if (ord_tlist[i]->flags & ENTRY_FLAG_VALID)
-			continue;
-		/* Found a removed trigger */
-		for (k = i; k < tlist_count - 1; k++)
-			ord_tlist[k] = ord_tlist[k + 1];
-		ord_tlist[k] = NULL;
-		tlist_count--;
+
+static int wrtd_out_hash_table_free(struct wrtd_trig_id *tid)
+{
+	int hidx = wrtd_hash_func(tid);
+
+	for (; hidx < FD_HASH_ENTRIES; hidx++) {
+		if (!ht[hidx])
+			return hidx;
+		/* Check if it already exists */
+		if (trig_eq(tid, &ht[hidx]->id))
+			break;
 	}
-	pp_printf("%s <<< qua (%d)\n", __func__, tlist_count);
+        return -1;
 }
 
-/**
- * Insert a trigger the ordered array
- */
-static inline void wrtd_out_trigger_order_insert(unsigned int trig_idx)
+static int wrtd_out_hash_table_insert(struct wrnc_proto_header *hin, void *pin,
+				      struct wrnc_proto_header *hout, void *pout)
 {
-	int ret, index = 0, k;
+	uint32_t tidx = *(uint32_t *)pin;
+	int hidx;
 
-	pp_printf("%s >>> qua trig %d\n", __func__, trig_idx);
-	ret = trigger_search(ord_tlist, &triggers[trig_idx].id, 0,
-			     tlist_count, &index);
-	if (ret) {
-		pp_printf("%s: trigger already there\n");
-		return;
+	if (tlist_count >= FD_HASH_ENTRIES) {
+		pp_printf("Too many triggers %d/%d\n",
+			  tlist_count, FD_HASH_ENTRIES);
+		return -1;
 	}
-	pp_printf("%s --- qua\n", __func__);
-	for (k = tlist_count - 1; k >= index; --k)
-		ord_tlist[k + 1] = ord_tlist[k];
-	ord_tlist[index] = &triggers[trig_idx];
+	if (!(triggers[tidx].flags & ENTRY_FLAG_VALID))
+		return; /* nothing to do is a valid trigger */
+
+	hidx = wrtd_out_hash_table_free(&triggers[tidx].id);
+	if  (hidx < 0)
+		goto out;
+
+	if (hidx >= FD_HASH_ENTRIES)
+		return -1;
+
 	tlist_count++;
-	pp_printf("%s <<< qua trig %d\n", __func__, trig_idx);
+	ht[hidx] = &triggers[tidx];
+out:
+	rt_send_ack(hin, pin, hout, pout);
+
+//	print_hash_table();
+
+	return 0;
 }
 
-/**
- * It order the triggers by ID
- */
-static int wrtd_out_trigger_order(struct wrnc_proto_header *hin, void *pin,
-				  struct wrnc_proto_header *hout, void *pout)
+static int wrtd_out_hash_table_remove(struct wrnc_proto_header *hin, void *pin,
+				      struct wrnc_proto_header *hout, void *pout)
 {
-	uint32_t *trig_idx = pin;
+	uint32_t tidx = *(uint32_t *)pin;
+	int hidx;
 
-	pp_printf("%s >>> qua\n", __func__);
-	if (hin->len != 1) {
-		pp_printf("%s: command does not have payload, got %d bytes\n",
-			  __func__, hin->len * 4);
+	if (tlist_count <= 0) {
+		pp_printf("No trigger to remove %d/%d\n",
+			  tlist_count, FD_HASH_ENTRIES);
 		return -1;
 	}
 
-	wrtd_out_trigger_order_remove();
-	wrtd_out_trigger_order_insert(*trig_idx);
+	if (triggers[tidx].flags & ENTRY_FLAG_VALID)
+		return; /* nothing to do is a valid trigger */
 
-	pp_printf("%s <<< qua\n", __func__);
-	rt_send_ack(hin, pin, hout, NULL);
+	hidx = wrtd_out_hash_table_find(&triggers[tidx].id);
+	if (hidx < 0)
+		return -1;
+
+	tlist_count--;
+	ht[hidx] = NULL;
+	rt_send_ack(hin, pin, hout, pout);
+
+//	print_hash_table();
+
 	return 0;
 }
 
@@ -754,9 +749,9 @@ static int wrtd_out_trigger_index(struct wrnc_proto_header *hin, void *pin,
 {
 	struct wrtd_trig_id *id = pin;
 	uint32_t *index = pout;
+	int hidx;
 	int ret;
 
-	pp_printf("%s --- qua\n", __func__);
 	/* Verify that the size is correct */
 	if (hin->len * 4 != sizeof(struct wrtd_trig_id)) {
 		pp_printf("%s: wrong incoming message size %d (expected %d)\n",
@@ -769,15 +764,24 @@ static int wrtd_out_trigger_index(struct wrnc_proto_header *hin, void *pin,
 	}
 
 
-	ret = trigger_search(ord_tlist, id, 0, tlist_count,
-			     (unsigned int *) index);
-	pp_printf("%s --- qua -- %d:%d:%d %d %d\n", __func__,
-		  id->system, id->source_port, id->trigger, ret, *index);
-	if (ret) {
-		/* hout.msg_id = TODO ; */
-		hout->len = 1;
-		return 0;
+	hidx = wrtd_out_hash_table_find(id);
+	if (hidx >= 0) {
+		*index = ((int)ht[hidx] - (int)triggers) / sizeof(struct wrtd_out_trigger);
+	} else {
+		/* Get first free */
+		for (*index = 0; *index < FD_HASH_ENTRIES; ++(*index)) {
+			if (!(triggers[*index].flags & ENTRY_FLAG_VALID)) {
+				hout->msg_id = WRTD_OUT_ACTION_TRIG_FRE;
+				break;
+			}
+		}
+		if ((*index) == FD_HASH_ENTRIES)
+			return -1;
 	}
+
+	hout->len = 1;
+	return 0;
+
 err:
 	return -1;
 }
@@ -817,7 +821,8 @@ static action_t *wrtd_out_actions[] = {
 	[RT_ACTION_RECV_STRUCT_GET] = rt_structure_getter,
 	[WRTD_OUT_ACTION_SW_TRIG] = wrtd_out_trigger_sw,
 	[WRTD_OUT_ACTION_TRIG_IDX] = wrtd_out_trigger_index,
-	[WRTD_OUT_ACTION_TRIG_ORD] = wrtd_out_trigger_order,
+	[WRTD_OUT_ACTION_TRIG_ADD] = wrtd_out_hash_table_insert,
+	[WRTD_OUT_ACTION_TRIG_DEL] = wrtd_out_hash_table_remove,
 };
 
 enum rt_slot_name {
@@ -900,7 +905,7 @@ void init(void)
 	/* Triggers */
 	for (i = 0; i < FD_HASH_ENTRIES; i++) {
 		memset(&triggers[i], 0, sizeof(struct wrtd_out_trigger));
-		ord_tlist[i] = NULL;
+		ht[i] = NULL;
 	}
 
 	/* librt: dynamically add structures */

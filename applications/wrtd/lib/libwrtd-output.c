@@ -104,19 +104,22 @@ static int wrtd_out_trigger_index_get(struct wrtd_desc *wrtd,
 		errno = EWRTD_NOFOUND_TRIGGER;
 		return -1;
 	}
+	if (hdr.msg_id != WRTD_OUT_ACTION_TRIG_IDX &&
+	    hdr.msg_id != WRTD_OUT_ACTION_TRIG_FRE) {
+		errno = EWRNC_INVALID_MESSAGE;
+		return -1;
+	}
 
 	/* return the trigger index */
 	return msg.data[sizeof(struct wrnc_proto_header) / 4];
 }
 
 
-/**
- * It retrieves the trigger index for the given trigger ID
- */
-static int wrtd_out_trigger_order(struct wrtd_desc *wrtd, uint32_t tid)
+static inline int wrtd_out_trigger_hash(struct wrtd_desc *wrtd, uint32_t tid,
+					uint8_t msgid)
 {
 	struct wrnc_proto_header hdr = {
-		.msg_id = WRTD_OUT_ACTION_TRIG_ORD,
+		.msg_id = msgid,
 		.slot_io = (WRTD_IN_FD_CONTROL << 4) |
 			   (WRTD_OUT_FD_CONTROL & 0xF),
 		.flags = WRNC_PROTO_FLAG_SYNC,
@@ -142,6 +145,17 @@ static int wrtd_out_trigger_order(struct wrtd_desc *wrtd, uint32_t tid)
 
 	return 0;
 }
+
+static int wrtd_out_trigger_insert(struct wrtd_desc *wrtd, uint32_t tid)
+{
+	return wrtd_out_trigger_hash(wrtd, tid, WRTD_OUT_ACTION_TRIG_ADD);
+}
+
+static int wrtd_out_trigger_remove(struct wrtd_desc *wrtd, uint32_t tid)
+{
+	return wrtd_out_trigger_hash(wrtd, tid, WRTD_OUT_ACTION_TRIG_DEL);
+}
+
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 /* * * * * * * * * * PROTOTYPEs IMPLEMENTATION * * * * * * * * * */
@@ -320,6 +334,70 @@ static int wrtd_out_trig_assign_condition_by_index(struct wrtd_node *dev,
 	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
 }
 
+
+/**
+ * It sets the given bitmaks (it means that it does OR with the current value)
+ */
+static int wrtd_out_flag_set(struct wrtd_node *dev, unsigned int output,
+			     uint32_t flags)
+{
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrtd_out_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = OUT_STRUCT_CHAN_0 + output,
+		.size = sizeof(struct wrtd_out_channel)
+		      - sizeof(struct wrtd_out_channel_private),
+		.structure = &chan,
+	};
+	struct wrnc_proto_header hdr = hdr_base_sync;
+	int err;
+
+	if (output >= FD_NUM_CHANNELS) {
+		errno = EWRTD_INVALID_CHANNEL;
+		return -1;
+	}
+
+	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	if (err)
+		return err;
+
+	chan.config.flags |= flags;
+
+	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
+}
+
+/**
+ * It sets the given bitmaks (it means that it does AND NOT with the current
+ * value)
+ */
+static int wrtd_out_flag_clr(struct wrtd_node *dev, unsigned int output,
+			     uint32_t flags)
+{
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrtd_out_channel chan;
+	struct wrnc_structure_tlv tlv = {
+		.index = OUT_STRUCT_CHAN_0 + output,
+		.size = sizeof(struct wrtd_out_channel)
+		      - sizeof(struct wrtd_out_channel_private),
+		.structure = &chan,
+	};
+	struct wrnc_proto_header hdr = hdr_base_sync;
+	int err;
+
+	if (output >= FD_NUM_CHANNELS) {
+		errno = EWRTD_INVALID_CHANNEL;
+		return -1;
+	}
+
+	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	if (err)
+		return err;
+
+	chan.config.flags &= ~flags;
+
+	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
+}
+
 static int wrtd_out_trig_assign_one(struct wrtd_node *dev, unsigned int output,
 				    struct wrtd_trigger_handle *handle,
 				    struct wrtd_trig_id *tid)
@@ -341,23 +419,13 @@ static int wrtd_out_trig_assign_one(struct wrtd_node *dev, unsigned int output,
 	}
 
         ret = wrtd_out_trigger_index_get(wrtd, tid);
-	if (ret < 0) {
-		handle->ptr_trig = wrtd_out_trigger_first_free(dev);
-		if (handle->ptr_trig < 0)
-			return -1;
-	} else {
-		handle->ptr_trig = ret;
-	}
-
+	if (ret < 0)
+		return ret;
+	handle->ptr_trig = ret;
 	tlv.index += handle->ptr_trig;
 	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
 	if (err)
 		return err;
-
-	if (trig.flags & ENTRY_FLAG_VALID) {
-		errno = EINVAL;
-		return -1;
-	}
 
 	trig.flags |= ENTRY_FLAG_VALID;
 	trig.id = *tid;
@@ -371,7 +439,11 @@ static int wrtd_out_trig_assign_one(struct wrtd_node *dev, unsigned int output,
 	if (err)
 		return err;
 
-	return wrtd_out_trigger_order(wrtd, handle->ptr_trig);
+	err = wrtd_out_trigger_insert(wrtd, handle->ptr_trig);
+	if (err)
+		return err;
+
+	return wrtd_out_flag_set(dev, handle->channel, WRTD_TRIGGER_ASSIGNED);
 }
 
 
@@ -423,6 +495,7 @@ int wrtd_out_trig_unassign(struct wrtd_node *dev,
 			   struct wrtd_trigger_handle *handle)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrtd_output_trigger_state triggers[256];
 	struct wrtd_out_trigger trig;
 	struct wrnc_structure_tlv tlv = {
 		.index = __WRTD_OUT_STRUCT_MAX + handle->ptr_trig,
@@ -451,7 +524,16 @@ int wrtd_out_trig_unassign(struct wrtd_node *dev,
         err = wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
 	if (err)
 		return err;
-	return wrtd_out_trigger_order(wrtd, handle->ptr_trig);
+	err = wrtd_out_trigger_remove(wrtd, handle->ptr_trig);
+	if (err)
+		return err;
+
+	err = wrtd_out_trig_get_all(dev, handle->channel, triggers, 256);
+	if (err < 0)
+		return -1;
+	if (err > 0)
+		return 0;
+	return wrtd_out_flag_clr(dev, handle->channel, WRTD_TRIGGER_ASSIGNED);
 }
 
 
@@ -468,6 +550,7 @@ int wrtd_out_trig_get_all(struct wrtd_node *dev, unsigned int output,
 			  struct wrtd_output_trigger_state *triggers,
 			  int max_count)
 {
+	struct wrtd_output_trigger_state tmp;
 	int err = 0, i, count = 0;
 
 	if (output >= FD_NUM_CHANNELS) {
@@ -475,9 +558,8 @@ int wrtd_out_trig_get_all(struct wrtd_node *dev, unsigned int output,
 		return -1;
 	}
 
-	for (i = 0; i < max_count && i < FD_HASH_ENTRIES; i++) {
-		err = wrtd_out_trig_state_get_by_index(dev, i, output,
-						       &triggers[count]);
+	for (i = 0; count < max_count && i < FD_HASH_ENTRIES; i++) {
+		err = wrtd_out_trig_state_get_by_index(dev, i, output, &tmp);
 		if (err) {
 			if (errno == EWRTD_NOFOUND_TRIGGER) {
 				err = 0;
@@ -486,6 +568,8 @@ int wrtd_out_trig_get_all(struct wrtd_node *dev, unsigned int output,
 			        break;
 			}
 		} else {
+			memcpy(&triggers[count], &tmp,
+			       sizeof(struct wrtd_output_trigger_state));
 			count++;
 		}
 
@@ -571,11 +655,13 @@ int wrtd_out_trig_state_get_by_index(struct wrtd_node *dev, unsigned int index,
 	if (err)
 		return err;
 
-	if (!(trig.flags & ENTRY_FLAG_VALID)) {
+	if (!(trig.flags & ENTRY_FLAG_VALID) ||
+	    (trig.ocfg[output].state == HASH_ENT_EMPTY)) {
 		errno = EWRTD_NOFOUND_TRIGGER;
 		return -1;
 	}
 
+	memset(trigger, 0, sizeof(struct wrtd_output_trigger_state));
 	trigger->handle.channel = output;
 	trigger->handle.ptr_trig = index;
 	trigger->handle.ptr_cond = (uint32_t)trig.ocfg[output].cond_ptr;

@@ -106,7 +106,9 @@ enum wrtd_in_actions {
 enum wrtd_out_actions {
 	WRTD_OUT_ACTION_SW_TRIG = __RT_ACTION_RECV_STANDARD_NUMBER,
 	WRTD_OUT_ACTION_TRIG_IDX,
-	WRTD_OUT_ACTION_TRIG_ORD,
+	WRTD_OUT_ACTION_TRIG_FRE,
+	WRTD_OUT_ACTION_TRIG_ADD,
+	WRTD_OUT_ACTION_TRIG_DEL,
 	WRTD_OUT_ACTION_LOG,
 };
 
@@ -475,4 +477,18 @@ struct wrtd_out {
 	struct wrtd_trigger_entry last_received;
 };
 
+/**
+ * Hash function, returing the hash table index corresponding to a given
+ * trigger ID
+ */
+static inline int wrtd_hash_func(struct wrtd_trig_id *id)
+{
+    int h = 0;
+
+    h += id->system * 10291;
+    h += id->source_port * 10017;
+    h += id->trigger * 3111;
+
+    return h & (FD_HASH_ENTRIES - 1); // hash table size must be a power of 2
+}
 #endif

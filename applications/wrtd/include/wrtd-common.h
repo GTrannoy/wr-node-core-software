@@ -236,7 +236,12 @@ struct wrtd_trig_id {
 
 
 /**
- * Trigger event
+ * Trigger event. It is shared between the user-space and the
+ * real time application. Those end-point use this structure to share
+ * information.
+ * It should have 32bit fields to avoid toubles with the muck turtle
+ * bit swapping. If not possible on user space you must fix the bit swapping
+ * manually where necessary.
  */
 struct wrtd_trigger_entry {
 	struct wr_timestamp ts; /**< when it fired */
@@ -417,11 +422,11 @@ struct wrtd_out_trigger {
 #define ENTRY_FLAG_VALID (1 << 0)
 
 struct wrtd_out_channel_stats {
-	unsigned int hits;
-	unsigned int miss_timeout;
-	unsigned int miss_deadtime;
-	unsigned int miss_overflow;
-	unsigned int miss_no_timing;
+	uint32_t hits;
+	uint32_t miss_timeout;
+	uint32_t miss_deadtime;
+	uint32_t miss_overflow;
+	uint32_t miss_no_timing;
 
 	struct wrtd_trigger_entry last_executed; /**< Last enqueued trigger
 						    (i.e. the last one that
@@ -433,17 +438,25 @@ struct wrtd_out_channel_stats {
 	struct wrtd_trigger_entry last_lost;
 };
 
+/**
+ * Channel configuration parameters. It is shared between the user-space and the
+ * real time application. Those end-point use this structure to share
+ * information.
+ * It should have 32bit fields to avoid toubles with the muck turtle
+ * bit swapping. If not possible on user space you must fix the bit swapping
+ * manually where necessary.
+ */
 struct wrtd_out_channel_config {
-	uint8_t idle; /**< Idle flag */
-	uint8_t state; /**< Arm state */
-	uint8_t mode; /**< Trigger mode */
-	uint8_t flags; /**< Flags (logging, etc) */
+	uint32_t state; /**< Arm state */
+	uint32_t mode; /**< Trigger mode */
+	uint32_t flags; /**< Flags (logging, etc) */
 	uint32_t log_level; /**< Current logging level */
 	uint32_t dead_time; /**< Dead time (8ns cycles) */
 	uint32_t width_cycles; /**< Pulse width (8ns cycles) */
 };
 
 struct wrtd_out_channel_private {
+	uint32_t idle; /**< Idle flag */
 	struct lrt_pulse_queue queue; /**< Output pulse queue */
 	struct lrt_output_rule *pending_trig; /**< Pending conditonal trigger */
 	struct wr_timestamp prev_pulse; /**< Last enqueued trigger + delay
@@ -452,7 +465,7 @@ struct wrtd_out_channel_private {
 
 struct wrtd_out_channel {
 	uint32_t base_addr;
-	int n;
+	uint32_t n;
 	struct wrtd_out_channel_stats stats;
 	struct wrtd_out_channel_config config;
 	struct wrtd_out_channel_private priv;

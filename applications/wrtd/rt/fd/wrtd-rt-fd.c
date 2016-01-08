@@ -379,7 +379,7 @@ void update_latency_stats (struct pulse_queue_entry *pq_ent)
 
 void drop_trigger( struct wrtd_out_channel *out, struct pulse_queue_entry *pq_ent, struct lrt_pulse_queue *q, int reason)
 {
-	out->config.idle = 1;
+	out->priv.idle = 1;
 
 	if(pulse_queue_empty(q))
 	    return;
@@ -414,7 +414,7 @@ void do_output (struct wrtd_out_channel *out)
 	uint32_t dcr = fd_ch_readl(out, FD_REG_DCR);
 
 	/* Check if the output has triggered */
-	if(!out->config.idle) {
+	if(!out->priv.idle) {
 		if( !wr_is_timing_ok() ) {
 			drop_trigger(out, pq_ent, q, WRTD_MISS_NO_WR);
 		}
@@ -427,7 +427,7 @@ void do_output (struct wrtd_out_channel *out)
 			pq_ent->rule->hits ++;
 			pulse_queue_pop(q);
 			out->stats.hits++;
-			out->config.idle = 1;
+			out->priv.idle = 1;
 			out->config.flags |= WRTD_TRIGGERED;
 
 			if(out->config.state == OUT_ST_TEST_PENDING)
@@ -477,7 +477,7 @@ void do_output (struct wrtd_out_channel *out)
 
 	/* Store the last programmed timestamp (+ some margin) and mark the output as busy */
 	out->stats.last_programmed = *ts;
-	out->config.idle = 0;
+	out->priv.idle = 0;
 
 	update_latency_stats (pq_ent);
 }
@@ -896,9 +896,10 @@ void init(void)
 	        wrtd_out_channels[i].config.mode = WRTD_TRIGGER_MODE_AUTO;
 	        wrtd_out_channels[i].priv.pending_trig = NULL;
 	        wrtd_out_channels[i].config.state = OUT_ST_IDLE;
-	        wrtd_out_channels[i].config.idle = 1;
+	        wrtd_out_channels[i].priv.idle = 1;
 	        wrtd_out_channels[i].config.dead_time = 80000 / 8; // 80 us
 	        wrtd_out_channels[i].config.width_cycles = 1250; // 1us
+		pp_printf("mode %d %d\n", i , wrtd_out_channels[i].config.mode);
 	}
 
 	/* Triggers */
@@ -916,7 +917,6 @@ void init(void)
 	for (i = 0, j = __WRTD_OUT_STRUCT_MAX; i < FD_HASH_ENTRIES; i++, j++) {
 		wrtd_out_structures[j].struct_ptr = &triggers[i];
 		wrtd_out_structures[j].len = sizeof(struct wrtd_out_trigger);
-		pp_printf("%d %d - %d\n", i , j, wrtd_out_structures[j].len);
 	}
 
 	pp_printf("rt-output firmware initialized.\n");

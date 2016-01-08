@@ -10,6 +10,11 @@
 #include <libwrnc.h>
 #include "libwrtd-internal.h"
 
+static const struct wrnc_proto_header wrtd_in_hdr_sync = {
+	.slot_io = (WRTD_IN_TDC_CONTROL << 4) |	(WRTD_OUT_TDC_CONTROL & 0xF),
+	.flags = WRNC_PROTO_FLAG_SYNC,
+};
+
 /**
  * Internal helper to send and recevie synchronous messages to/from the TDC
  */
@@ -64,11 +69,7 @@ int wrtd_in_state_get(struct wrtd_node *dev, unsigned int input,
 	};
 	uint32_t variables[] = {IN_VAR_DEVICE_SENT_PACK, 0,
 				IN_VAR_DEVICE_DEAD_TIME, 0};
-	struct wrnc_proto_header hdr = {
-		.slot_io = (WRTD_IN_TDC_CONTROL << 4) |
-			   (WRTD_OUT_TDC_CONTROL & 0xF),
-		.flags = WRNC_PROTO_FLAG_SYNC,
-	};
+	struct wrnc_proto_header hdr = wrtd_in_hdr_sync;
 
 	if (input >= TDC_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
@@ -133,11 +134,7 @@ int wrtd_in_enable(struct wrtd_node *dev, unsigned int input, int enable)
 		.structure = &chan,
 	};
 	uint32_t variables[] = {IN_VAR_DEVICE_CHAN_ENABLE, 0};
-	struct wrnc_proto_header hdr = {
-		.slot_io = (WRTD_IN_TDC_CONTROL << 4) |
-			   (WRTD_OUT_TDC_CONTROL & 0xF),
-		.flags = WRNC_PROTO_FLAG_SYNC,
-	};
+	struct wrnc_proto_header hdr = wrtd_in_hdr_sync;
 	int err;
 
 	if (input >= TDC_NUM_CHANNELS) {
@@ -192,11 +189,7 @@ int wrtd_in_trigger_assign(struct wrtd_node *dev, unsigned int input,
 		.size = sizeof(struct wrtd_in_channel),
 		.structure = &chan,
 	};
-	struct wrnc_proto_header hdr = {
-		.slot_io = (WRTD_IN_TDC_CONTROL << 4) |
-			   (WRTD_OUT_TDC_CONTROL & 0xF),
-		.flags = WRNC_PROTO_FLAG_SYNC,
-	};
+	struct wrnc_proto_header hdr = wrtd_in_hdr_sync;
 	int err;
 
 	if (input >= TDC_NUM_CHANNELS) {
@@ -258,11 +251,7 @@ int wrtd_in_trigger_mode_set(struct wrtd_node *dev, unsigned int input,
 		.size = sizeof(struct wrtd_in_channel),
 		.structure = &chan,
 	};
-	struct wrnc_proto_header hdr = {
-		.slot_io = (WRTD_IN_TDC_CONTROL << 4) |
-			   (WRTD_OUT_TDC_CONTROL & 0xF),
-		.flags = WRNC_PROTO_FLAG_SYNC,
-	};
+	struct wrnc_proto_header hdr = wrtd_in_hdr_sync;
 	int err;
 
 	if (input >= TDC_NUM_CHANNELS) {
@@ -339,11 +328,7 @@ int wrtd_in_arm(struct wrtd_node *dev, unsigned int input, int armed)
 		.size = sizeof(struct wrtd_in_channel),
 		.structure = &chan,
 	};
-	struct wrnc_proto_header hdr = {
-		.slot_io = (WRTD_IN_TDC_CONTROL << 4) |
-			   (WRTD_OUT_TDC_CONTROL & 0xF),
-		.flags = WRNC_PROTO_FLAG_SYNC,
-	};
+	struct wrnc_proto_header hdr = wrtd_in_hdr_sync;
 	int err;
 
 	if (input >= TDC_NUM_CHANNELS) {
@@ -379,12 +364,7 @@ int wrtd_in_dead_time_set(struct wrtd_node *dev, unsigned int input,
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	uint32_t variables[] = {IN_VAR_DEVICE_DEAD_TIME, 0};
-	struct wrnc_proto_header hdr = {
-		.slot_io = (WRTD_IN_TDC_CONTROL << 4) |
-			   (WRTD_OUT_TDC_CONTROL & 0xF),
-		.flags = WRNC_PROTO_FLAG_SYNC,
-		.len = 2,
-	};
+	struct wrnc_proto_header hdr = wrtd_in_hdr_sync;
 	uint32_t dead_time_cycles;
 
 	if (input >= TDC_NUM_CHANNELS) {
@@ -423,11 +403,7 @@ int wrtd_in_delay_set(struct wrtd_node *dev, unsigned int input,
 		.size = sizeof(struct wrtd_in_channel),
 		.structure = &chan,
 	};
-	struct wrnc_proto_header hdr = {
-		.slot_io = (WRTD_IN_TDC_CONTROL << 4) |
-			   (WRTD_OUT_TDC_CONTROL & 0xF),
-		.flags = WRNC_PROTO_FLAG_SYNC,
-	};
+	struct wrnc_proto_header hdr = wrtd_in_hdr_sync;
 	struct wr_timestamp t;
 	int err;
 
@@ -468,11 +444,7 @@ int wrtd_in_timebase_offset_set(struct wrtd_node *dev, unsigned int input,
 		.size = sizeof(struct wrtd_in_channel),
 		.structure = &chan,
 	};
-	struct wrnc_proto_header hdr = {
-		.slot_io = (WRTD_IN_TDC_CONTROL << 4) |
-			   (WRTD_OUT_TDC_CONTROL & 0xF),
-		.flags = WRNC_PROTO_FLAG_SYNC,
-	};
+	struct wrnc_proto_header hdr = wrtd_in_hdr_sync;
 	struct wr_timestamp t;
 	int err;
 
@@ -507,11 +479,7 @@ int wrtd_in_counters_reset(struct wrtd_node *dev, unsigned int input)
 		.size = sizeof(struct wrtd_in_channel),
 		.structure = &chan,
 	};
-	struct wrnc_proto_header hdr = {
-		.slot_io = (WRTD_IN_TDC_CONTROL << 4) |
-			   (WRTD_OUT_TDC_CONTROL & 0xF),
-		.flags = WRNC_PROTO_FLAG_SYNC,
-	};
+	struct wrnc_proto_header hdr = wrtd_in_hdr_sync;
 	int err;
 
 	if (input >= TDC_NUM_CHANNELS) {
@@ -549,11 +517,7 @@ int wrtd_in_is_enabled(struct wrtd_node *dev, unsigned int input,
 		.size = sizeof(struct wrtd_in_channel),
 		.structure = &chan,
 	};
-	struct wrnc_proto_header hdr = {
-		.slot_io = (WRTD_IN_TDC_CONTROL << 4) |
-			   (WRTD_OUT_TDC_CONTROL & 0xF),
-		.flags = WRNC_PROTO_FLAG_SYNC,
-	};
+	struct wrnc_proto_header hdr = wrtd_in_hdr_sync;
 	int err;
 
 	if (input >= TDC_NUM_CHANNELS) {
@@ -588,11 +552,7 @@ int wrtd_in_is_armed(struct wrtd_node *dev, unsigned int input,
 		.size = sizeof(struct wrtd_in_channel),
 		.structure = &chan,
 	};
-	struct wrnc_proto_header hdr = {
-		.slot_io = (WRTD_IN_TDC_CONTROL << 4) |
-			   (WRTD_OUT_TDC_CONTROL & 0xF),
-		.flags = WRNC_PROTO_FLAG_SYNC,
-	};
+	struct wrnc_proto_header hdr = wrtd_in_hdr_sync;
 	int err;
 
 	if (input >= TDC_NUM_CHANNELS) {
@@ -626,11 +586,7 @@ int wrtd_in_has_trigger(struct wrtd_node *dev, unsigned int input,
 		.size = sizeof(struct wrtd_in_channel),
 		.structure = &chan,
 	};
-	struct wrnc_proto_header hdr = {
-		.slot_io = (WRTD_IN_TDC_CONTROL << 4) |
-			   (WRTD_OUT_TDC_CONTROL & 0xF),
-		.flags = WRNC_PROTO_FLAG_SYNC,
-	};
+	struct wrnc_proto_header hdr = wrtd_in_hdr_sync;
 	int err;
 
 	if (input >= TDC_NUM_CHANNELS) {
@@ -664,12 +620,7 @@ int wrtd_in_dead_time_get(struct wrtd_node *dev, unsigned int input,
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	uint32_t variables[] = {IN_VAR_DEVICE_DEAD_TIME, 0};
-	struct wrnc_proto_header hdr = {
-		.slot_io = (WRTD_IN_TDC_CONTROL << 4) |
-			   (WRTD_OUT_TDC_CONTROL & 0xF),
-		.flags = WRNC_PROTO_FLAG_SYNC,
-		.len = 2,
-	};
+	struct wrnc_proto_header hdr = wrtd_in_hdr_sync;
 	int err;
 
 	if (input >= TDC_NUM_CHANNELS) {
@@ -706,11 +657,7 @@ int wrtd_in_delay_get(struct wrtd_node *dev, unsigned int input,
 		.size = sizeof(struct wrtd_in_channel),
 		.structure = &chan,
 	};
-	struct wrnc_proto_header hdr = {
-		.slot_io = (WRTD_IN_TDC_CONTROL << 4) |
-			   (WRTD_OUT_TDC_CONTROL & 0xF),
-		.flags = WRNC_PROTO_FLAG_SYNC,
-	};
+	struct wrnc_proto_header hdr = wrtd_in_hdr_sync;
 	int err;
 
 	if (input >= TDC_NUM_CHANNELS) {
@@ -744,11 +691,7 @@ int wrtd_in_seq_counter_set(struct wrtd_node *dev, unsigned int input,
 		.size = sizeof(struct wrtd_in_channel),
 		.structure = &chan,
 	};
-	struct wrnc_proto_header hdr = {
-		.slot_io = (WRTD_IN_TDC_CONTROL << 4) |
-			   (WRTD_OUT_TDC_CONTROL & 0xF),
-		.flags = WRNC_PROTO_FLAG_SYNC,
-	};
+	struct wrnc_proto_header hdr = wrtd_in_hdr_sync;
 	int err;
 
 	if (input >= TDC_NUM_CHANNELS) {
@@ -791,12 +734,7 @@ int wrtd_in_base_time(struct wrtd_node *dev, struct wr_timestamp *ts)
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	uint32_t variables[] = {IN_VAR_DEVICE_TIME_S, 0,
 				IN_VAR_DEVICE_TIME_T, 0};
-	struct wrnc_proto_header hdr = {
-		.slot_io = (WRTD_IN_TDC_CONTROL << 4) |
-			   (WRTD_OUT_TDC_CONTROL & 0xF),
-		.flags = WRNC_PROTO_FLAG_SYNC,
-		.len = 4,
-	};
+	struct wrnc_proto_header hdr = wrtd_in_hdr_sync;
 	int err;
 
 	err = wrnc_rt_variable_get(wrtd->wrnc, &hdr, variables, 2);

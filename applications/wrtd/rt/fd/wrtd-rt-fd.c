@@ -28,10 +28,6 @@
 
 #define OUT_TIMEOUT 10
 
-/* Received message counters */
-static int rx_ebone = 0, rx_loopback = 0;
-/* Last received trigger (i.e. last received packet from Etherbone). */
-static struct wrtd_trigger_entry last_received;
 static const uint32_t version = GIT_VERSION;
 static uint32_t promiscuous_mode = 0;
 

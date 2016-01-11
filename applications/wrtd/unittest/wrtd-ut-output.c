@@ -174,8 +174,8 @@ static void test_trigger_unassign_one(CuTest *tc, struct wrtd_node *wrtd,
 
 	ret = wrtd_out_trig_state_get_by_handle(wrtd, &trig.handle, &trig);
 	CuAssertTrue_Msg(tc, msg, ret);
-	// FIXME only with librt
-	//CuAssertIntEquals(tc, errno, EWRTD_NOFOUND_TRIGGER);
+
+	CuAssertIntEquals(tc, errno, EWRTD_NOFOUND_TRIGGER);
 	CuAssertTrue(tc, !wrtd_out_has_trigger(wrtd, chan, id, &assigned));
 	CuAssertTrue(tc, !assigned);
 }

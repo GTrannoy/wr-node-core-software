@@ -371,7 +371,7 @@ int wrtd_in_arm(struct wrtd_node *dev, unsigned int input, int armed)
  * 16 ns granularity)
  * @param[in] dev device token
  * @param[in] input index (0-based) of input channel
- * @param[in] dead_time_ps dead time in pico-seconds
+ * @param[in] dead_time_ps dead time in pico-seconds [80000000, 160000000000]
  * @return 0 on success, -1 on error and errno is set appropriately
  */
 int wrtd_in_dead_time_set(struct wrtd_node *dev, unsigned int input,

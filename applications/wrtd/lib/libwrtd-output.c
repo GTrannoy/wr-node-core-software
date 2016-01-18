@@ -41,20 +41,6 @@ static inline int wrtd_out_send_and_receive_sync(struct wrtd_desc *wrtd,
 	return err < 0 ? err : 0; /* Ignore timeout */
 }
 
-static int wrtd_out_trivial_request (struct wrtd_node *dev, struct wrnc_msg *request_msg)
-{
-	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	int err;
-
-	/* Send the message and get answer */
-	err = wrtd_out_send_and_receive_sync(wrtd, request_msg);
-        if (err)
-		return err;
-
-	return wrtd_validate_acknowledge(request_msg);
-}
-
-
 
 static int wrtd_out_trigger_first_free(struct wrtd_node *dev)
 {
@@ -75,7 +61,9 @@ static int wrtd_out_trigger_first_free(struct wrtd_node *dev)
 
 
 /**
- * It retrieves the trigger index for the given trigger ID
+ * It retrieves the trigger index where you can write.
+ * If the trigger with ID 'tid' already exists it returns its index,
+ * otherwise it return the first free index.
  */
 static int wrtd_out_trigger_index_get(struct wrtd_desc *wrtd,
 				      struct wrtd_trig_id *tid)

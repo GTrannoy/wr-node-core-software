@@ -872,9 +872,9 @@ int wrtd_out_trig_enable(struct wrtd_node *dev,
 	}
 
 	if (enable)
-		trig.ocfg[handle->ptr_trig].state &= ~HASH_ENT_DISABLED;
+		trig.ocfg[handle->channel].state &= ~HASH_ENT_DISABLED;
 	else
-		trig.ocfg[handle->ptr_trig].state |= HASH_ENT_DISABLED;
+		trig.ocfg[handle->channel].state |= HASH_ENT_DISABLED;
 
 	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
 }

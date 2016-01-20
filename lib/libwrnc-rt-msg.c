@@ -422,6 +422,7 @@ int wrnc_rt_structure_set(struct wrnc_dev *wrnc,
 {
 	int err;
 
+	hdr->len = 0;
 	hdr->msg_id = RT_ACTION_RECV_STRUCT_SET;
 
 	err = wrnc_rt_structure(wrnc, hdr, tlv, n_tlv);
@@ -452,6 +453,7 @@ int wrnc_rt_structure_get(struct wrnc_dev *wrnc,
 {
 	int err;
 
+	hdr->len = 0;
 	hdr->msg_id = RT_ACTION_RECV_STRUCT_GET;
 	/* Getting variables is always synchronous */
 	hdr->flags |= WRNC_PROTO_FLAG_SYNC;

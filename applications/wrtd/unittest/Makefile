@@ -13,7 +13,7 @@ LDLIBS += -Wl,-Bstatic -L../lib -lwrtd -L$(WRNC)/lib -lwrnc
 LDLIBS += -Wl,-Bdynamic
 
 PROG := wrtd-ut
-SRCS = CuTest.c wrtd-ut-common.c wrtd-ut-input.c wrtd-ut-output.c
+SRCS = CuTest.c wrtd-ut-common.c wrtd-ut-input.c wrtd-ut-output.c wrtd-ut-op.c
 
 all: $(PROG)
 clean:

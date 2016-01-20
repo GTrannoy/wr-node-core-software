@@ -20,6 +20,7 @@ void RunAllTests(void)
 	CuSuiteAddSuite(suite, wrtd_ut_in_suite_get());
 	CuSuiteAddSuite(suite, wrtd_ut_out_suite_get());
 	CuSuiteAddSuite(suite, wrtd_ut_cmm_suite_get());
+	CuSuiteAddSuite(suite, wrtd_ut_op_suite_get());
 
 	CuSuiteRun(suite);
 	CuSuiteSummary(suite, output);

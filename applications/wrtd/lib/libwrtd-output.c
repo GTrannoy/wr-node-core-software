@@ -145,6 +145,37 @@ static int wrtd_out_trigger_remove(struct wrtd_desc *wrtd, uint32_t tid)
 }
 
 
+static int wrtd_out_rt_disable(struct wrtd_desc *wrtd, unsigned int output)
+{
+	struct wrnc_proto_header hdr = {
+		.msg_id = WRTD_OUT_ACTION_DISABLE,
+		.slot_io = (WRTD_IN_FD_CONTROL << 4) |
+			   (WRTD_OUT_FD_CONTROL & 0xF),
+		.flags = WRNC_PROTO_FLAG_SYNC,
+		.len = 1,
+	};
+	struct wrnc_msg msg;
+	uint32_t *data;
+	int err;
+
+	memset(&msg, 0, sizeof(struct wrnc_msg));
+	data = &msg.data[sizeof(struct wrnc_proto_header) / 4];
+	data[0] = output;
+	wrnc_message_header_set(&msg, &hdr);
+	msg.datalen = sizeof(struct wrnc_proto_header) / 4 + hdr.len;
+	err = wrtd_out_send_and_receive_sync(wrtd, &msg);
+	if (err)
+		return -1;
+	wrnc_message_header_get(&msg, &hdr);
+	if (hdr.msg_id != RT_ACTION_SEND_ACK) {
+		errno = EWRTD_INVALID_ANSWER_ACK;
+		return -1;
+	}
+
+	return 0;
+}
+
+
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 /* * * * * * * * * * PROTOTYPEs IMPLEMENTATION * * * * * * * * * */
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -260,8 +291,10 @@ int wrtd_out_enable(struct wrtd_node *dev, unsigned int output,
 		chan.config.flags &= ~(WRTD_ENABLED | WRTD_ARMED |
 				       WRTD_TRIGGERED | WRTD_LAST_VALID);
 		chan.config.state = OUT_ST_IDLE;
-		/* run pulse_queue_init ( &out->queue ); on RT side */
-		/* set variable fd_ch_writel(out, FD_DCR_MODE, FD_REG_DCR); */
+
+		err = wrtd_out_rt_disable(wrtd, output);
+		if (err)
+			return -1;
 	}
 
 	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);

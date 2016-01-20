@@ -787,6 +787,19 @@ err:
 }
 
 
+static int wrtd_out_disable(struct wrnc_proto_header *hin, void *pin,
+			    struct wrnc_proto_header *hout, void *pout)
+{
+	uint32_t ch = *((uint32_t *)pin);
+
+	pulse_queue_init(&wrtd_out_channels[ch].priv.queue);
+	fd_ch_writel(&wrtd_out_channels[ch], FD_DCR_MODE, FD_REG_DCR);
+
+	rt_send_ack(hin, pin, hout, pout);
+	return 0;
+}
+
+
 /**
  * Data structures to export to host system. Initialized dynamically in
  * the function init()
@@ -823,6 +836,7 @@ static action_t *wrtd_out_actions[] = {
 	[WRTD_OUT_ACTION_TRIG_IDX] = wrtd_out_trigger_index,
 	[WRTD_OUT_ACTION_TRIG_ADD] = wrtd_out_hash_table_insert,
 	[WRTD_OUT_ACTION_TRIG_DEL] = wrtd_out_hash_table_remove,
+	[WRTD_OUT_ACTION_DISABLE] = wrtd_out_disable,
 };
 
 enum rt_slot_name {

@@ -110,6 +110,7 @@ enum wrtd_out_actions {
 	WRTD_OUT_ACTION_TRIG_ADD,
 	WRTD_OUT_ACTION_TRIG_DEL,
 	WRTD_OUT_ACTION_LOG,
+	WRTD_OUT_ACTION_DISABLE,
 };
 
 enum wrtd_in_variables_indexes {

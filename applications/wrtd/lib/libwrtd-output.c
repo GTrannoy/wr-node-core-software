@@ -330,7 +330,8 @@ static int wrtd_out_trig_assign_condition_by_index(struct wrtd_node *dev,
 		return err;
 	wrtd_output_rule_endianess_fix(&trig.ocfg[output]);
 
-	if (trig.flags & ENTRY_FLAG_VALID) {
+	if (!(trig.flags & ENTRY_FLAG_VALID)) {
+		/* If the given trigger is not valid, then skip */
 		errno = EINVAL;
 		return -1;
 	}
@@ -339,6 +340,7 @@ static int wrtd_out_trig_assign_condition_by_index(struct wrtd_node *dev,
 	trig.ocfg[output].state |= HASH_ENT_CONDITIONAL;
 	trig.ocfg[output].cond_ptr = cond_idx;
 
+	wrtd_output_rule_endianess_fix(&trig.ocfg[output]);
 	err = wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
 	if (err)
 		return err;
@@ -347,8 +349,10 @@ static int wrtd_out_trig_assign_condition_by_index(struct wrtd_node *dev,
 	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
 	if (err)
 		return err;
+	wrtd_output_rule_endianess_fix(&trig.ocfg[output]);
 
-	if (trig.flags & ENTRY_FLAG_VALID) {
+	if (!(trig.flags & ENTRY_FLAG_VALID)) {
+		/* If the given trigger is not valid, then skip */
 		errno = EINVAL;
 		return -1;
 	}
@@ -504,7 +508,7 @@ int wrtd_out_trig_assign(struct wrtd_node *dev, unsigned int output,
 	if (err)
 		return err;
 
-	handle->ptr_cond = tmp_handle.ptr_cond;
+	handle->ptr_cond = tmp_handle.ptr_trig;
 	return wrtd_out_trig_assign_condition_by_index(dev, output,
 						       handle->ptr_trig,
 						       handle->ptr_cond);
@@ -677,6 +681,7 @@ int wrtd_out_trig_state_get_by_index(struct wrtd_node *dev, unsigned int index,
 		.structure = &trig,
 	};
 	struct wrnc_proto_header hdr = hdr_base_sync;
+	struct wrtd_output_trigger_state cond;
 	int err;
 
 	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
@@ -694,7 +699,7 @@ int wrtd_out_trig_state_get_by_index(struct wrtd_node *dev, unsigned int index,
 	trigger->handle.channel = output;
 	trigger->handle.ptr_trig = index;
 	trigger->handle.ptr_cond = (uint32_t)trig.ocfg[output].cond_ptr;
-	trigger->is_conditional = !!trigger->handle.ptr_cond;
+	trigger->is_conditional = (0 <= trigger->handle.ptr_cond && trigger->handle.ptr_cond <= FD_HASH_ENTRIES);
 	trigger->enabled = !(trig.ocfg[output].state & HASH_ENT_DISABLED);
 	trigger->trigger = trig.id;
 	trigger->delay_trig.ticks = trig.ocfg[output].delay_cycles;
@@ -709,7 +714,18 @@ int wrtd_out_trig_state_get_by_index(struct wrtd_node *dev, unsigned int index,
 				  / 125;
 	trigger->executed_pulses = trig.ocfg[output].hits;
 	trigger->missed_pulses = trig.ocfg[output].misses;
-	/* trigger->condition */
+
+	if (!trigger->is_conditional)
+		return 0;
+
+	/* Get conditional trigger */
+	err =wrtd_out_trig_state_get_by_index(dev, trigger->handle.ptr_cond,
+					      output, &cond);
+	if (err)
+		return err;
+	memcpy(&trigger->condition, &cond.trigger, sizeof(struct wrtd_trig_id));
+	memcpy(&trigger->delay_cond, &cond.delay_trig,
+	       sizeof(struct wr_timestamp));
 
 	return 0;
 }

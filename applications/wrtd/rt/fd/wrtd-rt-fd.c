@@ -942,8 +942,8 @@ int main(void)
 	rt_init(&app);
 
 	while (1) {
-//		do_rx();
-//		do_outputs();
+		do_rx();
+		do_outputs();
 		rt_mq_action_dispatch(OUT_CMD_IN);
 		wr_update_link();
 	}

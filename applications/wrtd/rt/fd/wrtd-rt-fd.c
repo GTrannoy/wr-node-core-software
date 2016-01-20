@@ -12,7 +12,7 @@
 /*
  * LHC Instability Trigger Distribution (LIST) Firmware
  *
- * rt-fd.c: real-time CPU application for the FMC Fine Delay mezzanine (Trigger Output)
+ * Real-Time application for the FMC Fine Delay mezzanine (Trigger Output)
  */
 
 #include <string.h>
@@ -111,29 +111,31 @@ static struct wrtd_out_channel wrtd_out_channels[FD_NUM_CHANNELS]; /**< Output
 								      array */
 static struct wrtd_out wrtd_out_device;
 
+static inline int wr_is_timing_ok(void);
 
-
-static void print_hash_table(void)
+/**
+ * Writes to FD output registers for output (out)
+ */
+static inline void fd_ch_writel(struct wrtd_out_channel *out, uint32_t value,
+				 uint32_t reg)
 {
-	int i;
-
-	pp_printf("%s <><><><><><>\n", __func__);
-	for (i = 0; i < FD_HASH_ENTRIES; ++i) {
-		delay(100000);
-		if (ht[i]) {
-			pp_printf("%s [%d]=%d:%d:%d - %p\n", __func__,
-				  i, ht[i]->id.system,
-				  ht[i]->id.source_port,
-				  ht[i]->id.trigger,
-				  &ht[i]);
-		} else {
-			pp_printf("%s [%d]=--:--:-- - %p\n", __func__,
-				  i);
-		}
-	}
-	pp_printf("%s ==========\n", __func__);
+	dp_writel(value , reg + out->base_addr);
 }
 
+/**
+ * Reads from FD output registers for output (out)
+ */
+static inline uint32_t fd_ch_readl (struct wrtd_out_channel *out,  uint32_t reg)
+{
+	return dp_readl(reg + out->base_addr);
+}
+
+
+/**
+ * Compare two trigger identifiers.
+ * It does not use memcmp() because the shared memory use word addressing, so
+ * it will not work if one of the variable is located on the shared memory
+ */
 static inline int trig_eq(struct wrtd_trig_id *id1, struct wrtd_trig_id *id2)
 {
 	return id1->system == id2->system &&
@@ -142,6 +144,9 @@ static inline int trig_eq(struct wrtd_trig_id *id1, struct wrtd_trig_id *id2)
 }
 
 
+/**
+ * It looks for a trigger entry within the hash table
+ */
 static int wrtd_out_hash_table_find(struct wrtd_trig_id *tid)
 {
 	int hidx;
@@ -153,6 +158,10 @@ static int wrtd_out_hash_table_find(struct wrtd_trig_id *tid)
         return -1;
 }
 
+
+/**
+ * It looks for a trigger entry within the hash table
+ */
 static inline struct wrtd_out_trigger *rtfd_trigger_entry_find(struct wrtd_trig_id *tid)
 {
 	int hidx = wrtd_out_hash_table_find(tid);
@@ -161,7 +170,9 @@ static inline struct wrtd_out_trigger *rtfd_trigger_entry_find(struct wrtd_trig_
 }
 
 
-/* Adjusts the timestamp in-place by adding cycles/frac value */
+/**
+ * Adjusts the timestamp in-place by adding cycles/frac value
+ */
 static void ts_adjust_delay(struct wr_timestamp *ts, uint32_t cycles, uint32_t frac)
 {
 	ts->frac += frac;
@@ -178,7 +189,9 @@ static void ts_adjust_delay(struct wr_timestamp *ts, uint32_t cycles, uint32_t f
 	}
 }
 
-/* Puts a trigger message in the log buffer */
+/**
+ * Puts a trigger message in the log buffer
+ */
 static void log_trigger(int type, int miss_reason, struct wrtd_out_channel *out,
 			struct wrtd_trigger_entry *ent)
 {
@@ -212,23 +225,30 @@ static void log_trigger(int type, int miss_reason, struct wrtd_out_channel *out,
 	rt_mq_msg_send(&out_buf);
 }
 
-/* Initializes an empty pulse queue */
-void pulse_queue_init(struct lrt_pulse_queue *p)
+
+/**
+ * Initializes an empty pulse queue
+ */
+static void pulse_queue_init(struct lrt_pulse_queue *p)
 {
 	p->head = 0;
 	p->tail = 0;
 	p->count = 0;
 }
 
-/* Requests a new entry in a pulse queue. Returns pointer to the ne
-   entry or NULL if the queue is full. */
+
+/**
+ * Requests a new entry in a pulse queue. Returns pointer to the ne
+ * entry or NULL if the queue is full.
+ */
 struct pulse_queue_entry *pulse_queue_push(struct lrt_pulse_queue *p)
 {
+	struct pulse_queue_entry *ent;
+
 	if (p->count == FD_MAX_QUEUE_PULSES)
 		return NULL;
 
-	struct pulse_queue_entry *ent = &p->data[p->head];
-
+	ent = &p->data[p->head];
 	p->count++;
 	p->head++;
 
@@ -238,30 +258,42 @@ struct pulse_queue_entry *pulse_queue_push(struct lrt_pulse_queue *p)
 	return ent;
 }
 
-/* Returns non-0 if pulse queue p contains any pulses. */
-int pulse_queue_empty(struct lrt_pulse_queue *p)
+
+/**
+ * Returns non-0 if pulse queue p contains any pulses.
+ */
+static inline int pulse_queue_empty(struct lrt_pulse_queue *p)
 {
 	return (p->count == 0);
 }
 
-/* Returns the oldest entry in the pulse queue (or NULL if empty). */
-struct pulse_queue_entry* pulse_queue_front(struct lrt_pulse_queue *p)
+
+/**
+ * Returns the oldest entry in the pulse queue (or NULL if empty).
+ */
+static struct pulse_queue_entry* pulse_queue_front(struct lrt_pulse_queue *p)
 {
     if (!p->count)
 	   return NULL;
     return &p->data[p->tail];
 }
 
-/* Returns the newest entry in the pulse queue (or NULL if empty). */
-struct pulse_queue_entry* pulse_queue_back(struct lrt_pulse_queue *p)
+
+/**
+ * Returns the newest entry in the pulse queue (or NULL if empty).
+ */
+static struct pulse_queue_entry* pulse_queue_back(struct lrt_pulse_queue *p)
 {
     if (!p->count)
 	   return NULL;
     return &p->data[p->head];
 }
 
-/* Releases the oldest entry from the pulse queue. */
-void pulse_queue_pop(struct lrt_pulse_queue *p)
+
+/**
+ * Releases the oldest entry from the pulse queue.
+ */
+static void pulse_queue_pop(struct lrt_pulse_queue *p)
 {
 	p->tail++;
 
@@ -270,37 +302,30 @@ void pulse_queue_pop(struct lrt_pulse_queue *p)
 	p->count--;
 }
 
-/* Checks if the timestamp of the pulse (ts) does not violate the dead time on the output out
-   by comparing it with the last processed pulse timestamp. */
-static int check_dead_time( struct wrtd_out_channel *out, struct wr_timestamp *ts )
+/**
+ * Checks if the timestamp of the pulse (ts) does not violate the
+ * dead time on the output out by comparing it with the last processed
+ * pulse timestamp.
+ */
+static int check_dead_time(struct wrtd_out_channel *out,
+			   struct wr_timestamp *ts)
 {
 	int delta_s = ts->seconds - out->priv.prev_pulse.seconds;
 	int delta_c = ts->ticks - out->priv.prev_pulse.ticks;
 
-	if(delta_c < 0) {
+	if (delta_c < 0) {
 		delta_c += 125 * 1000 * 1000;
 		delta_s--;
 	}
 
-	if(delta_s < 0 || delta_c < out->config.dead_time)
-		return 0;
-
-	return 1;
+	return (delta_s < 0 || delta_c < out->config.dead_time) ? 0 : 1;
 }
 
-/* Writes to FD output registers for output (out) */
-static inline void fd_ch_writel(struct wrtd_out_channel *out, uint32_t value,
-				 uint32_t reg)
-{
-	dp_writel(value , reg + out->base_addr);
-}
 
-/* Reads from FD output registers for output (out) */
-static inline uint32_t fd_ch_readl (struct wrtd_out_channel *out,  uint32_t reg)
-{
-	return dp_readl(reg + out->base_addr);
-}
-
+/**
+ * Checks if the timestamp of the last programmed pulse is lost because
+ * of timeout
+ */
 static int check_output_timeout (struct wrtd_out_channel *out)
 {
 	struct lrt_pulse_queue *q = &out->queue;
@@ -308,12 +333,14 @@ static int check_output_timeout (struct wrtd_out_channel *out)
 	struct wr_timestamp tc;
 	int delta;
 
-	/* Read the current WR time, order is important: first seconds, then cycles (cycles
-	   get latched on reading secs register. */
+	/*
+	 * Read the current WR time, order is important: first seconds,
+	 * then cycles (cycles get latched on reading secs register.
+	 */
 	tc.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
 	tc.ticks = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
 
-	if (out->last_programmed.seconds > tc.seconds + OUT_TIMEOUT) {
+	if( out->stats.last_programmed.seconds > tc.seconds + OUT_TIMEOUT ) {
 	    pp_printf("Enqueued timestamp very far in the future [id %x:%x:%x]. Dropping.",
 		      pq_ent->trig.id.system,
 		      pq_ent->trig.id.source_port,
@@ -323,7 +350,7 @@ static int check_output_timeout (struct wrtd_out_channel *out)
 		      out->last_programmed.ticks);
 	}
 
-	delta = tc.seconds - out->last_programmed.seconds;
+	delta = tc.seconds - out->stats.last_programmed.seconds;
 	delta *= 125 * 1000 * 1000;
 	delta += tc.ticks - out->stats.last_programmed.ticks;
 
@@ -331,26 +358,28 @@ static int check_output_timeout (struct wrtd_out_channel *out)
 	return (delta > 0);
 }
 
-void update_latency_stats (struct pulse_queue_entry *pq_ent)
+
+/**
+ * It updates the latency stats
+ */
+void update_latency_stats(struct pulse_queue_entry *pq_ent)
 {
-/* Read the time and calculate the latency */
-	__attribute__((unused))
-		volatile uint32_t dummy = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
-	int latency = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES) - pq_ent->origin_cycles;
-
-	if (latency < 0)
-		latency += 125 * 1000 * 1000;
-
+	/* Read the time and calculate the latency */
 	struct lrt_output_rule *rule = pq_ent->rule;
+	__attribute__((unused))
+		volatile uint32_t dummy = lr_readl (WRN_CPU_LR_REG_TAI_SEC);
+	int latency;
 
 	if(!rule)
 		return;
+	latency = lr_readl (WRN_CPU_LR_REG_TAI_CYCLES) - pq_ent->origin_cycles;
+	if (latency < 0)
+		latency += 125 * 1000 * 1000;
 
 	if (latency > rule->latency_worst)
 		rule->latency_worst = latency;
 
-	if(rule->latency_avg_sum > 2000 * 1000 * 1000)
-	{
+	if (rule->latency_avg_sum > 2000 * 1000 * 1000) {
 		rule->latency_avg_sum = 0;
 		rule->latency_avg_nsamples = 0;
 	}
@@ -359,21 +388,31 @@ void update_latency_stats (struct pulse_queue_entry *pq_ent)
 	rule->latency_avg_nsamples++;
 }
 
-void drop_trigger( struct wrtd_out_channel *out, struct pulse_queue_entry *pq_ent, struct lrt_pulse_queue *q, int reason)
+
+/**
+ * Drop the given enqueued trigger
+ */
+static void drop_trigger(struct wrtd_out_channel *out,
+			 struct pulse_queue_entry *pq_ent,
+			 struct lrt_pulse_queue *q, int reason)
 {
 	out->priv.idle = 1;
 
-	if(pulse_queue_empty(q))
+	if (pulse_queue_empty(q))
 	    return;
 
 	/* Drop the pulse */
 	pulse_queue_pop(q);
 	pq_ent->rule->misses ++;
 
-	if(reason == WRTD_MISS_TIMEOUT)
-		out->stats.miss_timeout ++;
-	else if (reason == WRTD_MISS_NO_WR)
+	switch (reason) {
+	case WRTD_MISS_TIMEOUT:
+		out->stats.miss_timeout++;
+		break;
+	case WRTD_MISS_NO_WR:
 		out->stats.miss_no_timing ++;
+		break;
+	}
 
 	out->stats.last_lost = pq_ent->trig;
 
@@ -383,27 +422,30 @@ void drop_trigger( struct wrtd_out_channel *out, struct pulse_queue_entry *pq_en
 	if(out->config.state == OUT_ST_TEST_PENDING)
 		out->config.state = OUT_ST_IDLE;
 
-	log_trigger (WRTD_LOG_MISSED, reason,
-		     out, &pq_ent->trig);
+	log_trigger(WRTD_LOG_MISSED, reason, out, &pq_ent->trig);
 }
 
-/* Output driving function. Reads pulses from the output queue,
-   programs the output and updates the output statistics. */
-void do_output (struct wrtd_out_channel *out)
+
+/**
+ * Output driving function. Reads pulses from the output queue,
+ * programs the output and updates the output statistics.
+ */
+static void do_output (struct wrtd_out_channel *out)
 {
 	struct lrt_pulse_queue *q = &out->priv.queue;
 	struct pulse_queue_entry *pq_ent = pulse_queue_front(q);
 	uint32_t dcr = fd_ch_readl(out, FD_REG_DCR);
+	struct wr_timestamp *ts;
 
 	/* Check if the output has triggered */
 	if(!out->priv.idle) {
-		if( !wr_is_timing_ok() ) {
+		if (!wr_is_timing_ok()) {
 			drop_trigger(out, pq_ent, q, WRTD_MISS_NO_WR);
 		}
-		else if (!(dcr & FD_DCR_PG_TRIG)) { /* Nope, armed but still waiting for trigger */
-			if (check_output_timeout (out))	{
+		else if (!(dcr & FD_DCR_PG_TRIG)) {
+			/* Nope, armed but still waiting for trigger */
+			if (check_output_timeout (out))
 				drop_trigger(out, pq_ent, q, WRTD_MISS_TIMEOUT);
-			}
 		} else {
 			out->stats.last_executed = pq_ent->trig;
 			pq_ent->rule->hits ++;
@@ -421,13 +463,13 @@ void do_output (struct wrtd_out_channel *out)
 	}
 
 	/* Output is idle: check if there's something in the queue to execute */
-	if(pulse_queue_empty(q))
+	if (pulse_queue_empty(q))
         	return;
 
 	pq_ent = pulse_queue_front(q);
-	struct wr_timestamp *ts = &pq_ent->trig.ts;
+	ts = &pq_ent->trig.ts;
 
-	if( !wr_is_timing_ok() )
+	if (!wr_is_timing_ok())
 		drop_trigger(out, pq_ent, q, WRTD_MISS_NO_WR);
 
 
@@ -449,7 +491,8 @@ void do_output (struct wrtd_out_channel *out)
 	fd_ch_writel(out, 0, FD_REG_RCR);
 	fd_ch_writel(out, FD_DCR_MODE, FD_REG_DCR);
 	fd_ch_writel(out, FD_DCR_MODE | FD_DCR_UPDATE, FD_REG_DCR);
-	fd_ch_writel(out, FD_DCR_MODE | FD_DCR_PG_ARM | FD_DCR_ENABLE, FD_REG_DCR);
+	fd_ch_writel(out, FD_DCR_MODE | FD_DCR_PG_ARM | FD_DCR_ENABLE,
+		     FD_REG_DCR);
 
 	ts->ticks += 1000;
 	if (ts->ticks >= 125000000) {
@@ -457,19 +500,28 @@ void do_output (struct wrtd_out_channel *out)
 		ts->seconds++;
 	}
 
-	/* Store the last programmed timestamp (+ some margin) and mark the output as busy */
+	/*
+	 * Store the last programmed timestamp (+ some margin) and mark
+	 * the output as busy
+	 */
 	out->stats.last_programmed = *ts;
 	out->priv.idle = 0;
 
 	update_latency_stats (pq_ent);
 }
 
-void enqueue_trigger(int output, struct lrt_output_rule *rule,
-		     struct wrtd_trig_id *id, struct wr_timestamp *ts, int seq)
+
+/**
+ * If the given trigger can be generated, then push it into the queue
+ */
+static void enqueue_trigger(int output, struct lrt_output_rule *rule,
+			    struct wrtd_trig_id *id,
+			    struct wr_timestamp *ts, int seq)
 {
 	struct wrtd_out_channel *out = &wrtd_out_channels[output];
 	struct wr_timestamp adjusted = *ts;
 	struct pulse_queue_entry *pq_ent;
+	struct wrtd_trigger_entry ent;
 
 #ifdef RTDEBUG
 	pp_printf("%s:%d ch %d 0x%x\n", __func__, __LINE__, output, rule->state);
@@ -480,9 +532,8 @@ void enqueue_trigger(int output, struct lrt_output_rule *rule,
 	if (!(out->config.flags & WRTD_ENABLED))
 		return;
 
-	ts_adjust_delay (&adjusted, rule->delay_cycles, rule->delay_frac);
+	ts_adjust_delay(&adjusted, rule->delay_cycles, rule->delay_frac);
 
-	struct wrtd_trigger_entry ent;
 	ent.ts = *ts;
 	ent.id = *id;
 	ent.seq = seq;
@@ -501,42 +552,42 @@ void enqueue_trigger(int output, struct lrt_output_rule *rule,
 		return;
 	}
 
-	switch(out->config.state)
-	{
-		case OUT_ST_IDLE:
-			return; // output not armed
+	switch (out->config.state) {
+	case OUT_ST_IDLE: /* output not armed */
+		return;
 
-		case OUT_ST_ARMED:
-			if (rule->state & HASH_ENT_CONDITION) {
-				out->priv.pending_trig = &triggers[rule->cond_ptr].ocfg[0]; /* FIXME select the correct channel */
-				out->config.state = OUT_ST_CONDITION_HIT;
-				return;
-			} else if (out->config.mode == WRTD_TRIGGER_MODE_SINGLE) {
-				out->config.flags &= ~WRTD_ARMED;
-				out->config.state = OUT_ST_IDLE;
-			}
-			break;
-		case OUT_ST_TEST_PENDING:
+	case OUT_ST_ARMED:
+		if (rule->state & HASH_ENT_CONDITION) {
+			/* FIXME select the correct channel */
+			out->priv.pending_trig = &triggers[rule->cond_ptr].ocfg[0];
+			out->config.state = OUT_ST_CONDITION_HIT;
+			return;
+		} else if (out->config.mode == WRTD_TRIGGER_MODE_SINGLE) {
+			out->config.flags &= ~WRTD_ARMED;
+			out->config.state = OUT_ST_IDLE;
+		}
+		break;
+	case OUT_ST_TEST_PENDING:
+		return;
+
+	case OUT_ST_CONDITION_HIT:
+		if (rule != out->priv.pending_trig)
 			return;
 
-		case OUT_ST_CONDITION_HIT:
-			if (rule != out->priv.pending_trig)
-				return;
-
-			if (out->config.mode == WRTD_TRIGGER_MODE_SINGLE) {
-				out->config.flags &= ~WRTD_ARMED;
-				out->config.state = OUT_ST_IDLE;
-			} else {
-				out->config.state = OUT_ST_ARMED;
-			}
-			break;
-		default:
-			break;
+		if (out->config.mode == WRTD_TRIGGER_MODE_SINGLE) {
+			out->config.flags &= ~WRTD_ARMED;
+			out->config.state = OUT_ST_IDLE;
+		} else {
+			out->config.state = OUT_ST_ARMED;
+		}
+		break;
+	default:
+		break;
 
 	}
 
-	if ((pq_ent = pulse_queue_push (&out->priv.queue)) == NULL) {
-		struct wrtd_trigger_entry ent;
+	pq_ent = pulse_queue_push(&out->priv.queue);
+	if (!pq_ent) {
 		ent.ts = *ts;
 		ent.id = *id;
 		ent.seq = seq;
@@ -575,32 +626,36 @@ static void filter_trigger(struct wrtd_trigger_entry *trig)
 		  __func__, __LINE__,
 		  trig->id.system, trig->id.source_port, trig->id.trigger, ent);
 #endif
-	if(ent)
-	{
-		struct wr_timestamp ts = trig->ts;
-		struct wrtd_trig_id id = trig->id;
-		int seq = trig->seq;
-		for(j = 0; j < FD_NUM_CHANNELS; j++)
-			if(ent->ocfg[j].state != HASH_ENT_EMPTY)
-				enqueue_trigger (j, &ent->ocfg[j], &id, &ts, seq);
-	}
+	if (!ent)
+		return;
+
+	for(j = 0; j < FD_NUM_CHANNELS; j++)
+		if(ent->ocfg[j].state != HASH_ENT_EMPTY)
+			enqueue_trigger(j, &ent->ocfg[j],
+					&trig->id, &trig->ts, trig->seq);
+
 }
 
 void do_rx(void)
 {
-	if (rmq_poll( WRTD_REMOTE_IN_FD)) {
-		struct wrtd_trigger_message *msg = mq_map_in_buffer (1, WRTD_REMOTE_IN_FD) - sizeof(struct rmq_message_addr);
-		int i, cnt = msg->count;
+	struct wrtd_trigger_entry *ent;
+	struct wrtd_trigger_message *msg;
+	int i;
 
-		for (i = 0; i < cnt; i++)
+	/* check from etherbone */
+	if (rmq_poll(WRTD_REMOTE_IN_FD)) {
+		msg = mq_map_in_buffer(1, WRTD_REMOTE_IN_FD)
+			- sizeof(struct rmq_message_addr);
+
+		for (i = 0; i < msg->count; i++)
 			filter_trigger (&msg->triggers[i]);
 
 		mq_discard (1, WRTD_REMOTE_IN_FD);
 		wrtd_out_device.counter_etherbone++;
 	}
 
-	struct wrtd_trigger_entry *ent = loop_queue_pop();
-
+	/* Check from the loopback */
+	ent = loop_queue_pop();
 	if (ent) {
 		filter_trigger (ent);
 		wrtd_out_device.counter_loopback++;
@@ -666,12 +721,15 @@ static int wrtd_out_trigger_sw(struct wrnc_proto_header *hin, void *pin,
 }
 
 
-
+/**
+ * It gets the first available row in the hash table for the given
+ * trigger ID
+ */
 static int wrtd_out_hash_table_free(struct wrtd_trig_id *tid)
 {
-	int hidx = wrtd_hash_func(tid);
+	int hidx;
 
-	for (; hidx < FD_HASH_ENTRIES; hidx++) {
+	for (hidx = wrtd_hash_func(tid); hidx < FD_HASH_ENTRIES; hidx++) {
 		if (!ht[hidx])
 			return hidx;
 		/* Check if it already exists */
@@ -681,6 +739,10 @@ static int wrtd_out_hash_table_free(struct wrtd_trig_id *tid)
         return -1;
 }
 
+
+/**
+ * Insert trigger entry in the hash table
+ */
 static int wrtd_out_hash_table_insert(struct wrnc_proto_header *hin, void *pin,
 				      struct wrnc_proto_header *hout, void *pout)
 {
@@ -707,11 +769,13 @@ static int wrtd_out_hash_table_insert(struct wrnc_proto_header *hin, void *pin,
 out:
 	rt_send_ack(hin, pin, hout, pout);
 
-//	print_hash_table();
-
 	return 0;
 }
 
+
+/**
+ * Remove trigger entry from the hash table
+ */
 static int wrtd_out_hash_table_remove(struct wrnc_proto_header *hin, void *pin,
 				      struct wrnc_proto_header *hout, void *pout)
 {
@@ -734,8 +798,6 @@ static int wrtd_out_hash_table_remove(struct wrnc_proto_header *hin, void *pin,
 	tlist_count--;
 	ht[hidx] = NULL;
 	rt_send_ack(hin, pin, hout, pout);
-
-//	print_hash_table();
 
 	return 0;
 }
@@ -766,7 +828,8 @@ static int wrtd_out_trigger_index(struct wrnc_proto_header *hin, void *pin,
 
 	hidx = wrtd_out_hash_table_find(id);
 	if (hidx >= 0) {
-		*index = ((int)ht[hidx] - (int)triggers) / sizeof(struct wrtd_out_trigger);
+		*index = ((int)ht[hidx] - (int)triggers) /
+			sizeof(struct wrtd_out_trigger);
 	} else {
 		/* Get first free */
 		for (*index = 0; *index < FD_HASH_ENTRIES; ++(*index)) {
@@ -787,6 +850,9 @@ err:
 }
 
 
+/**
+ * It disable the given channel and clear its internal queue
+ */
 static int wrtd_out_disable(struct wrnc_proto_header *hin, void *pin,
 			    struct wrnc_proto_header *hout, void *pout)
 {

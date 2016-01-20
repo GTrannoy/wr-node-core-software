@@ -1,3 +1,8 @@
+/**
+ * Copyright (C) 2016 CERN (www.cern.ch)
+ * Author: Federico Vaga <federico.vaga@cern.ch>
+ * License: GPL v3
+ */
 #include <stdio.h>
 
 #include "wrtd-ut.h"

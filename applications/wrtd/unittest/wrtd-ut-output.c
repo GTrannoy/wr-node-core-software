@@ -1,7 +1,6 @@
 /**
- * Copyright (C) 2014 CERN (www.cern.ch)
+ * Copyright (C) 2016 CERN (www.cern.ch)
  * Author: Federico Vaga <federico.vaga@cern.ch>
- *         inspired by a draft of Tomasz Wlostowski <tomasz.wlostowski@cern.ch>
  * License: GPL v3
  *
  * @TODO software trigger test

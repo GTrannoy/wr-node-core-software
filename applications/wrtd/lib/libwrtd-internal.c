@@ -108,3 +108,13 @@ void wrtd_timestamp_endianess_fix(struct wr_timestamp *ts)
 	ts->seconds = ((ts->seconds & 0xFFFFFFFF) << 32) |
 		      ((ts->seconds >> 32) & 0xFFFFFFFF);
 }
+
+void wrtd_output_rule_endianess_fix(struct lrt_output_rule *rule)
+{
+	uint16_t tmp = rule->state;
+
+	rule->state = (rule->delay_frac & 0x00FF) << 8 |
+		(rule->delay_frac & 0xFF00) >> 8;
+	rule->delay_frac = (tmp & 0x00FF) << 8 |
+		(tmp & 0xFF00) >> 8;
+}

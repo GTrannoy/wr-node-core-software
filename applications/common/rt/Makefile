@@ -32,7 +32,7 @@ endif
 
 LDSCRIPT = $(WRNC)/applications/common/rt/wrnode.ld
 
-all:	$(OUTPUT)
+all: clean $(OUTPUT)
 
 $(OUTPUT): $(LDSCRIPT) $(OBJS)
 	${CC} -o $(OUTPUT).elf -nostartfiles $(OBJS) -T $(LDSCRIPT) -lgcc -lc

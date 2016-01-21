@@ -208,6 +208,28 @@ struct wrnc_dev *wrtd_get_wrnc_dev(struct wrtd_node *dev)
 
 
 /**
+ * It restarts both real-time applications
+ * @param[in] dev device token
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrtd_cpu_restart(struct wrtd_node *dev)
+{
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	int err;
+
+	err = wrnc_cpu_disable(wrtd->wrnc,WRTD_CPU_TDC);
+	if (err)
+		return err;
+	err = wrnc_cpu_disable(wrtd->wrnc,WRTD_CPU_FD);
+	if (err)
+		return err;
+	err = wrnc_cpu_enable(wrtd->wrnc,WRTD_CPU_TDC);
+	if (err)
+		return err;
+	return wrnc_cpu_enable(wrtd->wrnc,WRTD_CPU_FD);
+}
+
+/**
  * It loads a set of real-time applications for TDC and FD
  * @param[in] dev device token
  * @param[in] rt_tdc path to the TDC application

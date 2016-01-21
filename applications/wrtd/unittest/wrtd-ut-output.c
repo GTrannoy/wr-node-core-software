@@ -163,6 +163,86 @@ static void test_trigger_assign(CuTest *tc)
 }
 
 
+static void test_trigger_assign_cond_one(CuTest *tc, struct wrtd_node *wrtd,
+				    unsigned int chan,
+				    struct wrtd_trig_id *id)
+{
+	struct wrtd_output_trigger_state trig, cond;
+	struct wrtd_trig_id condid = *id;
+	struct wrtd_trigger_handle h;
+	unsigned int assigned;
+	char msg[128];
+	int ret;
+
+	condid.trigger += 100;
+	CuAssertIntEquals(tc, 0, wrtd_out_has_trigger(wrtd, chan, id, &assigned));
+	CuAssertIntEquals(tc, 0, assigned);
+
+	ret = wrtd_out_trig_assign(wrtd, chan, &h, id, &condid);
+	sprintf(msg, "Assert failed - Channel %d Trigger ID %d:%d:%d - %s",
+		chan, id->system, id->source_port, id->trigger, wrtd_strerror(errno));
+	CuAssertIntEquals_Msg(tc, msg, 0, ret);
+
+	ret = wrtd_out_trig_state_get_by_index(wrtd, h.ptr_trig, chan, &trig);
+	sprintf(msg, "Assert failed - Channel %d Trigger ID %d:%d:%d - %s",
+		chan, id->system, id->source_port, id->trigger, wrtd_strerror(errno));
+	CuAssertIntEquals_Msg(tc, msg, 0, ret);
+
+	ret = wrtd_out_trig_state_get_by_index(wrtd, h.ptr_cond, chan, &cond);
+	sprintf(msg, "Assert failed - Channel %d Trigger ID %d:%d:%d - %s",
+		chan, id->system, id->source_port, id->trigger, wrtd_strerror(errno));
+	CuAssertIntEquals_Msg(tc, msg, 0, ret);
+
+ 	CuAssertIntEquals(tc, 0, memcmp(id, &trig.trigger,
+					sizeof(struct wrtd_trig_id)));
+	CuAssertIntEquals(tc, 0, memcmp(&condid, &cond.trigger,
+					sizeof(struct wrtd_trig_id)));
+	CuAssertIntEquals(tc, 0, wrtd_out_has_trigger(wrtd, chan, id, &assigned));
+	CuAssertTrue(tc, assigned);
+}
+
+static void test_trigger_assign_cond_all(CuTest *tc, struct wrtd_node *wrtd,
+					 unsigned int chan)
+{
+	struct wrtd_trig_id id;
+	int k, w;
+
+	id.source_port = chan;
+	for (k = 0; k < 2; k++) {
+		for (w = 0; w < 3; w++) {
+			id.system = k;
+			id.trigger = w;
+			test_trigger_assign_cond_one(tc, wrtd, chan, &id);
+		}
+	}
+}
+
+static void test_trigger_assign_cond(CuTest *tc)
+{
+	struct wrtd_output_trigger_state trig[12];
+	struct wrtd_node *wrtd;
+	unsigned int assigned;
+        int i, ret;
+
+	wrtd = wrtd_open_by_lun(0);
+
+	for (i = 0; i < FD_NUM_CHANNELS; i++) {
+		CuAssertIntEquals(tc, 0, wrtd_out_trig_get_all(wrtd, i,
+							       trig, 12));
+		test_trigger_assign_cond_all(tc, wrtd, i);
+		CuAssertIntEquals(tc, 0, wrtd_out_has_trigger(wrtd, i, NULL,
+						       &assigned));
+		CuAssertTrue(tc, assigned);
+		memset(&trig, 0,
+		       sizeof(struct wrtd_output_trigger_state) * (12));
+		ret = wrtd_out_trig_get_all(wrtd, i, trig, 12);
+		CuAssertIntEquals(tc, 12, ret);
+	}
+
+	wrtd_close(wrtd);
+}
+
+
 static void test_trigger_unassign_one(CuTest *tc, struct wrtd_node *wrtd,
 				      unsigned int chan,
 				      struct wrtd_trig_id *id)
@@ -235,6 +315,49 @@ static void test_trigger_unassign(CuTest *tc)
 	wrtd_close(wrtd);
 }
 
+static void test_trigger_unassign_cond_all(CuTest *tc, struct wrtd_node *wrtd,
+					   unsigned int chan)
+{
+	struct wrtd_trig_id id;
+	int k, w;
+
+	id.source_port = chan;
+	for (k = 0; k < 2; k++) {
+		for (w = 0; w < 3; w++) {
+			id.system = k;
+			id.trigger = w;
+			test_trigger_unassign_one(tc, wrtd, chan, &id);
+		}
+	}
+}
+
+static void test_trigger_unassign_cond(CuTest *tc)
+{
+	struct wrtd_output_trigger_state trig[12];
+	struct wrtd_node *wrtd;
+	unsigned int assigned;
+	unsigned int i;
+
+	wrtd = wrtd_open_by_lun(0);
+
+	for (i = 0; i < FD_NUM_CHANNELS; i++) {
+		memset(&trig, 0,
+		       sizeof(struct wrtd_output_trigger_state) * (12));
+		CuAssertIntEquals(tc, 12, wrtd_out_trig_get_all(wrtd, i,
+								trig, 12));
+		test_trigger_unassign_cond_all(tc, wrtd, i);
+		CuAssertIntEquals(tc, 0, wrtd_out_has_trigger(wrtd, i, NULL,
+						       &assigned));
+		CuAssertIntEquals(tc, 0, assigned);
+
+		memset(&trig, 0,
+		       sizeof(struct wrtd_output_trigger_state) * (12));
+		CuAssertIntEquals(tc, 0, wrtd_out_trig_get_all(wrtd, i, trig, 12));
+	}
+
+	wrtd_close(wrtd);
+}
+
 static void test_pulse_width(CuTest *tc)
 {
 	struct wrtd_output_state st;
@@ -291,7 +414,8 @@ static void test_trigger_delay(CuTest *tc)
 	wrtd = wrtd_open_by_lun(0);
 	for (i = 0; i < FD_NUM_CHANNELS; i++) {
 		id.source_port = i;
-		wrtd_out_trig_assign(wrtd, i, &h[i], &id, NULL);
+		CuAssertIntEquals(tc, 0, wrtd_out_trig_assign(wrtd, i, &h[i],
+							      &id, NULL));
 		CuAssertIntEquals(tc, -1,
 				  wrtd_out_trig_delay_set(wrtd, &h[i],
 							  999999999999));
@@ -417,6 +541,8 @@ CuSuite *wrtd_ut_out_suite_get(void)
 	SUITE_ADD_TEST(suite, test_trigger_enable);
 	SUITE_ADD_TEST(suite, test_trigger_mode);
 	SUITE_ADD_TEST(suite, test_reset_counters);
+	SUITE_ADD_TEST(suite, test_trigger_assign_cond);
+	SUITE_ADD_TEST(suite, test_trigger_unassign_cond);
 
 	return suite;
 }

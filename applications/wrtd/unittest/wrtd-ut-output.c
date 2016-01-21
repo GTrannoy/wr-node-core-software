@@ -514,8 +514,7 @@ static void test_reset_counters(CuTest *tc)
 	for (i = 0; i < FD_NUM_CHANNELS; i++) {
 		CuAssertIntEquals(tc, 0, wrtd_out_counters_reset(wrtd, i));
 		CuAssertIntEquals(tc, 0, wrtd_out_state_get(wrtd, i, &st));
-		CuAssertIntEquals(tc, 0, st.executed_pulses);
-		CuAssertIntEquals(tc, 0,st.missed_pulses_late);
+		CuAssertIntEquals(tc, 0, st.missed_pulses_late);
 		CuAssertIntEquals(tc, 0, st.missed_pulses_deadtime);
 		CuAssertIntEquals(tc, 0, st.missed_pulses_overflow);
 		CuAssertIntEquals(tc, 0, st.missed_pulses_no_timing);

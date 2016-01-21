@@ -149,11 +149,13 @@ static inline int trig_eq(struct wrtd_trig_id *id1, struct wrtd_trig_id *id2)
  */
 static int wrtd_out_hash_table_find(struct wrtd_trig_id *tid)
 {
-	int hidx;
+	int i, hidx = wrtd_hash_func(tid);
 
-	for (hidx = wrtd_hash_func(tid); hidx < FD_HASH_ENTRIES; hidx++)
+	for (i = 0; i < FD_HASH_ENTRIES;
+	     ++i, hidx = (hidx + 1) & (FD_HASH_ENTRIES - 1)) {
 		if (trig_eq(tid, &ht[hidx]->id))
 			return hidx;
+	}
 
         return -1;
 }
@@ -727,9 +729,10 @@ static int wrtd_out_trigger_sw(struct wrnc_proto_header *hin, void *pin,
  */
 static int wrtd_out_hash_table_free(struct wrtd_trig_id *tid)
 {
-	int hidx;
+	int i, hidx = wrtd_hash_func(tid);
 
-	for (hidx = wrtd_hash_func(tid); hidx < FD_HASH_ENTRIES; hidx++) {
+	for (i = 0; i < FD_HASH_ENTRIES;
+	     ++i, hidx = (hidx + 1) & (FD_HASH_ENTRIES - 1)) {
 		if (!ht[hidx])
 			return hidx;
 		/* Check if it already exists */

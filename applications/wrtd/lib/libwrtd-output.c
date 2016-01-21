@@ -533,7 +533,9 @@ int wrtd_out_trig_unassign(struct wrtd_node *dev,
 		.structure = &trig,
 	};
 	struct wrnc_proto_header hdr = hdr_base_sync;
+	struct wrtd_output_trigger_state state;
 	int err, cnt = 0, i;
+	volatile int cond;
 
 	if (handle->channel >= FD_NUM_CHANNELS) {
 		errno = EWRTD_INVALID_CHANNEL;
@@ -545,6 +547,7 @@ int wrtd_out_trig_unassign(struct wrtd_node *dev,
 		return err;
 	wrtd_output_rule_endianess_fix(&trig.ocfg[handle->channel]);
 
+	cond = trig.ocfg[handle->channel].cond_ptr;
 	memset(&trig.ocfg[handle->channel], 0, sizeof(struct lrt_output_rule));
 	for (i = 0; i < FD_NUM_CHANNELS; i++)
 		if (trig.ocfg[i].state == HASH_ENT_EMPTY)
@@ -563,9 +566,23 @@ int wrtd_out_trig_unassign(struct wrtd_node *dev,
 	err = wrtd_out_trig_get_all(dev, handle->channel, triggers, 256);
 	if (err < 0)
 		return -1;
-	if (err > 0)
-		return 0;
-	return wrtd_out_flag_clr(dev, handle->channel, WRTD_TRIGGER_ASSIGNED);
+	if (err == 0){
+		err = wrtd_out_flag_clr(dev, handle->channel,
+					WRTD_TRIGGER_ASSIGNED);
+	} else {
+		err = 0;
+	}
+
+	if (cond < 0 || cond > FD_HASH_ENTRIES)
+		return err;
+
+	/* Remove also its condition */
+	err = wrtd_out_trig_state_get_by_index(dev, cond,
+					       handle->channel, &state);
+	if (err)
+		return err;
+
+	return wrtd_out_trig_unassign(dev, &state.handle);
 }
 
 

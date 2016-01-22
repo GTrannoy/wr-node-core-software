@@ -460,6 +460,12 @@ static void init(void)
 {
 	int i;
 
+	seq = 0;
+	sent_packets = 0;
+	coalesce_count = 0;
+	wr_state = 0;
+	tai_start = 0;
+
 	loop_queue_init();
 
 	wr_state = WR_LINK_OFFLINE;

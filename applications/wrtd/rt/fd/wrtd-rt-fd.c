@@ -1436,6 +1436,11 @@ void init()
 {
 	int i;
 
+	rx_ebone = 0;
+	rx_loopback = 0;
+	promiscuous_mode = 0;
+
+	memset(&last_received, 0, sizeof(struct wrtd_trigger_entry));
 	tlist_count = 0;
 	wr_state = WR_LINK_OFFLINE;
 	wr_enable_lock(0);

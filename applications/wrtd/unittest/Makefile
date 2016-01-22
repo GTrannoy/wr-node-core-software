@@ -5,7 +5,7 @@
 
 WRNC ?= ../../../
 
-CFLAGS += -Wall -ggdb
+CFLAGS += -Wall -ggdb -O0
 CFLAGS += -I. -I../include -I$(WRNC)/include -I$(WRNC)/lib -I../lib
 CFLAGS += $(EXTRACFLAGS)
 CFLAGS += $(EXTRACFLAGS)

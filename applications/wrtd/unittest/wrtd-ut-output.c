@@ -183,12 +183,14 @@ static void test_trigger_assign_cond_one(CuTest *tc, struct wrtd_node *wrtd,
 		chan, id->system, id->source_port, id->trigger, wrtd_strerror(errno));
 	CuAssertIntEquals_Msg(tc, msg, 0, ret);
 
-	ret = wrtd_out_trig_state_get_by_index(wrtd, h.ptr_trig, chan, &trig);
+	ret = wrtd_out_trig_state_get_by_handle(wrtd, &h, &trig);
 	sprintf(msg, "Assert failed - Channel %d Trigger ID %d:%d:%d - %s",
 		chan, id->system, id->source_port, id->trigger, wrtd_strerror(errno));
 	CuAssertIntEquals_Msg(tc, msg, 0, ret);
 
-	ret = wrtd_out_trig_state_get_by_index(wrtd, h.ptr_cond, chan, &cond);
+	h.ptr_trig = h.ptr_cond;
+	h.ptr_cond = NULL;
+	ret = wrtd_out_trig_state_get_by_handle(wrtd, &h, &cond);
 	sprintf(msg, "Assert failed - Channel %d Trigger ID %d:%d:%d - %s",
 		chan, id->system, id->source_port, id->trigger, wrtd_strerror(errno));
 	CuAssertIntEquals_Msg(tc, msg, 0, ret);

@@ -267,7 +267,6 @@ static void test_trigger_unassign_one(CuTest *tc, struct wrtd_node *wrtd,
 
 	ret = wrtd_out_trig_state_get_by_handle(wrtd, &trig.handle, &trig);
 	CuAssertIntEquals_Msg(tc, msg, -1, ret);
-	CuAssertIntEquals(tc, errno, EWRTD_NOFOUND_TRIGGER);
 
 	CuAssertIntEquals(tc, 0, wrtd_out_has_trigger(wrtd, chan, id, &assigned));
 	CuAssertIntEquals(tc, 0, assigned);

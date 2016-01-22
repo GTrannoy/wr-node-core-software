@@ -43,7 +43,7 @@ struct lrt_output_rule {
 	uint16_t delay_frac;
 	uint16_t state; /**< State of the rule (empty, disabled,
 			   conditional action, condition, etc.) */
-	struct lrt_output_rule *cond_ptr; /**< Pointer to conditional action.
+	struct lrt_hash_entry *cond_ptr; /**< Pointer to conditional action.
 					     Used for rules that define
 					     triggering conditions. */
 	uint32_t latency_worst; /**< Worst-case latency (in 8ns ticks)*/
@@ -649,7 +649,7 @@ void enqueue_trigger(int output, struct lrt_output_rule *rule,
 		case OUT_ST_ARMED:
 			if (rule->state & HASH_ENT_CONDITION)
 			{
-				out->pending_trig = rule->cond_ptr;
+				out->pending_trig = &rule->cond_ptr->ocfg[output];
 				out->state = OUT_ST_CONDITION_HIT;
 				return;
 			} else if (out->mode == WRTD_TRIGGER_MODE_SINGLE) {
@@ -858,7 +858,7 @@ static inline void ctl_trig_assign (uint32_t seq, struct wrnc_msg *ibuf)
 	rule.state |= HASH_ENT_DISABLED;
 	if (is_cond) {
 		rule.state |= HASH_ENT_CONDITIONAL;
-		rule.cond_ptr = &handle.cond->ocfg[ch];
+		rule.cond_ptr = handle.cond;
 	} else {
 		rule.state |= HASH_ENT_DIRECT;
 		rule.cond_ptr = NULL;
@@ -982,7 +982,7 @@ void send_hash_entry (uint32_t seq, int ch, int valid, struct lrt_hash_entry *en
 	wrnc_msg_int32(&obuf, &valid);
 
 	if(valid) {
-		cond = (struct lrt_hash_entry *) ent->ocfg[ch].cond_ptr;
+		cond = ent->ocfg[ch].cond_ptr;
 		is_conditional = (cond ? 1 : 0);
 		wrnc_msg_int32(&obuf, &is_conditional);
 
@@ -1436,6 +1436,7 @@ void init()
 {
 	int i;
 
+	tlist_count = 0;
 	wr_state = WR_LINK_OFFLINE;
 	wr_enable_lock(0);
 

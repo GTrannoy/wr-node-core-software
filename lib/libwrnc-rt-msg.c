@@ -308,6 +308,7 @@ int wrnc_rt_variable_set(struct wrnc_dev *wrnc,
 	int err;
 
 	hdr->msg_id = RT_ACTION_RECV_FIELD_SET;
+	hdr->len = n_var * 2;
 
 	err = wrnc_rt_variable(wrnc, hdr, var, n_var);
 	if (err)
@@ -356,6 +357,7 @@ int wrnc_rt_variable_get(struct wrnc_dev *wrnc,
 	hdr->msg_id = RT_ACTION_RECV_FIELD_GET;
 	/* Getting variables is always synchronous */
 	hdr->flags |= WRNC_PROTO_FLAG_SYNC;
+	hdr->len = n_var * 2;
 
         err = wrnc_rt_variable(wrnc, hdr, var, n_var);
 	if (err)

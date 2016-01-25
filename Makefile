@@ -25,7 +25,7 @@ gitmodules:
 #
 # Use the absolute path so it can be used by submodule
 CURDIR ?= $(shell pwd)
-FMC_BUS ?= /home/twl/repos/spec-sw/fmc-bus
+FMC_BUS ?= $(CURDIR)/fmc-bus
 export FMC_BUS
 SUBMOD = $(FMC_BUS)
 LIBWRNC= $(CURDIR)/lib

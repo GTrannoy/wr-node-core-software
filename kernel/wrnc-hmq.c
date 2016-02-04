@@ -25,7 +25,7 @@
 #include "wrnc.h"
 
 int hmq_max_msg = 32; /**< Maximum number of messages in driver queue */
-module_param_named(max_slot_msg, hmq_max_msg, int, 0644);
+module_param_named(max_slot_msg, hmq_max_msg, int, 0444);
 MODULE_PARM_DESC(max_slot_msg, "Maximum number of messages in driver queue.");
 
 int hmq_max_con = 8; /**< Maximum number connection for each slot */
@@ -145,7 +145,7 @@ static void wrnc_hmq_dispatch_out(struct wrnc_hmq *hmq,
 	        usr->n_output++;
 		spin_unlock_irqrestore(&usr->lock, flags);
 
-		if (unlikely(usr->n_output > hmq_max_msg)) {
+		if (unlikely(usr->n_output > hmq->max_msg)) {
 			/* there is no more space, remove the oldest message */
 			spin_lock_irqsave(&usr->lock, flags);
 		        new = list_entry(usr->list_msg_output.next,
@@ -218,9 +218,43 @@ static ssize_t wrnc_show_count(struct device *dev,
 /**
  * It returns the maximum number of messages in the WRNC queue
  */
-static ssize_t wrnc_show_count_max(struct device *dev,
-				   struct device_attribute *attr,
-				   char *buf)
+static ssize_t wrnc_show_count_max_sw(struct device *dev,
+				      struct device_attribute *attr,
+				      char *buf)
+{
+	struct wrnc_hmq *hmq = to_wrnc_hmq(dev);
+
+	return sprintf(buf, "%d\n", hmq->max_msg);
+}
+
+static ssize_t wrnc_store_count_max_sw(struct device *dev,
+				       struct device_attribute *attr,
+				       const char *buf, size_t count)
+{
+	struct wrnc_hmq *hmq = to_wrnc_hmq(dev);
+	long val;
+
+	if (kstrtol(buf, 0, &val))
+		return -EINVAL;
+	if (val < 1) {
+		dev_err(dev,
+			"Buffer length must be greater or equal 1, got %ld\n",
+			val);
+		return -EINVAL;
+	}
+
+	hmq->max_msg = val;
+
+	return count;
+}
+
+
+/**
+ * It returns the maximum number of messages in the WRNC queue
+ */
+static ssize_t wrnc_show_count_max_hw(struct device *dev,
+				      struct device_attribute *attr,
+				      char *buf)
 {
 	struct wrnc_hmq *hmq = to_wrnc_hmq(dev);
 
@@ -290,8 +324,10 @@ static ssize_t wrnc_store_share(struct device *dev,
 
 DEVICE_ATTR(full, S_IRUGO, wrnc_show_full, NULL);
 DEVICE_ATTR(empty, S_IRUGO, wrnc_show_empty, NULL);
-DEVICE_ATTR(count, S_IRUGO, wrnc_show_count, NULL);
-DEVICE_ATTR(count_max, S_IRUGO, wrnc_show_count_max, NULL);
+DEVICE_ATTR(count_hw, S_IRUGO, wrnc_show_count, NULL);
+DEVICE_ATTR(count_max_sw, S_IRUGO | S_IWUSR | S_IWGRP,
+	    wrnc_show_count_max_sw, wrnc_store_count_max_sw);
+DEVICE_ATTR(count_max_hw, S_IRUGO, wrnc_show_count_max_hw, NULL);
 DEVICE_ATTR(width_max, S_IRUGO, wrnc_show_width_max, NULL);
 DEVICE_ATTR(shared_by_users, (S_IRUGO | S_IWUSR | S_IWGRP |  S_IWOTH),
 	    wrnc_show_share, wrnc_store_share);
@@ -299,8 +335,9 @@ DEVICE_ATTR(shared_by_users, (S_IRUGO | S_IWUSR | S_IWGRP |  S_IWOTH),
 static struct attribute *wrnc_hmq_attr[] = {
 	&dev_attr_full.attr,
 	&dev_attr_empty.attr,
-	&dev_attr_count.attr,
-	&dev_attr_count_max.attr,
+	&dev_attr_count_hw.attr,
+	&dev_attr_count_max_sw.attr,
+	&dev_attr_count_max_hw.attr,
 	&dev_attr_width_max.attr,
 	&dev_attr_shared_by_users.attr,
 	NULL,
@@ -432,13 +469,13 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 		return -EINVAL;
 	}
 
-	if (hmq->n_input >= hmq_max_msg) {
+	if (hmq->n_input >= hmq->max_msg) {
 		return -EBUSY;
 	}
 
 	/* Get number of free slots */
 	n = count / sizeof(struct wrnc_msg);
-	free_slot = hmq_max_msg - hmq->n_input;
+	free_slot = hmq->max_msg - hmq->n_input;
 	n = free_slot < n ? free_slot : n;
 
 	count = 0;
@@ -590,7 +627,6 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	struct wrnc_msg_sync msg;
 	struct wrnc_hmq *hmq_out;
 	unsigned long flags;
-	uint32_t seq;
 	int err = 0, to;
 
 	/* Copy the message from user space*/
@@ -817,7 +853,7 @@ static unsigned int wrnc_hmq_poll(struct file *f, struct poll_table_struct *w)
 	poll_wait(f, &hmq->q_msg, w);
 
 	if (hmq->flags & WRNC_FLAG_HMQ_DIR) { /* CPU input */
-		if (hmq->n_input < hmq_max_msg)
+		if (hmq->n_input < hmq->max_msg)
 			ret |= POLLOUT | POLLWRNORM;
 	} else { /* CPU output */
 		if (user->n_output)

@@ -170,6 +170,9 @@ extern int wrnc_hmq_send_and_receive_sync(struct wrnc_hmq *hmq,
 					   unsigned int index_out,
 					   struct wrnc_msg *msg,
 					   unsigned int timeout_ms);
+extern int wrnc_hmq_count_max_sw_set(struct wrnc_hmq *hmq, uint32_t max);
+extern int wrnc_hmq_count_max_sw_get(struct wrnc_hmq *hmq, uint32_t *max);
+extern int wrnc_hmq_count_max_hw_get(struct wrnc_hmq *hmq, uint32_t *max);
 
 /* FIXME to be tested */
 extern int wrnc_hmq_filter_add(struct wrnc_hmq *hmq,

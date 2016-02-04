@@ -755,6 +755,58 @@ int wrnc_hmq_send_and_receive_sync(struct wrnc_hmq *hmq,
 
 
 /**
+ * It sets the maximum number of messages to store within the driver's HMQ
+ * Note that this does not affect the hardware in any way. The hardware
+ * maximum number of messages is fixed and cannot be change
+ * @param[in] hmq HMQ device descriptor
+ * @param[in] max maximum number of message to set
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrnc_hmq_count_max_sw_set(struct wrnc_hmq *hmq, uint32_t max)
+{
+	char path[WRNC_SYSFS_PATH_LEN];
+
+	snprintf(path, WRNC_SYSFS_PATH_LEN, "%s/count_max_sw", hmq->syspath);
+
+	return wrnc_sysfs_printf(path, "%d", max);
+}
+
+
+/**
+ * It gets the maximum number of messages that can be stored within the
+ * driver's HMQ.
+ * @param[in] hmq HMQ device descriptor
+ * @param[out] max maximum number of message to set
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrnc_hmq_count_max_sw_get(struct wrnc_hmq *hmq, uint32_t *max)
+{
+	char path[WRNC_SYSFS_PATH_LEN];
+
+	snprintf(path, WRNC_SYSFS_PATH_LEN, "%s/count_max_sw", hmq->syspath);
+
+	return wrnc_sysfs_scanf(path, "%d", max);
+}
+
+
+/**
+ * It gets the maximum number of messages that can be stored within the
+ * mock-turtle HMQ (in hardware).
+ * @param[in] hmq HMQ device descriptor
+ * @param[out] max maximum number of message to set
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrnc_hmq_count_max_hw_get(struct wrnc_hmq *hmq, uint32_t *max)
+{
+	char path[WRNC_SYSFS_PATH_LEN];
+
+	snprintf(path, WRNC_SYSFS_PATH_LEN, "%s/count_max_hw", hmq->syspath);
+
+	return wrnc_sysfs_scanf(path, "%d", max);
+}
+
+
+/**
  * It opens a WRNC device
  * @param[in] wdesc device descriptor
  * @return 0 on success, -1 on error and errno is set appropriately

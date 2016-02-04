@@ -86,7 +86,8 @@ struct wrnc_hmq {
 	struct wrnc_msg sync_answer; /**< synchronous answer message */
 
 	unsigned int max_width; /**< maximum words number per single buffer */
-	unsigned int max_depth; /**< maximum buffer queue length */
+	unsigned int max_depth; /**< maximum buffer queue length (HW) */
+	unsigned int max_msg; /**< maximum buffer queue length (SW)*/
 };
 
 /**

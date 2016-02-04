@@ -30,7 +30,7 @@ static void help()
 int main(int argc, char *argv[])
 {
 	int cpu_index = 0, err, dump = 0;
-	uint32_t dev_id = 0;
+	uint32_t dev_id = 0, rst;
 	char *file = NULL, c;
 	struct wrnc_dev *wrnc;
 
@@ -81,6 +81,18 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
+	err = wrnc_cpu_reset_get(wrnc, &rst);
+	if (err) {
+		fprintf(stderr, "Cannot get current reset line status: %s\n",
+			wrnc_strerror(errno));
+		goto out;
+	}
+	err = wrnc_cpu_reset_set(wrnc, (rst & ~(1 << cpu_index)));
+	if (err) {
+		fprintf(stderr, "Cannot put CPU %d in reset state: %s\n",
+			cpu_index, wrnc_strerror(errno));
+		goto out;
+	}
 	if (dump) {
 		/* Read the CPU application memory content to a given file */
 		err = wrnc_cpu_dump_application_file(wrnc, cpu_index, file);
@@ -100,8 +112,9 @@ int main(int argc, char *argv[])
 				wrnc_strerror(errno));
 		}
 	}
-
+	err = wrnc_cpu_reset_set(wrnc, rst);
+out:
 	wrnc_close(wrnc);
 
-	exit(0);
+	exit(err);
 }

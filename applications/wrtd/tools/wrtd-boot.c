@@ -189,13 +189,6 @@ int main(int argc, char *argv[])
 	wrnc = wrtd_get_wrnc_dev(wrtd);
 
 	fprintf(stdout, "Reboot applications\n");
-	/* Enable TDC and FD CPUs */
-	err = wrnc_cpu_enable(wrnc, 0);
-	if (err)
-		exit(1);
-	err = wrnc_cpu_enable(wrnc, 1);
-	if (err)
-		exit(1);
 
 	/* Start running application on TDC and FD CPUs */
 	err = wrnc_cpu_start(wrnc, 0);

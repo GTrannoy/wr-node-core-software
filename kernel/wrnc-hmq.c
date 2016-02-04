@@ -46,7 +46,7 @@ MODULE_PARM_DESC(hmq_in_irq, "Set it if you want to use interrupts to communicat
 
 static int hmq_in_no_irq_wait = 10;
 module_param_named(hmq_in_no_irq_wait_us, hmq_in_no_irq_wait, int, 0444);
-MODULE_PARM_DESC(hmq_in_irq, "Time (us) to wait after sending a message from the host to the core in a no-interrupt context. Default 10us");
+MODULE_PARM_DESC(hmq_in_no_irq_wait, "Time (us) to wait after sending a message from the host to the core in a no-interrupt context. Default 10us");
 
 static int wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg,
 			     uint32_t *seq);

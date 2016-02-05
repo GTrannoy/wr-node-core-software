@@ -18,7 +18,6 @@
 #include <string.h>
 
 #include "pp-printf.h"
-#include "rt-mqueue.h"
 #include "rt-common.h"
 
 /**
@@ -29,7 +28,7 @@ int puts(const char *p)
 	char c;
 	int i = 0;
 
-	while (c = *(p++)) {
+	while ((c = *(p++))) {
 		lr_writel(c, WRN_CPU_LR_REG_DBG_CHR);
 		++i;
 	}

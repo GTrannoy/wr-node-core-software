@@ -19,7 +19,7 @@ struct rt_application *_app;
 int rt_structure_setter(struct wrnc_proto_header *hin, void *pin,
 			struct wrnc_proto_header *hout, void *pout)
 {
-	unsigned int i, offset = 0, index, size;
+	unsigned int offset = 0, index, size;
 	uint32_t *din = pin;
 
 	while (offset < hin->len) {
@@ -29,7 +29,7 @@ int rt_structure_setter(struct wrnc_proto_header *hin, void *pin,
 		index = din[offset++];
 		size = din[offset++];
 #ifdef LIBRT_DEBUG
-		pp_printf("%s Type %d Len %d Addr 0x%x\n", __func__,
+		pp_printf("%s Type %d Len %d Addr 0x%p\n", __func__,
 			  index, size, _app->structures[index].struct_ptr);
 		delay(100000);
 #endif
@@ -62,7 +62,7 @@ int rt_structure_setter(struct wrnc_proto_header *hin, void *pin,
 int rt_structure_getter(struct wrnc_proto_header *hin, void *pin,
 			struct wrnc_proto_header *hout, void *pout)
 {
-	unsigned int i, offset = 0, index, size;
+	unsigned int offset = 0, index, size;
 	uint32_t *din = pin;
 	uint32_t *dout = pout;
 
@@ -77,7 +77,7 @@ int rt_structure_getter(struct wrnc_proto_header *hin, void *pin,
 		size = din[offset];
 		dout[offset++] = size;
 #ifdef LIBRT_DEBUG
-		pp_printf("%s Type %d Len %d Addr 0x%x\n", __func__,
+		pp_printf("%s Type %d Len %d Addr 0x%p\n", __func__,
 			  index, size, _app->structures[index].struct_ptr);
 		delay(100000);
 #endif
@@ -144,7 +144,7 @@ int rt_variable_setter(struct wrnc_proto_header *hin, void *pin,
 			*mem = (*mem & ~var->mask) | val;
 
 #ifdef LIBRT_DEBUG
-		pp_printf("%s index %d/%d | [0x%x] = 0x%08x <- 0x%08x (0x%08x) | index in msg (%d/%d)\n",
+		pp_printf("%s index %d/%d | [0x%p] = 0x%08x <- 0x%08x (0x%08x) | index in msg (%d/%d)\n",
 			  __func__,
 			  din[i], _app->n_variables,
 			  mem, *mem, val, din[i + 1],
@@ -194,7 +194,7 @@ int rt_variable_getter(struct wrnc_proto_header *hin, void *pin,
 		val = (*mem >> var->offset) & var->mask;
 		dout[i + 1] = val;
 #ifdef LIBRT_DEBUG
-		pp_printf("%s index %d/%d | [0x%x] = 0x%08x -> 0x%08x | index in msg (%d/%d)\n",
+		pp_printf("%s index %d/%d | [0x%p] = 0x%08x -> 0x%08x | index in msg (%d/%d)\n",
 			  __func__,
 			  dout[i], _app->n_variables,
 			  mem, *mem,  dout[i + 1],
@@ -289,14 +289,17 @@ int rt_mq_action_dispatch(unsigned int mq_in)
 	struct wrnc_proto_header *header;
 	unsigned int mq_in_slot = _app->mq[mq_in].index;
 	unsigned int is_remote = _app->mq[mq_in].flags & RT_MQ_FLAGS_REMOTE;
-	struct rt_action *action;
 	uint32_t *msg;
 	void *pin;
 	int err = 0;
 
 	/* HMQ control slot empty? */
-	if (!(mq_poll() & ( 1 << mq_in_slot)))
-		return -EAGAIN;
+	if (is_remote) {
+		return -EAGAIN; /* Not used now */
+	} else {
+		if (!(mq_poll() & ( 1 << mq_in_slot)))
+			return -EAGAIN;
+	}
 
 	/* Get the message from the HMQ */
 	msg = mq_map_in_buffer(0, mq_in_slot);

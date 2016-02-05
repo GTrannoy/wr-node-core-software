@@ -60,7 +60,7 @@ static inline uint32_t lr_readl(uint32_t reg)
 /**
  * Write to the CPU Local Registers
  */
-static inline uint32_t lr_writel(uint32_t value, uint32_t reg)
+static inline void lr_writel(uint32_t value, uint32_t reg)
 {
 	*(volatile uint32_t *) ( reg + CPU_LR_BASE ) = value;
 }

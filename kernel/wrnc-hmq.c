@@ -558,17 +558,12 @@ static int wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg,
 /**
  * It reads a message from a FPGA HMQ
  */
-static struct wrnc_msg *wrnc_message_pop(struct wrnc_hmq *hmq)
+static void wrnc_message_pop(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
 {
 	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
-	struct wrnc_msg *msg;
 	uint32_t status;
 	int i;
-
-	msg = kmalloc(sizeof(struct wrnc_msg), GFP_ATOMIC);
-	if (!msg)
-		return ERR_PTR(-ENOMEM);
 
 	/* Get information about the incoming slot */
 	status = fmc_readl(fmc, hmq->base_sr + MQUEUE_SLOT_STATUS);
@@ -582,8 +577,6 @@ static struct wrnc_msg *wrnc_message_pop(struct wrnc_hmq *hmq)
 
 	/* Discard the slot content */
 	fmc_writel(fmc, MQUEUE_CMD_DISCARD, hmq->base_sr + MQUEUE_SLOT_COMMAND);
-
-	return msg;
 }
 
 
@@ -908,27 +901,18 @@ s		 * interrupts
  */
 static void wrnc_irq_handler_output(struct wrnc_hmq *hmq)
 {
-	struct wrnc_msg_element *msgel;
+	struct wrnc_msg_element msgel;
+	struct wrnc_msg msg;
 	unsigned long flags;
-
-	/* Allocate space for the incoming message */
-	msgel = kmalloc(sizeof(struct wrnc_msg_element), GFP_ATOMIC);
-	if (!msgel)
-		return;
 
 	/* get the message from the device */
 	spin_lock_irqsave(&hmq->lock, flags);
-	msgel->msg = wrnc_message_pop(hmq);
+	wrnc_message_pop(hmq, &msg);
+	msgel.msg = &msg;
 	spin_unlock_irqrestore(&hmq->lock, flags);
-	if (IS_ERR_OR_NULL(msgel->msg)) {
-		kfree(msgel);
-		return;
-	}
 
 	/* Dispatch to all users or to the one who is waiting a sync message */
-	wrnc_hmq_dispatch_out(hmq, msgel);
-	kfree(msgel->msg);
-	kfree(msgel);
+	wrnc_hmq_dispatch_out(hmq, &msgel);
 
 	/* Wake up processes waiting for this */
 	wake_up_interruptible(&hmq->q_msg);

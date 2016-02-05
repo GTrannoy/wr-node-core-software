@@ -13,7 +13,7 @@ SIZE =		$(CROSS_COMPILE_TARGET)size
 
 RT_GIT_VERSION = 0x$(shell cd ../../..; git rev-parse --short=8 HEAD)
 
-CFLAGS += -DWRNODE_RT -g -O3 -mmultiply-enabled -mbarrel-shift-enabled
+CFLAGS += -Wall -DWRNODE_RT -g -O3 -mmultiply-enabled -mbarrel-shift-enabled
 CFLAGS += -I.
 CFLAGS += -I$(WRNC)/applications/common/rt
 CFLAGS += -I$(WRNC)/applications/common/include

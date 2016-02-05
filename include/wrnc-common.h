@@ -60,7 +60,7 @@ struct wrnc_proto_header {
 	uint32_t seq; /**< sequence number */
 	uint8_t len; /**< message data lenght */
 	uint8_t flags; /**< protocol flags */
-	uint8_t __unused; /**< not used, future use */
+	uint8_t unused; /**< not used, future use */
 	uint8_t trans; /**< transaction descriptor - flag and seq number  */
 	uint32_t time;
 };

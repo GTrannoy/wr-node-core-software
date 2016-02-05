@@ -91,7 +91,7 @@ static int wrtd_in_trigger_log(int type, int miss_reason,
 	};
 
 	if (!(st->config.log_level & type))
-		return;
+		return -1;
 
 	out_buf = rt_mq_claim_out(&hdr);
 	log = (struct wrtd_log_entry *)rt_proto_payload_get(out_buf.data);
@@ -286,10 +286,8 @@ static int wrtd_in_trigger_sw(struct wrnc_proto_header *hin, void *pin,
 	return 0;
 }
 
-int wr_enable_lock(int enable)
+void wr_enable_lock(int enable)
 {
-	int i = 0;
-
 	dp_writel(TDC_CTRL_DIS_ACQ, BASE_DP_TDC_REGS + TDC_REG_CTRL);
 	if (enable)
 		dp_writel(TDC_WR_CTRL_ENABLE, BASE_DP_TDC_REGS + TDC_REG_WR_CTRL);
@@ -476,7 +474,7 @@ static void init(void)
 	dp_writel(DEFAULT_DEAD_TIME, BASE_DP_TDC_DIRECT + DR_REG_DEAD_TIME);
 
 	/* Set up channel states to safe default values */
-	memset(&wrtd_in_channels[i], 0,
+	memset(wrtd_in_channels, 0,
 	       sizeof(struct wrtd_in_channel) * TDC_NUM_CHANNELS);
 	for(i = 0; i < TDC_NUM_CHANNELS; i++) {
 		wrtd_in_channels[i].n = i;

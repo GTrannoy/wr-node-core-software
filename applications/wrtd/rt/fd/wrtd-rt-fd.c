@@ -33,6 +33,85 @@
 static const uint32_t version = GIT_VERSION;
 static uint32_t promiscuous_mode = 0;
 
+
+
+#define WR_LINK_OFFLINE		1
+#define WR_LINK_ONLINE		2
+#define WR_LINK_SYNCING		3
+#define WR_LINK_SYNCED		4
+
+static int wr_state;
+
+int wr_link_up()
+{
+	return dp_readl ( FD_REG_TCR ) & FD_TCR_WR_LINK;
+}
+
+int wr_time_locked()
+{
+	return dp_readl ( FD_REG_TCR ) & FD_TCR_WR_LOCKED;
+}
+
+int wr_time_ready()
+{
+	return 1;
+}
+
+int wr_enable_lock( int enable )
+{
+	if(enable)
+		dp_writel ( FD_TCR_WR_ENABLE, FD_REG_TCR );
+	else
+		dp_writel ( 0, FD_REG_TCR);
+
+	return 0;
+}
+
+void wr_update_link()
+{
+	switch(wr_state)
+	{
+		case WR_LINK_OFFLINE:
+			if ( wr_link_up() )
+			{
+				wr_state = WR_LINK_ONLINE;
+			}
+			break;
+
+		case WR_LINK_ONLINE:
+			if (wr_time_ready())
+			{
+				wr_state = WR_LINK_SYNCING;
+				wr_enable_lock(1);
+			}
+			break;
+
+		case WR_LINK_SYNCING:
+			if (wr_time_locked())
+			{
+				pp_printf("WR link up!\n");
+				wr_state = WR_LINK_SYNCED;
+			}
+			break;
+
+		case WR_LINK_SYNCED:
+			break;
+	}
+
+	if( wr_state != WR_LINK_OFFLINE && !wr_link_up() )
+	{
+		wr_state = WR_LINK_OFFLINE;
+		wr_enable_lock(0);
+	}
+}
+
+int wr_is_timing_ok()
+{
+	return (wr_state == WR_LINK_SYNCED);
+}
+
+
+
 /**
  * Rule defining the behaviour of a trigger output upon reception of a
  * trigger message with matching ID
@@ -129,7 +208,8 @@ int trigger_search(struct lrt_hash_entry **tlist,
 
 struct lrt_hash_entry *rtfd_trigger_entry_find(struct wrtd_trig_id *id)
 {
-	int index, ret;
+	unsigned int index;
+	int ret;
 
 	ret = trigger_search(ord_tlist, id, 0, tlist_count, &index);
 
@@ -146,7 +226,8 @@ struct lrt_hash_entry * rtfd_trigger_entry_update(struct wrtd_trig_id *id,
 						  int output,
 						  struct lrt_output_rule *rule)
 {
-	int i = -1, k, cmp, index = 0, ret = 0;
+	unsigned int index = 0;
+	int i = -1, k, ret = 0;
 
 	ret = trigger_search(ord_tlist, id, 0, tlist_count, &index);
 
@@ -189,8 +270,8 @@ struct lrt_hash_entry * rtfd_trigger_entry_update(struct wrtd_trig_id *id,
  */
 void rtfd_trigger_entry_remove(struct lrt_hash_entry *ent, unsigned int output)
 {
-	int i, index = 0, ret;
-	struct lrt_hash_entry *tmp, *new;
+	unsigned int index = 0;
+	int i, ret;
 
 	ret = trigger_search(ord_tlist, &ent->id, 0, tlist_count, &index);
 	if (!ret) {
@@ -471,8 +552,9 @@ static int check_output_timeout (struct lrt_output *out)
 void update_latency_stats (struct pulse_queue_entry *pq_ent)
 {
 /* Read the time and calculate the latency */
-	volatile uint32_t dummy = lr_readl (WRN_CPU_LR_REG_TAI_SEC);
-	int latency = lr_readl (WRN_CPU_LR_REG_TAI_CYCLES) - pq_ent->origin_cycles;
+	__attribute__((unused))
+		volatile uint32_t dummy = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
+	int latency = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES) - pq_ent->origin_cycles;
 
 	if (latency < 0)
 		latency += 125 * 1000 * 1000;
@@ -529,9 +611,6 @@ void do_output (struct lrt_output *out)
 {
 	struct lrt_pulse_queue *q = &out->queue;
 	struct pulse_queue_entry *pq_ent = pulse_queue_front(q);
-	struct lrt_output_rule dummy_rule;
-	struct lrt_output_rule *rule = (pq_ent->rule ? pq_ent->rule : &dummy_rule);
-
 	uint32_t dcr = fd_ch_readl(out, FD_REG_DCR);
 
 	/* Check if the output has triggered */
@@ -1080,7 +1159,7 @@ static inline void ctl_ping (uint32_t seq, struct wrnc_msg *ibuf)
 static inline void ctl_base_time (uint32_t seq, struct wrnc_msg *ibuf)
 {
 	struct wrnc_msg buf = ctl_claim_out_buf();
-	uint32_t id_ack = WRTD_REP_BASE_TIME_ID, seconds, ticks;
+	uint32_t id_ack = WRTD_REP_BASE_TIME_ID;
 	struct wr_timestamp ts;
 
 	ts.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
@@ -1182,7 +1261,7 @@ static inline void ctl_software_trigger (uint32_t seq, struct wrnc_msg *ibuf)
 		tc.frac = 0;
 		tc.ticks += 10000;
 	} else {
-		wrnc_msg_timestamp(ibuf, &tc);
+		wrtd_msg_timestamp(ibuf, &tc);
 	}
 
 	struct wrnc_msg obuf = ctl_claim_out_buf();
@@ -1198,7 +1277,7 @@ static inline void ctl_software_trigger (uint32_t seq, struct wrnc_msg *ibuf)
 		tc.seconds++;
 	}
 
-	wrnc_msg_timestamp(&obuf, &tc);
+	wrtd_msg_timestamp(&obuf, &tc);
 	hmq_msg_send (&obuf);
 
 	struct lrt_output *out = &outputs[ch];
@@ -1359,78 +1438,6 @@ void init_outputs()
     }
 }
 
-#define WR_LINK_OFFLINE		1
-#define WR_LINK_ONLINE		2
-#define WR_LINK_SYNCING		3
-#define WR_LINK_SYNCED		4
-
-static int wr_state;
-
-int wr_link_up()
-{
-	return dp_readl ( FD_REG_TCR ) & FD_TCR_WR_LINK;
-}
-
-int wr_time_locked()
-{
-	return dp_readl ( FD_REG_TCR ) & FD_TCR_WR_LOCKED;
-}
-
-int wr_time_ready()
-{
-	return 1;
-}
-
-int wr_enable_lock( int enable )
-{
-	if(enable)
-		dp_writel ( FD_TCR_WR_ENABLE, FD_REG_TCR );
-	else
-		dp_writel ( 0, FD_REG_TCR);
-}
-
-void wr_update_link()
-{
-	switch(wr_state)
-	{
-		case WR_LINK_OFFLINE:
-			if ( wr_link_up() )
-			{
-				wr_state = WR_LINK_ONLINE;
-			}
-			break;
-
-		case WR_LINK_ONLINE:
-			if (wr_time_ready())
-			{
-				wr_state = WR_LINK_SYNCING;
-				wr_enable_lock(1);
-			}
-			break;
-
-		case WR_LINK_SYNCING:
-			if (wr_time_locked())
-			{
-				pp_printf("WR link up!\n");
-				wr_state = WR_LINK_SYNCED;
-			}
-			break;
-
-		case WR_LINK_SYNCED:
-			break;
-	}
-
-	if( wr_state != WR_LINK_OFFLINE && !wr_link_up() )
-	{
-		wr_state = WR_LINK_OFFLINE;
-		wr_enable_lock(0);
-	}
-}
-
-int wr_is_timing_ok()
-{
-	return (wr_state == WR_LINK_SYNCED);
-}
 
 void init()
 {

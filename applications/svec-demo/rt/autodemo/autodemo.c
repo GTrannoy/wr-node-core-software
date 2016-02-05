@@ -67,7 +67,7 @@ void autodemo()
 
 		/* Turn on/off leds one by one */
 		if (i % 7500 == 0) {
-			dp_writel(1 << j + 8, on ? GPIO_SODR : GPIO_CODR);
+			dp_writel(1 << (j + 8), on ? GPIO_SODR : GPIO_CODR);
 			j = (j >= 16 ? 0 : j + 1);
 			on = j ? on : !on;
 		}

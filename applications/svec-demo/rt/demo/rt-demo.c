@@ -34,8 +34,6 @@ struct rt_mq mq[] = {
 };
 
 
-static uint32_t out_seq = 0;
-
 static struct demo_structure demo_struct;
 
 struct rt_structure demo_structures[] = {

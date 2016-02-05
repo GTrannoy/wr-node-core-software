@@ -144,7 +144,7 @@ static inline int wrtd_msg_timestamp ( struct wrnc_msg *buf, struct wr_timestamp
         buf->data[buf->datalen + 3] = 	ts->frac;
 	buf->datalen += 4;
     } else {
-       ts->seconds = 	buf->data[buf->offset + 0] << 32;
+	ts->seconds = 	((uint64_t)buf->data[buf->offset + 0]) << 32;
        ts->seconds |=	buf->data[buf->offset + 1];
 	ts->ticks = 	buf->data[buf->offset + 2];
         ts->frac = 	buf->data[buf->offset + 3];

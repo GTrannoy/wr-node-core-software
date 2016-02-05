@@ -8,6 +8,7 @@
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/delay.h>
+#include <linux/vmalloc.h>
 
 #include <linux/fmc.h>
 #include <hw/wrn_cpu_csr.h>

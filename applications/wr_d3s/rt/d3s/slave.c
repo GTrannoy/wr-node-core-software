@@ -34,7 +34,7 @@ static uint32_t _tune_queue_buf[ DDS_MAX_SLAVE_DELAY * sizeof(struct tune_queue_
 
 void rf_counter_update(struct dds_slave_state *state);
 
-int dds_poll_next_sample(uint32_t *pd_data)
+static int poll_next_sample(uint32_t *pd_data)
 {
 	uint32_t v;
     v = dp_readl(DDS_REG_PD_DATA);
@@ -209,7 +209,7 @@ void dds_slave_update(struct dds_slave_state *state)
 
     rf_counter_update (state);
 
-	if(!dds_poll_next_sample(&pd_data))
+	if(!poll_next_sample(&pd_data))
         return;
 
     // produce timestamp of the current tune sample

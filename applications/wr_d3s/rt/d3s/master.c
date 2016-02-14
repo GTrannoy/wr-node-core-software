@@ -124,7 +124,7 @@ static inline void send_phase_fixup( struct dds_master_state *state )
     msg->phase_fixup.rf_cnt_snap_cycles = state->rf_cnt_snap_timestamp.ticks;
     msg->phase_fixup.rf_cnt_snap_count  = state->rf_cnt_snap_count;
 
-    pp_printf("SendFixup [%d]!\n", state->stats.sent_updates);
+    dbg_printf("SendFixup [%d]!\n", state->stats.sent_updates);
 
 
     mq_send(1, WR_D3S_REMOTE_OUT_STREAM, 32);
@@ -225,6 +225,9 @@ static uint64_t get_phase_snapshot(struct dds_master_state *state)
 void dds_master_update(struct dds_master_state *state)
 {
 	uint32_t pd_data;
+
+    if( !state->enabled )
+        return;
 
     if (!wr_is_timing_ok())
         return;

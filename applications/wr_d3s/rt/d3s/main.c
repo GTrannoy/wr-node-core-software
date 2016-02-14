@@ -21,9 +21,13 @@
 #include "rt-d3s.h"
 
 #include "master.h"
+#include "slave.h"
+
+static int current_mode = D3S_STREAM_SLAVE;
 
 // state of our DDS loop
-struct dds_master_state master_loop;
+static struct dds_master_state master_loop;
+static struct dds_slave_state slave_loop;
 
 /* Forces a software reset of the DDS core. May be only run
    AFTER the AD9516 has been programmed and locked */
@@ -70,7 +74,7 @@ void init()
     dbg_printf("RT_D3S firmware initialized.");
 }
 
-void setup_test_output(uint32_t tune_hi, uint32_t tune_lo)
+static void setup_test_output(uint32_t tune_hi, uint32_t tune_lo)
 {
     uint32_t pd_data;
 
@@ -130,6 +134,9 @@ static inline void ctl_d3s_start_response_logging (uint32_t seq, struct wrnc_msg
 {
     int n_samples;
 
+    if(current_mode != D3S_STREAM_MASTER)
+        ctl_err ( seq, -1 );
+
     wrnc_msg_int32 (ibuf, &n_samples);
     ctl_ack(seq);
     resp_log_start(&master_loop.rsp_log, seq, n_samples);
@@ -137,20 +144,32 @@ static inline void ctl_d3s_start_response_logging (uint32_t seq, struct wrnc_msg
 
 static inline void ctl_d3s_stream_config (uint32_t seq, struct wrnc_msg *ibuf)
 {
-    int mode;
+    int stream_id;
+    int64_t base_freq;
 
-    wrnc_msg_int32(ibuf, &mode);
-    wrnc_msg_int32(ibuf, &master_loop.stream_id);
-    wrnc_msg_int64(ibuf, &master_loop.base_freq);
+    wrnc_msg_int32(ibuf, &current_mode);
+    wrnc_msg_int32(ibuf, &stream_id);
+    wrnc_msg_int64(ibuf, &base_freq);
 
-    master_loop.enabled = (mode != D3S_STREAM_MASTER ) ? 1 : 0;
 
-    pp_printf("StreamConfig: mode %d enabled %d\n", mode, master_loop.enabled );
+    dbg_printf("StreamConfig: mode %d\n", current_mode);
 
-    if( master_loop.enabled )
+    if( current_mode == D3S_STREAM_MASTER )
+    {
+        master_loop.base_freq = base_freq;
+        master_loop.stream_id = stream_id;
         dds_master_start(&master_loop);
+    }
+    else if ( current_mode == D3S_STREAM_SLAVE )
+    {
+        slave_loop.stream_id = stream_id;
+        dds_slave_start(&slave_loop);
+    }
     else
-        dds_master_stop(&master_loop);
+    {
+        dds_slave_stop( &slave_loop );
+        dds_master_stop ( &master_loop );
+    }
 
     ctl_ack (seq);
 }
@@ -229,22 +248,14 @@ static inline void do_control()
 void main_loop()
 {
     dds_master_init ( &master_loop );
-    dds_master_start (&master_loop);
-
-    int n = 0;
+    dds_slave_init ( &slave_loop );
 
     for(;;)
     {
         dds_master_update (&master_loop);
+        dds_slave_update ( &slave_loop);
         wr_update_link();
         do_control();
-
-        if(n == 100000)
-        {
-            pp_printf("CT: %d\n", master_loop.current_tune);
-            n=0;
-        }
-        n++;
     }
 }
 

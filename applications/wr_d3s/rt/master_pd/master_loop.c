@@ -312,7 +312,7 @@ void dds_master_start(struct dds_master_state *state)
     delay(100);
 
     /* Start sampling */
-    dp_writel(DDS_CR_SAMP_EN | DDS_CR_SAMP_DIV_W(state->sampling_divider - 1), DDS_REG_CR);
+    dp_writel(DDS_CR_RF_CNT_ENABLE | DDS_CR_SAMP_EN | DDS_CR_SAMP_DIV_W(state->sampling_divider - 1), DDS_REG_CR);
 }
 
 

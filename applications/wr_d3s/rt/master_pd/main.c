@@ -20,6 +20,8 @@
 #include "wrtd-serializers.h"
 #include "rt-d3s.h"
 
+#include "master.h"
+
 // state of our DDS loop
 struct dds_master_state master_loop;
 

@@ -1,7 +1,7 @@
 /*
  * This work is part of the White Rabbit Node Core project.
  *
- * Copyright (C) 2013-2015 CERN (www.cern.ch)
+ * Copyright (C) 2013-2016 CERN (www.cern.ch)
  * Author: Tomasz Wlostowski <tomasz.wlostowski@cern.ch>
  *
  * Released according to the GNU GPL, version 2 or any later version.
@@ -11,7 +11,7 @@
 /*.
  * WR Distributed DDS Realtime Firmware.
  *
- * master_loop.c - master side PLL
+ * master.c - master side PLL
  */
 
 #include <string.h>
@@ -19,6 +19,8 @@
 #include "wr-d3s-common.h"
 #include "wrtd-serializers.h"
 #include "rt-d3s.h"
+
+#include "master.h"
 
 
 /*
@@ -220,15 +222,15 @@ static uint64_t get_phase_snapshot(struct dds_master_state *state)
     return acc_snap;
 }
 
-int dds_master_update(struct dds_master_state *state)
+void dds_master_update(struct dds_master_state *state)
 {
 	uint32_t pd_data;
 
     if (!wr_is_timing_ok())
-        return 0;
+        return;
 
     if(!dds_poll_next_sample(&pd_data))
-    	return 0;
+    	return;
 
     state->last_adc_value = -((pd_data & 0xffff)    - 32768);
 
@@ -247,7 +249,7 @@ int dds_master_update(struct dds_master_state *state)
 	state->current_tune = y;//& 0xffffff;
 
     if(!state->locked)
-        return 0;
+        return;
 
     if(state->current_sample_idx == 0)
     {
@@ -265,9 +267,6 @@ int dds_master_update(struct dds_master_state *state)
     }
 
     send_tune_update(state, &ts);
-
-
-	return 1;
 }
 
 
@@ -276,8 +275,6 @@ void dds_master_init (struct dds_master_state *state)
     state->enabled = 0;
     state->kp = 200000;//100 << 4;
     state->ki = 1024; //1
-    //state->kp = 100 << 4;
-    //state->ki = 1;
     state->lock_samples = 10000;
     state->delock_samples = 1000;
     state->lock_threshold = 2000;

@@ -19,6 +19,7 @@
 #include "wr-d3s-common.h"
 #include "wrtd-serializers.h"
 #include "rt-d3s.h"
+#include "slave.h"
 
 // state of our DDS loop
 struct dds_slave_state slave_loop;

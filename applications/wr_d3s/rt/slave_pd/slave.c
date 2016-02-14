@@ -22,6 +22,7 @@
 #include "gqueue.h"
 #include "rt-d3s.h"
 #include "shared_vars.h"
+#include "slave.h"
 
 struct tune_queue_entry {
     int sample_id;
@@ -29,10 +30,7 @@ struct tune_queue_entry {
     int tune;
 };
 
-#define TUNE_QUEUE_ENTRIES 8
-#define MAX_SLAVE_DELAY 8
-
-static uint32_t _tune_queue_buf[ TUNE_QUEUE_ENTRIES * sizeof(struct tune_queue_entry) / 4];
+static uint32_t _tune_queue_buf[ DDS_MAX_SLAVE_DELAY * sizeof(struct tune_queue_entry) / 4];
 
 void rf_counter_update(struct dds_slave_state *state);
 
@@ -65,7 +63,7 @@ void slave_got_fixup(struct dds_slave_state *state, struct wr_d3s_remote_message
         state->rf_cnt_state = RF_CNT_SLAVE_WAIT_FIXUP;
         state->lock_id = msg->lock_id;
 
-	    gqueue_init(&state->tune_queue, TUNE_QUEUE_ENTRIES, sizeof(struct tune_queue_entry), _tune_queue_buf);
+	    gqueue_init(&state->tune_queue, DDS_MAX_SLAVE_DELAY, sizeof(struct tune_queue_entry), _tune_queue_buf);
     }
 
     switch (state->slave_state)
@@ -90,7 +88,7 @@ void slave_got_fixup(struct dds_slave_state *state, struct wr_d3s_remote_message
 
             dp_writel(DDS_CR_RF_CNT_ENABLE | DDS_CR_SAMP_EN | DDS_CR_SAMP_DIV_W(state->sampling_divider - 1), DDS_REG_CR);
 
-    	    gqueue_init(&state->tune_queue, TUNE_QUEUE_ENTRIES, sizeof(struct tune_queue_entry), _tune_queue_buf);
+    	    gqueue_init(&state->tune_queue, DDS_MAX_SLAVE_DELAY, sizeof(struct tune_queue_entry), _tune_queue_buf);
 
     	    dbg_printf("Got config: sps %d base_freq 0x%08x%08x rfPeriod %d vco_gain %d lock_id %d\n",
     		state->samples_per_second,
@@ -245,22 +243,16 @@ void dds_slave_update(struct dds_slave_state *state)
             {
                 state->phase_correction = calculate_phase_correction( state, ent->tune, state->delay_samples );
 
-                uint64_t fixup_phase_next = state->fixup_phase;
-                //fixup_phase_next += (int64_t) ent->tune * state->vco_gain;
-                //fixup_phase_next += (int64_t) (state->base_freq); // + (int64_t)ent->tune * state->vco_gain);
-                //fixup_phase_next += (int64_t) ent->tune * state->vco_gain;
-                //fixup_phase_next += (uint64_t) ent->tune * state->vco_gain;
+                dp_writel(state->fixup_phase >> 32, DDS_REG_ACC_LOAD_HI);
+        		dp_writel(state->fixup_phase & 0xffffffff, DDS_REG_ACC_LOAD_LO);
 
-                dp_writel(fixup_phase_next >> 32, DDS_REG_ACC_LOAD_HI);
-        		dp_writel(fixup_phase_next & 0xffffffff, DDS_REG_ACC_LOAD_LO);
-
-            //    dp_writel( state->phase_correction & 0xffffffff, DDS_REG_PHASE_LO );
-            //    dp_writel( ((state->phase_correction >> 32) & 0x7ff) | DDS_PHASE_HI_UPDATE, DDS_REG_PHASE_HI );
+                dp_writel( state->phase_correction & 0xffffffff, DDS_REG_PHASE_LO );
+                dp_writel( ((state->phase_correction >> 32) & 0x7ff) | DDS_PHASE_HI_UPDATE, DDS_REG_PHASE_HI );
 
                 dp_writel((ent->tune & 0xffffff)| DDS_TUNE_VAL_LOAD_ACC, DDS_REG_TUNE_VAL);
 
                 state->fixups_applied++;
-                pp_printf("apply\n");
+                dbg_printf("apply\n");
             } else {
                 dp_writel((ent->tune & 0xffffff), DDS_REG_TUNE_VAL);
             }
@@ -292,7 +284,7 @@ void dds_slave_start(struct dds_slave_state *state)
     state->slave_state = SLAVE_WAIT_CONFIG;
     state->rf_cnt_state = RF_CNT_SLAVE_WAIT_FIXUP;
 
-    gqueue_init(&state->tune_queue, TUNE_QUEUE_ENTRIES, sizeof(struct tune_queue_entry), _tune_queue_buf);
+    gqueue_init(&state->tune_queue, DDS_MAX_SLAVE_DELAY, sizeof(struct tune_queue_entry), _tune_queue_buf);
 }
 
 void dds_slave_stop(struct dds_slave_state *state)

@@ -24,11 +24,10 @@
 // Mask for the above bits
 #define DDS_ACC_MASK ((1ULL << (DDS_ACC_BITS) ) - 1)
 
-// DDS tuning gain (value written to GAIN register of the DDS core)
-#define DDS_TUNE_GAIN 1024
-
 // Maximum reconstruction delay allowed by the slave (in sampling periods)
 #define DDS_MAX_SLAVE_DELAY 16
+
+#if 0
 
 // Size of the data buffer in the PLL response log packet
 #define RESP_LOG_BUF_SIZE 128
@@ -120,8 +119,8 @@ struct dds_master_state {
 // statistics counters
     struct dds_master_stats stats;
 };
-
-
+#endif
+#if 0
 // Slave state machine states
 #define SLAVE_WAIT_CONFIG 0
 #define SLAVE_RUN 1
@@ -192,6 +191,7 @@ struct dds_slave_state {
     struct wr_timestamp rf_cnt_snap_timestamp;
 };
 
+#endif
 
 /* Sets/clears the GPIO bits selected by the mask */
 static inline void gpior_set(uint32_t mask, int value)

@@ -31,16 +31,20 @@
 #define WR_D3S_CMD_PING    0x4
 #define WR_D3S_CMD_STREAM_CONFIG 0x5
 #define WR_D3S_CMD_TEST_SIGNAL 0x6
+#define WR_D3S_REP_NACK    0x7
+#define WR_D3S_CMD_SET_GAINS 0x8
+
+#define WR_D3S_ERR_INCORRECT_MODE 0x1
 
 #define D3S_STREAM_MASTER 0x1
 #define D3S_STREAM_SLAVE 0x2
 #define D3S_STREAM_OFF 0x3
- 
+
 #define D3S_MSG_PHASE_FIXUP 0x1
 #define D3S_MSG_TUNE_UPDATE 0x2
 #define D3S_MSG_EVENT 0x3
 #define D3S_MSG_COUNTER_FIXUP 0x4
- 
+
 struct wr_timestamp {
 	uint64_t seconds;
 	uint32_t ticks;
@@ -56,15 +60,16 @@ struct wr_d3s_remote_message {
     int lock_id;
     uint32_t transmit_seconds;
     uint32_t transmit_cycles;
-  
+
     union {
         struct {
-            uint32_t tai;
-            int64_t fixup_value;
-            int64_t base_tune;
-	    uint32_t counter_snap_tai_cycles;
-            uint32_t counter_snap_rf_cycles;
-	    uint32_t counter_rf_period;
+            uint32_t fixup_tai;
+            int64_t fixup_phase;
+            int64_t base_freq;
+	        uint32_t rf_cnt_snap_cycles;
+            uint32_t rf_cnt_snap_count;
+	        uint32_t rf_cnt_period;
+            int32_t vco_gain;
         } phase_fixup;
         struct {
             uint32_t tai;

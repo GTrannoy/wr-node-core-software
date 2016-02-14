@@ -24,6 +24,18 @@ void help()
 	fprintf(stderr, "  -h             print this help\n");
 	fprintf(stderr, "  -D 0x<dev_id>  device id\n");
 	fprintf(stderr, "  -C command parameters provice a command & its parameters\n");
+	fprintf(stderr, "\nAvailable commands are:\n\n");
+	fprintf(stderr, " - ping                             : check if the card is alive.\n");
+	fprintf(stderr, " - pll_response n_samples filename  : gathers n_samples of the response function of the PLL (in master mode only) \n");
+	fprintf(stderr, "                                      and writes it to a given file.\n");                         -
+	fprintf(stderr, " - stream mode ID [frequency]       : configures RF streaming according to the mode. The mode can be:  \n");
+	fprintf(stderr, "                                      - off: no streaming\n");
+	fprintf(stderr, "                                      - master: encode the incoming RF and broadcast it with given stream ID\n");
+	fprintf(stderr, "                                        (allowing to multiplex different RF streams in the same network)\n");
+	fprintf(stderr, "                                        User must also provide the center frequency in Hz. \n");
+	fprintf(stderr, "                                      - slave: reconstruct the RF signal from a given stream ID\n");
+	fprintf(stderr, " - test_signal frequency            : output an RF of given frequency [in Hz]\n\n");
+
 }
 
 #define HMQ_TIMEOUT 500

@@ -35,7 +35,7 @@ static void resp_log_init(struct resp_log_state *state)
     state->active = 0;
 }
 
-// adds a new phase-control value entry to the response log, send if full
+// adds a new phase-control value entry to the response log, send it to the host if full
 void resp_log_update(struct resp_log_state *state, int phase, int y)
 {
     if(!state->active)
@@ -46,6 +46,7 @@ void resp_log_update(struct resp_log_state *state, int phase, int y)
 
     state->remaining_samples--;
 
+    // we've got a full block? make a message
     if(state->block_offset == state->block_samples || !state->remaining_samples)
     {
         struct wrnc_msg buf = hmq_msg_claim_out (WR_D3S_OUT_CONTROL, RESP_LOG_BUF_SIZE + 3);
@@ -152,17 +153,20 @@ Master PLL servo
 
 */
 
+// PI PLL Servo
 static int pi_update(struct dds_master_state *state, int phase_error)
 {
     int err = -(phase_error - 32768);
 
     state->integ += err;
 
-
+    // do the PI control
     int y = (state->kp * err + state->ki * state->integ) >> 14;
 
+    // log the PLL response
     resp_log_update(&state->rsp_log, phase_error, y);
 
+    // Lock detection logic
     if( !state->locked )
     {
         if(  abs(err) <= state->lock_threshold)
@@ -194,6 +198,7 @@ static int pi_update(struct dds_master_state *state, int phase_error)
     return y;
 }
 
+// reads the next phase error sample from the ADC (if there's a fresh sample returns 1, otherwise 0)
 int dds_poll_next_sample(uint32_t *pd_data)
 {
 	uint32_t v;
@@ -208,6 +213,8 @@ int dds_poll_next_sample(uint32_t *pd_data)
     return 1;
 }
 
+// reads the DDS accumulator value (a.k.a 'phase snapshot')
+// at the beginning of the current sampling period
 static uint64_t get_phase_snapshot(struct dds_master_state *state)
 {
     uint32_t snap_lo = dp_readl ( DDS_REG_ACC_SNAP_LO );
@@ -216,12 +223,14 @@ static uint64_t get_phase_snapshot(struct dds_master_state *state)
     int64_t acc_snap = snap_lo;
     acc_snap |= ((int64_t) snap_hi ) << 32;
 
+// the snapshot is taken few clock cycles after the sampling trigger, we need to compensate for this
     acc_snap += (int64_t)DDS_SNAP_LAG_SAMPLES * (state->base_freq + state->current_tune) ;
     acc_snap &= DDS_ACC_MASK;
 
     return acc_snap;
 }
 
+// main master loop
 void dds_master_update(struct dds_master_state *state)
 {
 	uint32_t pd_data;
@@ -235,18 +244,17 @@ void dds_master_update(struct dds_master_state *state)
     if(!dds_poll_next_sample(&pd_data))
     	return;
 
-    state->last_adc_value = -((pd_data & 0xffff)    - 32768);
-
     // produce timestamp of the current tune sample
     state->current_sample_idx = dp_readl(DDS_REG_SAMPLE_IDX);
-    struct wr_timestamp ts;
 
+    struct wr_timestamp ts;
     ts.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
     ts.ticks = state->current_sample_idx * state->sampling_divider * 125;
 
     /* do the actual PLL's job */
     int y = pi_update(state, pd_data & 0xffff);
 
+    // and drive the oscillator
     dp_writel(y & 0xffffff, DDS_REG_TUNE_VAL);
 
 	state->current_tune = y;//& 0xffffff;
@@ -254,6 +262,8 @@ void dds_master_update(struct dds_master_state *state)
     if(!state->locked)
         return;
 
+    // for every sample aligned with the PPS, send a 'fixup' message
+    // containing the setup (i.e. base frequency & counter period/snapshot).
     if(state->current_sample_idx == 0)
     {
         // take snapshot of the RF phase
@@ -268,7 +278,7 @@ void dds_master_update(struct dds_master_state *state)
 
         send_phase_fixup(state);
     }
-
+    // for every sample, send the current tune value
     send_tune_update(state, &ts);
 }
 

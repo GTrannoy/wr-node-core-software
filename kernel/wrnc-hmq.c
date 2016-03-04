@@ -24,6 +24,10 @@
 
 #include "wrnc.h"
 
+int hmq_default_buf_size = 8192; /**< default buffer size in byte */
+module_param_named(slot_buffer_size, hmq_default_buf_size, int, 0444);
+MODULE_PARM_DESC(slot_buffer_size, "Default buffer size in byte.");
+
 int hmq_max_msg = 32; /**< Maximum number of messages in driver queue */
 module_param_named(max_slot_msg, hmq_max_msg, int, 0444);
 MODULE_PARM_DESC(max_slot_msg, "Maximum number of messages in driver queue.");

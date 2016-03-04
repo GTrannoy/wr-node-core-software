@@ -59,6 +59,15 @@ struct wrnc_msg_element {
 	struct wrnc_msg *msg; /**< the real message */
 };
 
+
+struct mturtle_hmq_buffer {
+	void *mem;
+	unsigned int size;
+	unsigned int ptr_w;
+	/* ptr_r depends on users */
+};
+
+
 /**
  * It describe the status of a HMQ slot
  */
@@ -89,6 +98,8 @@ struct wrnc_hmq {
 	unsigned int max_width; /**< maximum words number per single buffer */
 	unsigned int max_depth; /**< maximum buffer queue length (HW) */
 	unsigned int max_msg; /**< maximum buffer queue length (SW)*/
+
+	struct mturtle_hmq_buffer buf; /**< Circular buffer */
 };
 
 /**
@@ -105,6 +116,8 @@ struct wrnc_hmq_user {
 	struct list_head list_filters; /**< list of filters to apply */
 	unsigned int n_filters; /**< number of filters */
 	struct spinlock lock_filter; /**< to protect filter list read/write */
+
+	unsigned int ptr_r; /**< read pointer for the message circular buffer */
 };
 
 

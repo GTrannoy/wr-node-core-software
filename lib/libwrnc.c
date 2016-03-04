@@ -762,37 +762,36 @@ int wrnc_hmq_send_and_receive_sync(struct wrnc_hmq *hmq,
 
 
 /**
- * It sets the maximum number of messages to store within the driver's HMQ
+ * It sets the driver buffer size.
  * Note that this does not affect the hardware in any way. The hardware
  * maximum number of messages is fixed and cannot be change
  * @param[in] hmq HMQ device descriptor
- * @param[in] max maximum number of message to set
+ * @param[in] size buffer size in bytes. It must be a power-of-2 value.
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrnc_hmq_count_max_sw_set(struct wrnc_hmq *hmq, uint32_t max)
+int wrnc_hmq_buffer_size_set(struct wrnc_hmq *hmq, uint32_t size)
 {
 	char path[WRNC_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN, "%s/count_max_sw", hmq->syspath);
+	snprintf(path, WRNC_SYSFS_PATH_LEN, "%s/buffer_size", hmq->syspath);
 
-	return wrnc_sysfs_printf(path, "%d", max);
+	return wrnc_sysfs_printf(path, "%d", size);
 }
 
 
 /**
- * It gets the maximum number of messages that can be stored within the
- * driver's HMQ.
+ * It gets the driver buffer size.
  * @param[in] hmq HMQ device descriptor
- * @param[out] max maximum number of message to set
+ * @param[out] size buffer size in bytes
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrnc_hmq_count_max_sw_get(struct wrnc_hmq *hmq, uint32_t *max)
+int wrnc_hmq_buffer_size_get(struct wrnc_hmq *hmq, uint32_t *size)
 {
 	char path[WRNC_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN, "%s/count_max_sw", hmq->syspath);
+	snprintf(path, WRNC_SYSFS_PATH_LEN, "%s/buffer_size", hmq->syspath);
 
-	return wrnc_sysfs_scanf(path, "%d", max);
+	return wrnc_sysfs_scanf(path, "%d", size);
 }
 
 

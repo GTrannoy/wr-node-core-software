@@ -492,6 +492,7 @@ static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
 		return err;
 
 	mutex_init(&hmq->mtx);
+	mutex_init(&hmq->mtx_sync);
 	INIT_LIST_HEAD(&hmq->list_msg_input);
 	INIT_LIST_HEAD(&hmq->list_usr);
 

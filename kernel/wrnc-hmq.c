@@ -654,6 +654,10 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	}
 	hmq_out = &wrnc->hmq_out[msg.index_out];
 
+	/* Use mutex to serialize sync messages. */
+	mutex_lock(&hmq->mtx_sync);
+	mutex_lock(&hmq->mtx_sync);
+
 	/* Rise wait flag */
 	spin_lock_irqsave(&hmq_out->lock, flags);
 	hmq_out->flags |= WRNC_FLAG_HMQ_SYNC_WAIT;
@@ -679,6 +683,9 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 	hmq_out->flags &= ~WRNC_FLAG_HMQ_SYNC_READY;
 	msg_ans = hmq_out->sync_answer;
 	spin_unlock_irqrestore(&hmq_out->lock, flags);
+
+	mutex_unlock(&hmq_out->mtx_sync);
+	mutex_unlock(&hmq->mtx_sync);
 
 	/* On error, or timeout, clear the message.
 	 * This should not happen, so optimize

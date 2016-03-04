@@ -76,6 +76,7 @@ struct wrnc_hmq {
 	unsigned int n_input; /**< number of messages in the list */
 	struct spinlock lock; /**< to protect list read/write */
 	struct mutex mtx; /**< to protect operations on the HMQ */
+	struct mutex mtx_sync; /**< to protect sync messages on the HMQ */
 	wait_queue_head_t q_msg; /**< wait queue for synchronous messages */
 
 	struct list_head list_usr; /**< list of consumer of the output slot  */

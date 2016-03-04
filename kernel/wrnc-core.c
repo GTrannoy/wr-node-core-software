@@ -450,7 +450,9 @@ static void wrnc_cpu_release(struct device *dev)
  */
 static void wrnc_hmq_release(struct device *dev)
 {
+	struct wrnc_hmq *hmq = to_wrnc_hmq(dev);
 	/*wrnc_minor_put(dev);*/
+	kfree(hmq->buf.mem);
 }
 
 #define WRNC_SLOT_CFG(_name, _val)                          \
@@ -482,14 +484,23 @@ static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
 	if (err)
 		return err;
 
+
+	hmq->buf.ptr_w = 0;
+	hmq->buf.size = hmq_default_buf_size;
+	hmq->buf.mem = kzalloc(hmq->buf.size, GFP_KERNEL);
+	if (!hmq->buf.mem)
+		return -ENOMEM;
+
 	init_waitqueue_head(&hmq->q_msg);
 	hmq->dev.class = &wrnc_cdev_class;
 	hmq->dev.parent = &wrnc->dev;
 	hmq->dev.groups = wrnc_hmq_groups;
 	hmq->dev.release = wrnc_hmq_release;
 	err = device_register(&hmq->dev);
-	if (err)
+	if (err) {
+		kfree(hmq->buf.mem);
 		return err;
+	}
 
 	mutex_init(&hmq->mtx);
 	mutex_init(&hmq->mtx_sync);

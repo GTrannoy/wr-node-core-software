@@ -399,8 +399,12 @@ static int wrnc_hmq_open(struct inode *inode, struct file *file)
 		spin_unlock_irqrestore(&hmq->lock, flags);
 	}
 
-	file->private_data = user;
+	spin_lock_irqsave(&hmq->lock, flags);
+	/* Point to the current position in buffer */
+	user->ptr_r = hmq->buf.ptr_w;
+	spin_unlock_irqrestore(&hmq->lock, flags);
 
+	file->private_data = user;
 
 	return 0;
 }

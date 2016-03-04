@@ -175,6 +175,7 @@ extern void wrnc_cpu_reset_set(struct wrnc_dev *wrnc, uint8_t mask);
 extern int dbg_max_msg;
 extern irqreturn_t wrnc_irq_handler_debug(int irq_core_base, void *arg);
 /* HMQ */
+extern int hmq_default_buf_size;
 extern int hmq_shared;
 extern int hmq_max_msg;
 extern const struct attribute_group *wrnc_hmq_groups[];

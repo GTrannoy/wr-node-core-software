@@ -486,6 +486,7 @@ static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
 
 
 	hmq->buf.ptr_w = 0;
+	hmq->buf.ptr_r = 0;
 	hmq->buf.size = hmq_default_buf_size;
 	hmq->buf.mem = kzalloc(hmq->buf.size, GFP_KERNEL);
 	if (!hmq->buf.mem)
@@ -518,7 +519,7 @@ static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
 	val = fmc_readl(fmc, hmq->base_sr + MQUEUE_SLOT_STATUS);
 	hmq->max_width = WRNC_SLOT_CFG(WIDTH, val);
 	hmq->max_depth = WRNC_SLOT_CFG(ENTRIES, val);
-	hmq->max_msg = hmq_max_msg;
+	hmq->buf.max_msg_size = hmq->max_width * 4;
 
 	dev_dbg(&hmq->dev, " 0x%x -> %d %d\n",
 		val, hmq->max_width, hmq->max_depth);

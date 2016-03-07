@@ -60,11 +60,20 @@ struct wrnc_msg_element {
 };
 
 
+/**
+ * Circular buffer implementation for MockTurtle
+ */
 struct mturtle_hmq_buffer {
 	void *mem;
-	unsigned int size;
-	unsigned int ptr_w;
-	/* ptr_r depends on users */
+	unsigned int size; /**< buffer size */
+	unsigned int ptr_w; /**< circular buffer head */
+	unsigned int ptr_r; /**< circular buffer tail - used only when the
+			       buffer is used to transferm from host to mturtle.
+			       Otherwise use the user->ptr_r */
+	unsigned int max_msg_size; /**< maximum message size storable in the
+				      buffer. This is a temporary field; once
+				      we move to the mturtle protocol we will
+				      not need such field FIXME */
 };
 
 
@@ -97,7 +106,6 @@ struct wrnc_hmq {
 
 	unsigned int max_width; /**< maximum words number per single buffer */
 	unsigned int max_depth; /**< maximum buffer queue length (HW) */
-	unsigned int max_msg; /**< maximum buffer queue length (SW)*/
 
 	struct mturtle_hmq_buffer buf; /**< Circular buffer */
 };
@@ -109,9 +117,6 @@ struct wrnc_hmq_user {
 	struct list_head list; /**< to keep it in our local queue */
 	struct wrnc_hmq *hmq; /**< reference to opened HMQ */
 	struct spinlock lock; /**< to protect list read/write */
-	struct list_head list_msg_output; /**< list of messages from
-					     output slot */
-	unsigned int n_output; /**< number of messages in the list */
 
 	struct list_head list_filters; /**< list of filters to apply */
 	unsigned int n_filters; /**< number of filters */
@@ -177,7 +182,6 @@ extern irqreturn_t wrnc_irq_handler_debug(int irq_core_base, void *arg);
 /* HMQ */
 extern int hmq_default_buf_size;
 extern int hmq_shared;
-extern int hmq_max_msg;
 extern const struct attribute_group *wrnc_hmq_groups[];
 extern const struct file_operations wrnc_hmq_fops;
 extern irqreturn_t wrnc_irq_handler(int irq_core_base, void *arg);

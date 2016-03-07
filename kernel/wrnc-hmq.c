@@ -16,6 +16,7 @@
 #include <linux/poll.h>
 #include <linux/sched.h>
 #include <linux/delay.h>
+#include <linux/circ_buf.h>
 
 #include <linux/fmc.h>
 
@@ -27,10 +28,6 @@
 int hmq_default_buf_size = 8192; /**< default buffer size in byte */
 module_param_named(slot_buffer_size, hmq_default_buf_size, int, 0444);
 MODULE_PARM_DESC(slot_buffer_size, "Default buffer size in byte.");
-
-int hmq_max_msg = 32; /**< Maximum number of messages in driver queue */
-module_param_named(max_slot_msg, hmq_max_msg, int, 0444);
-MODULE_PARM_DESC(max_slot_msg, "Maximum number of messages in driver queue.");
 
 int hmq_max_con = 8; /**< Maximum number connection for each slot */
 module_param_named(max_slot_con, hmq_max_con, int, 0644);
@@ -56,18 +53,16 @@ static int hmq_max_irq_loop = 5;
 module_param_named(max_irq_loop, hmq_max_irq_loop, int, 0644);
 MODULE_PARM_DESC(max_irq_loop, "Maximum number of messages to read per interrupt per hmq");
 
-static int wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg,
-			     uint32_t *seq);
+static int wrnc_message_push(struct wrnc_hmq *hmq, void *buf, uint32_t *seq);
 
 /**
  * It applies filters on a given message.
  */
-static int wrnc_hmq_filter_check(struct wrnc_hmq_user *user,
-				 struct wrnc_msg *msg)
+static int wrnc_hmq_filter_check(struct wrnc_hmq_user *user, void *buffer)
 {
 	struct wrnc_msg_filter_element *fltel, *tmp;
 	unsigned int passed = 1;
-	uint32_t word;
+	uint32_t word, *data = buffer;
 
 	spin_lock(&user->lock_filter);
 	list_for_each_entry_safe (fltel, tmp, &user->list_filters, list) {
@@ -75,7 +70,7 @@ static int wrnc_hmq_filter_check(struct wrnc_hmq_user *user,
 		if (!passed)
 			break;
 
-		word = msg->data[fltel->filter.word_offset];
+		word = data[fltel->filter.word_offset];
 		switch(fltel->filter.operation) {
 		case WRNC_MSG_FILTER_AND:
 			word &= fltel->filter.mask;
@@ -97,71 +92,6 @@ static int wrnc_hmq_filter_check(struct wrnc_hmq_user *user,
 	spin_unlock(&user->lock_filter);
 
 	return passed;
-}
-
-/**
- * Dispatch messages to all listeners. This allow multiple readers to get the
- * messages
- */
-static void wrnc_hmq_dispatch_out(struct wrnc_hmq *hmq,
-				  struct wrnc_msg_element *msgel)
-{
-	struct wrnc_msg_element *new;
-	struct wrnc_msg *msg;
-	struct wrnc_hmq_user *usr, *tmp;
-	unsigned long flags;
-
-	/* If we are waiting a synchronous answer on this HMQ check */
-	if ((hmq->flags & WRNC_FLAG_HMQ_SYNC_WAIT) &&
-	    hmq->waiting_seq == wrnc_get_sequence(msgel->msg)) {
-		spin_lock_irqsave(&hmq->lock, flags);
-		hmq->sync_answer = *msgel->msg;
-		hmq->flags &= ~WRNC_FLAG_HMQ_SYNC_WAIT;
-		hmq->flags |= WRNC_FLAG_HMQ_SYNC_READY;
-		spin_unlock_irqrestore(&hmq->lock, flags);
-
-		/* Do not store synchronous answer */
-		return;
-	}
-
-	/* for each user list copy the message */
-	list_for_each_entry_safe(usr, tmp, &hmq->list_usr, list) {
-		/* Filter the message */
-		if (!wrnc_hmq_filter_check(usr, msgel->msg))
-			continue;
-
-		/* Create a copy */
-		new = kmalloc(sizeof(struct wrnc_msg_element), GFP_ATOMIC);
-		if (!new)
-			continue;
-		msg = kmalloc(sizeof(struct wrnc_msg), GFP_ATOMIC);
-		if (!msg) {
-			kfree(new);
-			continue;
-		}
-		memcpy(msg, msgel->msg, sizeof(struct wrnc_msg));
-		new->msg = msg;
-
-
-		/* Save the copy within user's list */
-		spin_lock_irqsave(&usr->lock, flags);
-		list_add_tail(&new->list, &usr->list_msg_output);
-	        usr->n_output++;
-		spin_unlock_irqrestore(&usr->lock, flags);
-
-		if (unlikely(usr->n_output > hmq->max_msg)) {
-			/* there is no more space, remove the oldest message */
-			spin_lock_irqsave(&usr->lock, flags);
-		        new = list_entry(usr->list_msg_output.next,
-					   struct wrnc_msg_element, list);
-			list_del(&new->list);
-		        usr->n_output--;
-			spin_unlock_irqrestore(&usr->lock, flags);
-
-			kfree(new->msg);
-			kfree(new);
-		}
-	}
 }
 
 
@@ -220,34 +150,63 @@ static ssize_t wrnc_show_count(struct device *dev,
 
 
 /**
- * It returns the maximum number of messages in the WRNC queue
+ * It returns the maximum buffer size
  */
-static ssize_t wrnc_show_count_max_sw(struct device *dev,
-				      struct device_attribute *attr,
-				      char *buf)
+static ssize_t wrnc_show_buffer_size(struct device *dev,
+				     struct device_attribute *attr,
+				     char *buf)
 {
 	struct wrnc_hmq *hmq = to_wrnc_hmq(dev);
 
-	return sprintf(buf, "%d\n", hmq->max_msg);
+	return sprintf(buf, "%d\n", hmq->buf.size);
 }
 
-static ssize_t wrnc_store_count_max_sw(struct device *dev,
-				       struct device_attribute *attr,
-				       const char *buf, size_t count)
+static ssize_t wrnc_store_buffer_size(struct device *dev,
+				      struct device_attribute *attr,
+				      const char *buf, size_t count)
 {
 	struct wrnc_hmq *hmq = to_wrnc_hmq(dev);
+	struct wrnc_hmq_user *usr, *tmp;
+	void *newbuf;
 	long val;
 
 	if (kstrtol(buf, 0, &val))
 		return -EINVAL;
-	if (val < 1) {
+
+	if (val == hmq->buf.size)
+		return count;
+
+	if (val < hmq->buf.max_msg_size) {
 		dev_err(dev,
-			"Buffer length must be greater or equal 1, got %ld\n",
-			val);
+			"Buffer size (%ld) must at least double the size of the maximum message sized (%d)\n",
+			val, hmq->buf.max_msg_size);
 		return -EINVAL;
 	}
 
-	hmq->max_msg = val;
+	if ((val - 1) & val) {
+		dev_err(dev, "Buffer size (%ld) must be power of two\n", val);
+		return -EINVAL;
+	}
+
+	newbuf = kzalloc(val, GFP_KERNEL);
+	if (!newbuf) {
+		dev_err(dev, "Cannot allocate new buffer (%ld)\n", val);
+		return -ENOMEM;
+	}
+
+	spin_lock(&hmq->lock);
+	kfree(hmq->buf.mem);
+	hmq->buf.mem = newbuf;
+	hmq->buf.size = val;
+	hmq->buf.ptr_w = 0;
+	hmq->buf.ptr_r = 0;
+
+	list_for_each_entry_safe(usr, tmp, &hmq->list_usr, list) {
+		spin_lock(&usr->lock);
+		usr->ptr_r = 0;
+		spin_unlock(&usr->lock);
+	}
+	spin_unlock(&hmq->lock);
 
 	return count;
 }
@@ -329,8 +288,8 @@ static ssize_t wrnc_store_share(struct device *dev,
 DEVICE_ATTR(full, S_IRUGO, wrnc_show_full, NULL);
 DEVICE_ATTR(empty, S_IRUGO, wrnc_show_empty, NULL);
 DEVICE_ATTR(count_hw, S_IRUGO, wrnc_show_count, NULL);
-DEVICE_ATTR(count_max_sw, S_IRUGO | S_IWUSR | S_IWGRP,
-	    wrnc_show_count_max_sw, wrnc_store_count_max_sw);
+DEVICE_ATTR(buffer_size, S_IRUGO | S_IWUSR | S_IWGRP,
+	    wrnc_show_buffer_size, wrnc_store_buffer_size);
 DEVICE_ATTR(count_max_hw, S_IRUGO, wrnc_show_count_max_hw, NULL);
 DEVICE_ATTR(width_max, S_IRUGO, wrnc_show_width_max, NULL);
 DEVICE_ATTR(shared_by_users, (S_IRUGO | S_IWUSR | S_IWGRP |  S_IWOTH),
@@ -340,7 +299,7 @@ static struct attribute *wrnc_hmq_attr[] = {
 	&dev_attr_full.attr,
 	&dev_attr_empty.attr,
 	&dev_attr_count_hw.attr,
-	&dev_attr_count_max_sw.attr,
+	&dev_attr_buffer_size.attr,
 	&dev_attr_count_max_hw.attr,
 	&dev_attr_width_max.attr,
 	&dev_attr_shared_by_users.attr,
@@ -378,7 +337,6 @@ static int wrnc_hmq_open(struct inode *inode, struct file *file)
 		user->hmq = hmq;
 		spin_lock_init(&user->lock);
 		spin_lock_init(&user->lock_filter);
-		INIT_LIST_HEAD(&user->list_msg_output);
 		INIT_LIST_HEAD(&user->list_filters);
 
 		/* Add new user to the list */
@@ -413,7 +371,6 @@ static int wrnc_hmq_release(struct inode *inode, struct file *f)
 {
 	struct wrnc_hmq_user *user = f->private_data;
 	struct wrnc_hmq *hmq = user->hmq;
-	struct wrnc_msg_element *msgel, *tmp;
 	unsigned long flags;
 
 
@@ -423,15 +380,6 @@ static int wrnc_hmq_release(struct inode *inode, struct file *f)
 
 	if (hmq->flags & WRNC_FLAG_HMQ_SHR_USR || hmq->n_user == 0) {
 		list_del(&user->list);
-
-		/* Clean up message list */
-		spin_lock(&user->lock);
-		list_for_each_entry_safe(msgel, tmp, &user->list_msg_output, list) {
-			list_del(&msgel->list);
-			kfree(msgel);
-		}
-		spin_unlock_irqrestore(&user->lock, flags);
-
 		kfree(user);
 	}
 
@@ -459,10 +407,9 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 	struct wrnc_hmq *hmq = user->hmq;
 	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
-	struct wrnc_msg_element *msgel;
 	struct wrnc_msg msg;
 	unsigned long flags;
-	unsigned int i, n, free_slot;
+	unsigned int i, n;
 	const char __user *curbuf = buf;
 	uint32_t mask, seq;
 	int err = 0;
@@ -477,15 +424,9 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 		return -EINVAL;
 	}
 
-	if (hmq->n_input >= hmq->max_msg) {
-		return -EBUSY;
-	}
 
 	/* Get number of free slots */
 	n = count / sizeof(struct wrnc_msg);
-	free_slot = hmq->max_msg - hmq->n_input;
-	n = free_slot < n ? free_slot : n;
-
 	count = 0;
 	mutex_lock(&hmq->mtx);
 
@@ -495,10 +436,10 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 			break;
 		}
 
-		if (msg.datalen >= hmq->max_width) {
+		if (msg.datalen * 4 >= hmq->buf.max_msg_size) {
 			dev_err(&hmq->dev,
-				"Cannot send %d bytes, the maximum size is %d\n",
-				msg.datalen * 4, hmq->max_width * 4);
+				"Cannot send %d bytes, the maximum size is %d bytes\n",
+				msg.datalen * 4, hmq->buf.max_msg_size);
 			err = -EINVAL;
 			break;
 		}
@@ -506,28 +447,22 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 		/* Enqueue messages if we are going to send them using
 		   interrupts; otherwise sen them immediately */
 		if (hmq_in_irq) {
-			/* Allocate and fill message structure */
-			msgel = kmalloc(sizeof(struct wrnc_msg_element), GFP_KERNEL);
-			if (!msgel) {
-				err = -ENOMEM;
+			if (CIRC_SPACE(hmq->buf.ptr_w, hmq->buf.ptr_r,
+				       hmq->buf.size) == 0) {
+				/* No more space left */
 				break;
 			}
-
-			msgel->msg = kmalloc(sizeof(struct wrnc_msg), GFP_KERNEL);
-			if (!msgel->msg) {
-				kfree(msgel);
-				err = -ENOMEM;
-				break;
-			}
-			memcpy(msgel->msg, &msg, sizeof(struct wrnc_msg));
-
 			spin_lock_irqsave(&hmq->lock, flags);
-			list_add_tail(&msgel->list, &hmq->list_msg_input);
-			hmq->n_input++;
+			memcpy(hmq->buf.mem + hmq->buf.ptr_w, msg.data,
+			       hmq->buf.max_msg_size);
+		        hmq->buf.ptr_w += hmq->buf.max_msg_size;
+			if (hmq->buf.ptr_w >= hmq->buf.size) {
+				hmq->buf.ptr_w = 0;
+			}
 			spin_unlock_irqrestore(&hmq->lock, flags);
 		} else {
 			spin_lock_irqsave(&hmq->lock, flags);
-			err = wrnc_message_push(hmq, &msg, &seq);
+			err = wrnc_message_push(hmq, msg.data, &seq);
 			spin_unlock_irqrestore(&hmq->lock, flags);
 			if (err)
 				break;
@@ -569,12 +504,12 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
  * @param[in] msg the message to send
  * @param[out] the sequence number used to send the message
  */
-static int wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg,
+static int wrnc_message_push(struct wrnc_hmq *hmq, void *buf,
 			     uint32_t *seq)
 {
 	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
-	uint32_t freeslot;
+	uint32_t freeslot, *data = buf;
 	int i;
 
 	freeslot = fmc_readl(fmc, hmq->base_sr + MQUEUE_SLOT_STATUS)
@@ -587,46 +522,17 @@ static int wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg,
 	fmc_writel(fmc, MQUEUE_CMD_CLAIM, hmq->base_sr + MQUEUE_SLOT_COMMAND);
 	*seq = ++wrnc->message_sequence;
 	/* Assign a sequence number to the message */
-	msg->data[1] = *seq;
+	data[1] = *seq;
 	/* Write data into the slot */
-	for (i = 0; i < msg->datalen && i < hmq->max_width; ++i)
-		fmc_writel(fmc, msg->data[i],
+	for (i = 0; i < hmq->buf.max_msg_size / 4; ++i)
+		fmc_writel(fmc, data[i],
 			   hmq->base_sr + MQUEUE_SLOT_DATA_START + i * 4);
 
 	/* The slot is ready to be sent to the CPU */
-	fmc_writel(fmc, MQUEUE_CMD_READY | (msg->datalen & 0xFF),
+	fmc_writel(fmc, MQUEUE_CMD_READY | ((hmq->buf.max_msg_size / 4) & 0xFF),
 		   hmq->base_sr + MQUEUE_SLOT_COMMAND);
 
 	return 0;
-}
-
-/**
- * It reads a message from a FPGA HMQ
- */
-static size_t wrnc_message_pop(struct wrnc_hmq *hmq, void *buf)
-{
-	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
-	struct fmc_device *fmc = to_fmc_dev(wrnc);
-	uint32_t status, *buffer = buf;
-	size_t size;
-	int i;
-
-
-	/* Get information about the incoming slot */
-	status = fmc_readl(fmc, hmq->base_sr + MQUEUE_SLOT_STATUS);
-	size = (status & MQUEUE_SLOT_STATUS_MSG_SIZE_MASK);
-	size >>= MQUEUE_SLOT_STATUS_MSG_SIZE_SHIFT;
-
-	/* Read data from the slot */
-	for (i = 0; i < size; ++i) {
-		buffer[i] = fmc_readl(fmc,
-				hmq->base_sr + MQUEUE_SLOT_DATA_START + i * 4);
-	}
-
-	/* Discard the slot content */
-	fmc_writel(fmc, MQUEUE_CMD_DISCARD, hmq->base_sr + MQUEUE_SLOT_COMMAND);
-
-	return size;
 }
 
 
@@ -659,9 +565,9 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 		dev_err(&hmq->dev, "un-existent slot %d\n", msg.index_out);
 		return -EINVAL;
 	}
-	if (msg_req.datalen >= hmq->max_width) {
+	if (msg_req.datalen * 4 >= hmq->buf.max_msg_size) {
 		dev_err(&hmq->dev,
-			"Cannot send %d bytes, the maximum size is %d\n",
+			"Cannot send %d bytes, the maximum size is %d bytes\n",
 			msg_req.datalen * 4, hmq->max_width * 4);
 		return -EINVAL;
 	}
@@ -678,7 +584,7 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 
 	/* Send the message */
 	spin_lock_irqsave(&hmq->lock, flags);
-	err = wrnc_message_push(hmq, &msg_req, &hmq_out->waiting_seq);
+	err = wrnc_message_push(hmq, msg_req.data, &hmq_out->waiting_seq);
 	spin_unlock_irqrestore(&hmq->lock, flags);
 	if (err)
 		return err;
@@ -751,6 +657,8 @@ static int wrnc_ioctl_msg_filter_add(struct wrnc_hmq_user *user,
 
 	/* Copy the filter */
 	memcpy(&fltel->filter, &u_filter, sizeof(struct wrnc_msg_filter));
+
+	/* TODO validate filter - word_offset less that max_msg_size */
 
 	/* Store filter */
 	spin_lock(&user->lock_filter);
@@ -831,8 +739,8 @@ static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 {
 	struct wrnc_hmq_user *user = f->private_data;
 	struct wrnc_hmq *hmq = user->hmq;
-	struct wrnc_msg_element *msgel;
-	unsigned int i, n;
+	struct wrnc_msg msg;
+	unsigned int i = 0, n;
 	int err = 0;
 
 	if (hmq->flags & WRNC_FLAG_HMQ_DIR) {
@@ -847,31 +755,35 @@ static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 	}
 	n = count / sizeof(struct wrnc_msg);
 
-
 	count = 0;
 	mutex_lock(&hmq->mtx); /* Not really useful mutex for the time being */
 	/* read as much as we can */
-	for (i = 0; i < n && !err; ++i) {
-		if (list_empty(&user->list_msg_output)) {
-			*offp = 0;
+	while (!err && i < n && CIRC_CNT(hmq->buf.ptr_w, user->ptr_r, hmq->buf.size)) {
+		if (!wrnc_hmq_filter_check(user, hmq->buf.mem + user->ptr_r)) {
+			/* The current message is of no interest for the user */
+			user->ptr_r += hmq->buf.max_msg_size;
+			if (user->ptr_r >= hmq->buf.size) {
+				user->ptr_r = 0;
+			}
+			continue;
+		}
+
+		/* Copy to user space buffer - not optimal because inherited
+		   mechanism that I cannot change it now */
+		memcpy(msg.data, hmq->buf.mem + user->ptr_r, hmq->buf.max_msg_size);
+		msg.datalen = hmq->buf.max_msg_size / 4;
+		if (copy_to_user(buf + count, &msg, sizeof(struct wrnc_msg))) {
+			dev_err(&hmq->dev, "Cannot message transfer to user-space\n");
+			err = -EFAULT;
 			break;
 		}
-		/* Get the oldest message in the queue */
-		spin_lock(&user->lock);
-		msgel = list_entry(user->list_msg_output.next,
-				   struct wrnc_msg_element, list);
-		list_del(&msgel->list);
-	        user->n_output--;
-		spin_unlock(&user->lock);
 
-		/* Copy to user space buffer */
-		if (copy_to_user(buf + count, msgel->msg,
-				 sizeof(struct wrnc_msg)))
-			err = -EFAULT;
-
-		count = (i + 1) * sizeof(struct wrnc_msg);
-		kfree(msgel->msg);
-		kfree(msgel);
+		count = (++i) * sizeof(struct wrnc_msg);
+		/* Point to the next message */
+		user->ptr_r += hmq->buf.max_msg_size;
+		if (user->ptr_r >= hmq->buf.size) {
+			user->ptr_r = 0;
+		}
 	}
 	mutex_unlock(&hmq->mtx);
 
@@ -891,11 +803,13 @@ static unsigned int wrnc_hmq_poll(struct file *f, struct poll_table_struct *w)
 
 	poll_wait(f, &hmq->q_msg, w);
 
-	if (hmq->flags & WRNC_FLAG_HMQ_DIR) { /* CPU input */
-		if (hmq->n_input < hmq->max_msg)
+	if (hmq->flags & WRNC_FLAG_HMQ_DIR) { /* MockTurtle input */
+		/* Check if we have free space */
+		if (CIRC_SPACE(hmq->buf.ptr_w, hmq->buf.ptr_r, hmq->buf.size))
 			ret |= POLLOUT | POLLWRNORM;
-	} else { /* CPU output */
-		if (user->n_output)
+	} else { /* MockTurtle output */
+		/* Check if we have something to read */
+		if (CIRC_CNT(hmq->buf.ptr_w, user->ptr_r, hmq->buf.size))
 			ret |= POLLIN | POLLRDNORM;
 	}
 
@@ -938,12 +852,12 @@ static void wrnc_irq_handler_input(struct wrnc_hmq *hmq)
 	if (mutex_is_locked(&hmq->mtx))
 		return;
 
-	spin_lock_irqsave(&hmq->lock, flags);
-	if (list_empty(&hmq->list_msg_input)) {
+	if (CIRC_CNT(hmq->buf.ptr_w, hmq->buf.ptr_r, hmq->buf.size) == 0) {
 		/*
 		 * We don't have nothing to send, disable the CPU input ready
-s		 * interrupts
+		 * interrupts
 		 */
+		spin_lock_irqsave(&hmq->lock, flags);
 		mask = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
 		mask &= ~(1 << (hmq->index + MQUEUE_GCR_IRQ_MASK_IN_SHIFT));
 		fmc_writel(fmc, mask, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
@@ -954,20 +868,15 @@ s		 * interrupts
 		return;
 	}
 
-	/* Retrieve and send the first message */
-	msgel = list_entry(hmq->list_msg_input.next, struct wrnc_msg_element, list);
-	list_del(&msgel->list);
-	hmq->n_input--;
+	spin_lock_irqsave(&hmq->lock, flags);
 	err = wrnc_message_push(hmq, msgel->msg, &seq);  /* we don't care about seq num */
 	if (err) {
 		dev_err(&hmq->dev,
 			"Cannot send message %d\n", seq);
 	}
-	spin_unlock_irqrestore(&hmq->lock, flags);
+	hmq->buf.ptr_r = (hmq->buf.ptr_r + hmq->buf.max_msg_size) & (hmq->buf.size - 1);
 
-	/* Release resources */
-	kfree(msgel->msg);
-	kfree(msgel);
+	spin_unlock_irqrestore(&hmq->lock, flags);
 }
 
 /**
@@ -976,19 +885,65 @@ s		 * interrupts
  */
 static void wrnc_irq_handler_output(struct wrnc_hmq *hmq)
 {
-	struct wrnc_msg_element msgel;
-	struct wrnc_msg msg;
+	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
+	struct fmc_device *fmc = to_fmc_dev(wrnc);
+	struct mturtle_hmq_buffer *buf = &hmq->buf;
+	uint32_t status, *buffer = buf->mem + buf->ptr_w;
+	size_t size;
+	int i, left_byte;
+	struct wrnc_hmq_user *usr, *tmp;
 	unsigned long flags;
 
-	/* get the message from the device */
 	spin_lock_irqsave(&hmq->lock, flags);
-	msg.datalen = wrnc_message_pop(hmq, msg.data);
-	msgel.msg = &msg;
+	/* Get the message */
+	/* Get information about the incoming slot */
+	status = fmc_readl(fmc, hmq->base_sr + MQUEUE_SLOT_STATUS);
+	size = (status & MQUEUE_SLOT_STATUS_MSG_SIZE_MASK);
+	size >>= MQUEUE_SLOT_STATUS_MSG_SIZE_SHIFT;
+	/* Read data from the slot */
+	for (i = 0; i < size; ++i) {
+		buffer[i] = fmc_readl(fmc,
+				hmq->base_sr + MQUEUE_SLOT_DATA_START + i * 4);
+	}
+	/* Discard the slot content */
+	fmc_writel(fmc, MQUEUE_CMD_DISCARD, hmq->base_sr + MQUEUE_SLOT_COMMAND);
 	spin_unlock_irqrestore(&hmq->lock, flags);
 
-	/* Dispatch to all users or to the one who is waiting a sync message */
-	wrnc_hmq_dispatch_out(hmq, &msgel);
+	/* If we are waiting a synchronous answer on this HMQ check */
+	if ((hmq->flags & WRNC_FLAG_HMQ_SYNC_WAIT) &&
+	    hmq->waiting_seq == buffer[1]) { /* seq number always position 1 */
+		spin_lock_irqsave(&hmq->lock, flags);
+		memcpy(hmq->sync_answer.data, buffer, size * 4);
+		hmq->sync_answer.datalen = size;
+		hmq->flags &= ~WRNC_FLAG_HMQ_SYNC_WAIT;
+		hmq->flags |= WRNC_FLAG_HMQ_SYNC_READY;
+		spin_unlock_irqrestore(&hmq->lock, flags);
 
+		/* Do not store synchronous answer */
+	        goto out;
+	}
+
+
+	/*
+	 * Update user pointer when the write pointer is overwriting data
+	 * not yet read by the user. Loop over all users and check their
+	 * read-pointer
+	 */
+	list_for_each_entry_safe(usr, tmp, &hmq->list_usr, list) {
+		/* TODO check user read pointer if overwritten */
+		spin_lock_irqsave(&usr->lock, flags);
+		left_byte = CIRC_SPACE(buf->ptr_w, usr->ptr_r, buf->size);
+		if (left_byte <= buf->max_msg_size)
+			usr->ptr_r = (usr->ptr_r + buf->max_msg_size) & (hmq->buf.size - 1);
+		spin_unlock_irqrestore(&usr->lock, flags);
+	}
+
+	/* Update write pointer for the next pop */
+	spin_lock_irqsave(&hmq->lock, flags);
+	buf->ptr_w = (buf->ptr_w + hmq->buf.max_msg_size) & (hmq->buf.size - 1);
+	spin_unlock_irqrestore(&hmq->lock, flags);
+
+ out:
 	/* Wake up processes waiting for this */
 	wake_up_interruptible(&hmq->q_msg);
 }

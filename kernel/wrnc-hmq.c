@@ -603,25 +603,30 @@ static int wrnc_message_push(struct wrnc_hmq *hmq, struct wrnc_msg *msg,
 /**
  * It reads a message from a FPGA HMQ
  */
-static void wrnc_message_pop(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
+static size_t wrnc_message_pop(struct wrnc_hmq *hmq, void *buf)
 {
 	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
-	uint32_t status;
+	uint32_t status, *buffer = buf;
+	size_t size;
 	int i;
+
 
 	/* Get information about the incoming slot */
 	status = fmc_readl(fmc, hmq->base_sr + MQUEUE_SLOT_STATUS);
-	msg->datalen = (status & MQUEUE_SLOT_STATUS_MSG_SIZE_MASK);
-	msg->datalen >>= MQUEUE_SLOT_STATUS_MSG_SIZE_SHIFT;
+	size = (status & MQUEUE_SLOT_STATUS_MSG_SIZE_MASK);
+	size >>= MQUEUE_SLOT_STATUS_MSG_SIZE_SHIFT;
+
 	/* Read data from the slot */
-	for (i = 0; i < msg->datalen; ++i) {
-		msg->data[i] = fmc_readl(fmc,
+	for (i = 0; i < size; ++i) {
+		buffer[i] = fmc_readl(fmc,
 				hmq->base_sr + MQUEUE_SLOT_DATA_START + i * 4);
 	}
 
 	/* Discard the slot content */
 	fmc_writel(fmc, MQUEUE_CMD_DISCARD, hmq->base_sr + MQUEUE_SLOT_COMMAND);
+
+	return size;
 }
 
 
@@ -977,7 +982,7 @@ static void wrnc_irq_handler_output(struct wrnc_hmq *hmq)
 
 	/* get the message from the device */
 	spin_lock_irqsave(&hmq->lock, flags);
-	wrnc_message_pop(hmq, &msg);
+	msg.datalen = wrnc_message_pop(hmq, msg.data);
 	msgel.msg = &msg;
 	spin_unlock_irqrestore(&hmq->lock, flags);
 

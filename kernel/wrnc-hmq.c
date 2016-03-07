@@ -656,7 +656,7 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 
 	/* Use mutex to serialize sync messages. */
 	mutex_lock(&hmq->mtx_sync);
-	mutex_lock(&hmq->mtx_sync);
+	mutex_lock(&hmq_out->mtx_sync);
 
 	/* Rise wait flag */
 	spin_lock_irqsave(&hmq_out->lock, flags);

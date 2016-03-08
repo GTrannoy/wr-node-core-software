@@ -524,9 +524,12 @@ static int wrnc_message_push(struct wrnc_hmq *hmq, void *buf,
 	/* Assign a sequence number to the message */
 	data[1] = *seq;
 	/* Write data into the slot */
-	for (i = 0; i < hmq->buf.max_msg_size / 4; ++i)
+	for (i = 0; i < hmq->buf.max_msg_size / 4; ++i) {
 		fmc_writel(fmc, data[i],
 			   hmq->base_sr + MQUEUE_SLOT_DATA_START + i * 4);
+		dev_vdbg(&hmq->dev, "From HOST to MT data[%i] = 0x%08x\n",
+			 i, data[i]);
+	}
 
 	/* The slot is ready to be sent to the CPU */
 	fmc_writel(fmc, MQUEUE_CMD_READY | ((hmq->buf.max_msg_size / 4) & 0xFF),
@@ -904,6 +907,8 @@ static void wrnc_irq_handler_output(struct wrnc_hmq *hmq)
 	for (i = 0; i < size; ++i) {
 		buffer[i] = fmc_readl(fmc,
 				hmq->base_sr + MQUEUE_SLOT_DATA_START + i * 4);
+		dev_vdbg(&hmq->dev, "From MT to HOST data[%i] = 0x%08x\n",
+			 i, buffer[i]);
 	}
 	/* Discard the slot content */
 	fmc_writel(fmc, MQUEUE_CMD_DISCARD, hmq->base_sr + MQUEUE_SLOT_COMMAND);

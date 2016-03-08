@@ -753,6 +753,8 @@ int wrnc_hmq_send_and_receive_sync(struct wrnc_hmq *hmq,
 	msg->offset = 0;
 	msg->direction = WRNC_MSG_DIR_RECEIVE;
 
+	if (smsg.timeout_ms == 0)
+		errno = ETIME;
 	return smsg.timeout_ms;
 }
 

@@ -810,7 +810,32 @@ int wrnc_hmq_width_get(struct wrnc_hmq *hmq, uint32_t *width)
 
 	err = wrnc_sysfs_scanf(path, "%d", width);
 	*width = 4 * (*width); /* Convert to byte */
+
 	return err;
+}
+
+
+/**
+ * It gets the maximum number of messages that can be saved in the buffer
+ * @param[in] hmq HMQ device descriptor
+ * @param[out] max maximum number of messages in the buffer
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrnc_hmq_msg_max_get(struct wrnc_hmq *hmq, uint32_t *max)
+{
+	uint32_t buf_size, msg_size;
+	int err;
+
+	err = wrnc_hmq_buffer_size_get(hmq, &buf_size);
+	if (err)
+		return err;
+	err = wrnc_hmq_width_get(hmq, &msg_size);
+	if (err)
+		return err;
+
+	*max = buf_size / msg_size;
+
+	return 0;
 }
 
 

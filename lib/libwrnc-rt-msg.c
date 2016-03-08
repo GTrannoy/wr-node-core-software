@@ -183,8 +183,8 @@ int wrnc_rt_version_get(struct wrnc_dev *wrnc, struct wrnc_rt_version *version,
         err = wrnc_hmq_send_and_receive_sync(hmq, hmq_out, &msg,
 					     wrnc_default_timeout_ms);
 	wrnc_hmq_close(hmq);
-	if (err)
-		return err;
+	if (err <= 0)
+		return -1;
 
 	wrnc_message_unpack(&msg, &hdr, version);
 	if (hdr.msg_id != RT_ACTION_SEND_VERSION) {
@@ -225,8 +225,8 @@ int wrnc_rt_ping(struct wrnc_dev *wrnc,
 	/* Send the message and get answer */
         err = wrnc_hmq_send_and_receive_sync(hmq, hmq_out, &msg,
 					     wrnc_default_timeout_ms);
-	if (err)
-		return err;
+	if (err <= 0)
+		return -1;
 	wrnc_hmq_close(hmq);
 	wrnc_message_unpack(&msg, &hdr, NULL);
 	if (hdr.msg_id != RT_ACTION_SEND_ACK) {
@@ -261,14 +261,14 @@ static inline int wrnc_rt_variable(struct wrnc_dev *wrnc,
 	if (hdr->flags & WRNC_PROTO_FLAG_SYNC) {
 		err = wrnc_hmq_send_and_receive_sync(hmq, (hdr->slot_io & 0xF),
 						     &msg, 1000);
-		if (!err)
+		if (err > 0)
 			wrnc_message_unpack(&msg, hdr, variables);
 	} else {
 		err = wrnc_hmq_send(hmq, &msg);
 	}
 	wrnc_hmq_close(hmq);
 
-	return err;
+	return err <= 0 ? -1 : 0;
 }
 
 
@@ -396,7 +396,7 @@ static int wrnc_rt_structure(struct wrnc_dev *wrnc,
 	if (hdr->flags & WRNC_PROTO_FLAG_SYNC) {
 		err = wrnc_hmq_send_and_receive_sync(hmq, (hdr->slot_io & 0xF),
 						     &msg, 1000);
-		if (!err)
+		if (err > 0)
 			for (i = 0; i < n_tlv; ++i)
 				wrnc_message_structure_pop(&msg, hdr, &tlv[i]);
 	} else {
@@ -404,7 +404,7 @@ static int wrnc_rt_structure(struct wrnc_dev *wrnc,
 	}
 	wrnc_hmq_close(hmq);
 
-	return err;
+	return err <= 0 ? -1 : 0;
 }
 
 

@@ -722,8 +722,8 @@ int wrnc_hmq_share_get(struct wrnc_dev *wrnc, unsigned int dir,
  * @param[in] timeout_ms maximum ms to wait for an answer. If you ask for
  *            0ms timeout, the driver will use the default driver timeout.
  * @return On success, a positive number is returned; this number represent
- *         the remaining ms to the timeout. A value of 0 indicates that the
- *         call timed out. -1 on error and errno is set appropriately
+ *         the remaining ms to the timeout. -1 on error and errno is set
+ *         appropriately
  */
 int wrnc_hmq_send_and_receive_sync(struct wrnc_hmq *hmq,
 				   unsigned int index_out,
@@ -753,8 +753,10 @@ int wrnc_hmq_send_and_receive_sync(struct wrnc_hmq *hmq,
 	msg->offset = 0;
 	msg->direction = WRNC_MSG_DIR_RECEIVE;
 
-	if (smsg.timeout_ms == 0)
+	if (smsg.timeout_ms == 0) {
 		errno = ETIME;
+		return -1;
+	}
 	return smsg.timeout_ms;
 }
 

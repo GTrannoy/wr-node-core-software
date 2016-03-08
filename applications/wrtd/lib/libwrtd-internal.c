@@ -78,7 +78,7 @@ int wrtd_send_and_receive_sync(struct wrtd_desc *wrtd,
 
 	wrnc_hmq_close(hmq);
 
-	return err;
+	return err < 0 ? err : 0; /* ignore timeout */
 }
 
 /**

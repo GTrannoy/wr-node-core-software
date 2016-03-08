@@ -173,7 +173,7 @@ extern int wrnc_hmq_send_and_receive_sync(struct wrnc_hmq *hmq,
 extern int wrnc_hmq_buffer_size_set(struct wrnc_hmq *hmq, uint32_t size);
 extern int wrnc_hmq_buffer_size_get(struct wrnc_hmq *hmq, uint32_t *size);
 extern int wrnc_hmq_count_max_hw_get(struct wrnc_hmq *hmq, uint32_t *max);
-
+extern int wrnc_hmq_width_get(struct wrnc_hmq *hmq, uint32_t *width);
 /* FIXME to be tested */
 extern int wrnc_hmq_filter_add(struct wrnc_hmq *hmq,
 			       struct wrnc_msg_filter *filter);

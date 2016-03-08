@@ -796,6 +796,25 @@ int wrnc_hmq_buffer_size_get(struct wrnc_hmq *hmq, uint32_t *size)
 
 
 /**
+ * It gets the message size, in other words the buffer width
+ * @param[in] hmq HMQ device descriptor
+ * @param[out] width maximum message width in bytes
+ * @return 0 on success, -1 on error and errno is set appropriately
+ */
+int wrnc_hmq_width_get(struct wrnc_hmq *hmq, uint32_t *width)
+{
+	char path[WRNC_SYSFS_PATH_LEN];
+	int err;
+
+	snprintf(path, WRNC_SYSFS_PATH_LEN, "%s/width_max", hmq->syspath);
+
+	err = wrnc_sysfs_scanf(path, "%d", width);
+	*width = 4 * (*width); /* Convert to byte */
+	return err;
+}
+
+
+/**
  * It gets the maximum number of messages that can be stored within the
  * mock-turtle HMQ (in hardware).
  * @param[in] hmq HMQ device descriptor

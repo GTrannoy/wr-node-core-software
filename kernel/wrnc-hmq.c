@@ -762,12 +762,14 @@ static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 	mutex_lock(&hmq->mtx); /* Not really useful mutex for the time being */
 	/* read as much as we can */
 	while (!err && i < n && CIRC_CNT(hmq->buf.ptr_w, user->ptr_r, hmq->buf.size)) {
+		spin_lock(&hmq->lock);
 		if (!wrnc_hmq_filter_check(user, hmq->buf.mem + user->ptr_r)) {
 			/* The current message is of no interest for the user */
 			user->ptr_r += hmq->buf.max_msg_size;
 			if (user->ptr_r >= hmq->buf.size) {
 				user->ptr_r = 0;
 			}
+			spin_unlock(&hmq->lock);
 			continue;
 		}
 
@@ -778,6 +780,7 @@ static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 		if (copy_to_user(buf + count, &msg, sizeof(struct wrnc_msg))) {
 			dev_err(&hmq->dev, "Cannot message transfer to user-space\n");
 			err = -EFAULT;
+			spin_unlock(&hmq->lock);
 			break;
 		}
 
@@ -787,6 +790,7 @@ static ssize_t wrnc_hmq_read(struct file *f, char __user *buf,
 		if (user->ptr_r >= hmq->buf.size) {
 			user->ptr_r = 0;
 		}
+		spin_unlock(&hmq->lock);
 	}
 	mutex_unlock(&hmq->mtx);
 

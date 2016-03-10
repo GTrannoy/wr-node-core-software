@@ -53,7 +53,8 @@ static int hmq_max_irq_loop = 5;
 module_param_named(max_irq_loop, hmq_max_irq_loop, int, 0644);
 MODULE_PARM_DESC(max_irq_loop, "Maximum number of messages to read per interrupt per hmq");
 
-static int wrnc_message_push(struct wrnc_hmq *hmq, void *buf, uint32_t *seq);
+static int wrnc_message_push(struct wrnc_hmq *hmq, void *buf,
+			     unsigned int size,  uint32_t *seq);
 
 /**
  * It applies filters on a given message.
@@ -462,7 +463,8 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
 			spin_unlock_irqrestore(&hmq->lock, flags);
 		} else {
 			spin_lock_irqsave(&hmq->lock, flags);
-			err = wrnc_message_push(hmq, msg.data, &seq);
+			err = wrnc_message_push(hmq, msg.data,
+						msg.datalen * 4, &seq);
 			spin_unlock_irqrestore(&hmq->lock, flags);
 			if (err)
 				break;
@@ -501,17 +503,24 @@ static ssize_t wrnc_hmq_write(struct file *f, const char __user *buf,
  * It writes a message to a FPGA HMQ. Note that you have to take
  * the HMQ spinlock before call this function
  * @param[in] hmq queue where send the message
- * @param[in] msg the message to send
+ * @param[in] buf data buffer to send
+ * @param[in] size buffer size
  * @param[out] the sequence number used to send the message
  */
 static int wrnc_message_push(struct wrnc_hmq *hmq, void *buf,
-			     uint32_t *seq)
+			     unsigned int size, uint32_t *seq)
 {
 	struct wrnc_dev *wrnc = to_wrnc_dev(hmq->dev.parent);
 	struct fmc_device *fmc = to_fmc_dev(wrnc);
 	uint32_t freeslot, *data = buf;
 	int i;
 
+	if (size > hmq->buf.max_msg_size) {
+		dev_err(&hmq->dev,
+			"The message (%d bytes) does not fit in the maximum message size (%d bytes)\n",
+			size, hmq->buf.max_msg_size);
+		return -EINVAL;
+	}
 	freeslot = fmc_readl(fmc, hmq->base_sr + MQUEUE_SLOT_STATUS)
 		& MQUEUE_SLOT_STATUS_OCCUPIED_MASK
 		>> MQUEUE_SLOT_STATUS_OCCUPIED_SHIFT;
@@ -524,15 +533,15 @@ static int wrnc_message_push(struct wrnc_hmq *hmq, void *buf,
 	/* Assign a sequence number to the message */
 	data[1] = *seq;
 	/* Write data into the slot */
-	for (i = 0; i < hmq->buf.max_msg_size / 4; ++i) {
+	for (i = 0; i < size / 4; ++i) {
 		fmc_writel(fmc, data[i],
 			   hmq->base_sr + MQUEUE_SLOT_DATA_START + i * 4);
 		dev_vdbg(&hmq->dev, "From HOST to MT data[%i] = 0x%08x\n",
-			 i, data[i]);
+		  i, data[i]);
 	}
 
 	/* The slot is ready to be sent to the CPU */
-	fmc_writel(fmc, MQUEUE_CMD_READY | ((hmq->buf.max_msg_size / 4) & 0xFF),
+	fmc_writel(fmc, MQUEUE_CMD_READY | ((size / 4) & 0xFF),
 		   hmq->base_sr + MQUEUE_SLOT_COMMAND);
 
 	return 0;
@@ -587,7 +596,8 @@ static int wrnc_ioctl_msg_sync(struct wrnc_hmq *hmq, void __user *uarg)
 
 	/* Send the message */
 	spin_lock_irqsave(&hmq->lock, flags);
-	err = wrnc_message_push(hmq, msg_req.data, &hmq_out->waiting_seq);
+	err = wrnc_message_push(hmq, msg_req.data,
+				msg_req.datalen * 4, &hmq_out->waiting_seq);
 	spin_unlock_irqrestore(&hmq->lock, flags);
 	if (err)
 		return err;
@@ -876,7 +886,8 @@ static void wrnc_irq_handler_input(struct wrnc_hmq *hmq)
 	}
 
 	spin_lock_irqsave(&hmq->lock, flags);
-	err = wrnc_message_push(hmq, msgel->msg, &seq);  /* we don't care about seq num */
+	err = wrnc_message_push(hmq, msgel->msg,
+				hmq->buf.max_msg_size * 4, &seq);  /* we don't care about seq num */
 	if (err) {
 		dev_err(&hmq->dev,
 			"Cannot send message %d\n", seq);
@@ -911,8 +922,8 @@ static void wrnc_irq_handler_output(struct wrnc_hmq *hmq)
 	for (i = 0; i < size; ++i) {
 		buffer[i] = fmc_readl(fmc,
 				hmq->base_sr + MQUEUE_SLOT_DATA_START + i * 4);
-		dev_vdbg(&hmq->dev, "From MT to HOST data[%i] = 0x%08x\n",
-			 i, buffer[i]);
+		/*dev_vdbg(&hmq->dev, "From MT to HOST data[%i] = 0x%08x\n",
+		  i, buffer[i]);*/
 	}
 	/* Discard the slot content */
 	fmc_writel(fmc, MQUEUE_CMD_DISCARD, hmq->base_sr + MQUEUE_SLOT_COMMAND);

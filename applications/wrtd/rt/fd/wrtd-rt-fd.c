@@ -55,7 +55,7 @@ int wr_time_ready()
 	return 1;
 }
 
-int wr_enable_lock(int enable)
+void wr_enable_lock(int enable)
 {
 	if(enable)
 		dp_writel(FD_TCR_WR_ENABLE, FD_REG_TCR);
@@ -110,8 +110,6 @@ static struct wrtd_out_channel wrtd_out_channels[FD_NUM_CHANNELS]; /**< Output
 								      state
 								      array */
 static struct wrtd_out wrtd_out_device;
-
-static inline int wr_is_timing_ok(void);
 
 /**
  * Writes to FD output registers for output (out)
@@ -278,17 +276,6 @@ static struct pulse_queue_entry* pulse_queue_front(struct lrt_pulse_queue *p)
     if (!p->count)
 	   return NULL;
     return &p->data[p->tail];
-}
-
-
-/**
- * Returns the newest entry in the pulse queue (or NULL if empty).
- */
-static struct pulse_queue_entry* pulse_queue_back(struct lrt_pulse_queue *p)
-{
-    if (!p->count)
-	   return NULL;
-    return &p->data[p->head];
 }
 
 
@@ -758,7 +745,7 @@ static int wrtd_out_hash_table_insert(struct wrnc_proto_header *hin, void *pin,
 		return -1;
 	}
 	if (!(triggers[tidx].flags & ENTRY_FLAG_VALID))
-		return; /* nothing to do is a valid trigger */
+		return 0; /* nothing to do is a valid trigger */
 
 	hidx = wrtd_out_hash_table_free(&triggers[tidx].id);
 	if  (hidx < 0)
@@ -792,7 +779,7 @@ static int wrtd_out_hash_table_remove(struct wrnc_proto_header *hin, void *pin,
 	}
 
 	if (triggers[tidx].flags & ENTRY_FLAG_VALID)
-		return; /* nothing to do is a valid trigger */
+		return 0; /* nothing to do is a valid trigger */
 
 	hidx = wrtd_out_hash_table_find(&triggers[tidx].id);
 	if (hidx < 0)
@@ -815,7 +802,6 @@ static int wrtd_out_trigger_index(struct wrnc_proto_header *hin, void *pin,
 	struct wrtd_trig_id *id = pin;
 	uint32_t *index = pout;
 	int hidx;
-	int ret;
 
 	/* Verify that the size is correct */
 	if (hin->len * 4 != sizeof(struct wrtd_trig_id)) {
@@ -958,11 +944,7 @@ void init(void)
 {
 	int i, j;
 
-	pp_printf("Running %s from commit 0x%x.\n", __FILE__, version);
-	rx_ebone = 0;
-	rx_loopback = 0;
 	promiscuous_mode = 0;
-	memset(&last_received, 0, sizeof(struct wrtd_trigger_entry));
 	tlist_count = 0;
 	wr_state = WR_LINK_OFFLINE;
 	wr_enable_lock(0);

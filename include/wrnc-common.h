@@ -67,6 +67,27 @@ struct wrnc_proto_header {
 
 
 /**
+ * Data structure representing a MockTurtle packet
+ */
+struct mturtle_packet {
+	/* offset 0x00 */
+	volatile struct wrnc_proto_header header; /**< packet header */
+	/* offset 0x10 */
+	volatile uint32_t payload[]; /**< packet payload  */
+};
+
+/**
+ * It returns the pointer to the MockTurtle packet
+ * @param[in] buf buffer containing the packet
+ * @return pointer to the packet
+ */
+static inline struct mturtle_packet *rt_proto_packet_get(void *buf)
+{
+	return (struct mturtle_packet *)buf;
+}
+
+
+/**
  * It extracts the header from a raw message
  * @param[in] raw_msg raw message
  * @param[out] header the header from the message
@@ -98,7 +119,6 @@ static inline void *rt_proto_payload_get(void *raw_msg)
 {
 	return ((char *)raw_msg + sizeof(struct wrnc_proto_header));
 }
-
 
 
 #endif

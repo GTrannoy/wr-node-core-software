@@ -54,26 +54,44 @@ struct wr_timestamp {
 #ifdef WRNODE_RT
 struct wr_d3s_remote_message {
     struct rmq_message_addr hdr;
+    /* Message type (see D3S_MSG_ macros). Types are:
+	PHASE_FIXUP: initial 'fixup' phase value sent at the beginning of every second
+	TUNE_UPDATE: momentary frequency value, sent at every sample */
     int type;
+    /* ID of the RF stream */
     int stream_id;
+    /* Sampling clock divider value (FSamp = 1 MHz / sampling_divider) */
     int sampling_divider;
+    /* Master lock ID. If increased, the master has-relocked and the slave has to re-lock as well */
     int lock_id;
+
+    /* Software TX timestamp */
     uint32_t transmit_seconds;
     uint32_t transmit_cycles;
 
     union {
         struct {
+	    /* TAI second the fixup has been generated for */
             uint32_t fixup_tai;
+	    /* Phase value (1 << DDS_ACC_BITS = 2*Pi) */
             int64_t fixup_phase;
+	    /* Base frequency (DDS step) */
             int64_t base_freq;
-	        uint32_t rf_cnt_snap_cycles;
+	    /* TAI cycles at which the RF counter snapshot was taken */
+            uint32_t rf_cnt_snap_cycles;
+	    /* RF counter value at the snapshot time above */
             uint32_t rf_cnt_snap_count;
-	        uint32_t rf_cnt_period;
+	    /* Period of the RF counter */
+	    uint32_t rf_cnt_period;
+	    /* Gain of the master VCO (multiplicand of the tune) */
             int32_t vco_gain;
         } phase_fixup;
         struct {
+	    /* TAI seconds at which the sample was taken) */
             uint32_t tai;
+	    /* Tune value (DDS-specific) */
             int32_t tune;
+	    /* Index of the sample within the current TAI second (0...sampling_divider-1) */
             uint32_t sample_id;
         } tune_update;
     };

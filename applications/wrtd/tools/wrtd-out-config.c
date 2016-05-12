@@ -104,9 +104,9 @@ static struct wrtd_commands cmds[] = {
 	{ NULL }
 };
 
-static void dump_output_state(struct wrtd_output_state *state)
+static void dump_output_state(struct wrtd_output_state *state, struct wr_timestamp current)
 {
-	char tmp[1024], tmp2[1024];
+	char tmp[1024], tmp2[1024], tmp3[1024];
 
 	if(! (state->flags & WRTD_ENABLED))
 		printf("Channel %d: disabled\n", state->output);
@@ -134,23 +134,27 @@ static void dump_output_state(struct wrtd_output_state *state)
 
 	format_ts(tmp, state->last_executed.ts, 1);
 	format_id(tmp2, state->last_executed.id);
-	printf(" - Last executed trigger:         %s, ID: %s, SeqNo %d\n",
-		       tmp, tmp2, state->last_executed.seq);
+	format_ago(tmp3, state->last_executed.ts, current);
+	printf(" - Last executed trigger:         %s (%s), ID: %s, SeqNo %d\n",
+		       tmp, tmp3, tmp2, state->last_executed.seq);
 
 	format_ts(tmp, state->last_enqueued.ts, 1);
 	format_id(tmp2, state->last_enqueued.id);
-	printf(" - Last enqueued trigger:         %s, ID: %s, SeqNo %d\n",
-		       tmp, tmp2, state->last_enqueued.seq);
+	format_ago(tmp3, state->last_enqueued.ts, current);
+	printf(" - Last enqueued trigger:         %s (%s), ID: %s, SeqNo %d\n",
+		       tmp, tmp3, tmp2, state->last_enqueued.seq);
 
 	format_ts(tmp, state->last_received.ts, 1);
 	format_id(tmp2, state->last_received.id);
-	printf(" - Last received trigger:         %s, ID: %s, SeqNo %d\n",
-		       tmp, tmp2, state->last_received.seq);
+	format_ago(tmp3, state->last_received.ts, current);
+	printf(" - Last received trigger:         %s (%s), ID: %s, SeqNo %d\n",
+		       tmp, tmp3, tmp2, state->last_received.seq);
 
 	format_ts(tmp, state->last_lost.ts, 1);
 	format_id(tmp2, state->last_lost.id);
-	printf(" - Last missed/lost trigger:      %s, ID: %s, SeqNo %d\n",
-		       tmp, tmp2, state->last_lost.seq);
+	format_ago(tmp3, state->last_lost.ts, current);
+	printf(" - Last missed/lost trigger:      %s (%s), ID: %s, SeqNo %d\n",
+		       tmp, tmp3, tmp2, state->last_lost.seq);
 	wrtd_strlogging_full(tmp, state->log_level);
 	printf(" - Log level:             %s\n", tmp);
 
@@ -254,13 +258,19 @@ static int wrtd_cmd_state(struct wrtd_node *wrtd, int output,
 {
 	struct wrtd_output_state state;
 	int err;
+	struct wr_timestamp current;
 
 	err = wrtd_out_state_get(wrtd, output, &state);
 
     	if(err)
 		return err;
 
-	dump_output_state(&state);
+	err = wrtd_out_base_time(wrtd, &current);
+
+    	if(err)
+		return err;
+	
+	dump_output_state(&state, current);
 	return 0;
 }
 

@@ -115,6 +115,29 @@ void format_ts(char *buf, struct wr_timestamp ts, int with_seconds)
     }
 }
 
+void format_ago(char *buf, struct wr_timestamp ts, struct wr_timestamp current)
+{
+    uint64_t delta = current.seconds - ts.seconds;
+    char when[16];
+    if (delta < 0)
+    {
+	sprintf(when, "future");
+	delta = -delta;
+    } else {
+    	sprintf(when, "past");
+    }
+
+    
+    if(delta < 60)
+	sprintf(buf, "%lu seconds in the %s", delta, when);
+    else if (delta < 3600)
+	sprintf(buf, "%lu minutes in the %s", delta/60, when);
+    else if (delta < 3600*24)
+	sprintf(buf, "%lu hours in the %s", delta/3600, when);
+    else
+	sprintf(buf, "%lu days in the %s", delta/(24*3600), when);
+}
+
 void format_id(char *buf, struct wrtd_trig_id id)
 {
     sprintf( buf, "%04x:%04x:%08x", id.system, id.source_port,id.trigger);

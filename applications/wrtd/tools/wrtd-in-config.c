@@ -95,9 +95,9 @@ static void help()
 	exit(1);
 }
 
-void dump_input_state(struct wrtd_input_state *state)
+void dump_input_state(struct wrtd_input_state *state, struct wr_timestamp current)
 {
-	char tmp[1024], tmp2[1024];
+	char tmp[1024], tmp2[1024], tmp3[1024];
 
 	if(!(state->flags & WRTD_ENABLED))
 		printf("Channel %d: disabled\n", state->input );
@@ -120,14 +120,16 @@ void dump_input_state(struct wrtd_input_state *state)
 
 	if( state-> flags & WRTD_LAST_VALID ) {
 		format_ts( tmp, state->last_tagged_pulse, 1 );
-		printf(" - Last input pulse:      %s\n", tmp );
+		format_ago( tmp2, state->last_tagged_pulse, current );
+		printf(" - Last input pulse:      %s (%s)\n", tmp, tmp2 );
 	}
 
 	if(state->sent_triggers > 0) {
 		format_ts( tmp, state->last_sent.ts, 1 );
 		format_id( tmp2, state->last_sent.id );
-		printf(" - Last sent trigger:     %s, ID: %s, SeqNo %d\n",
-		       tmp, tmp2, state->last_sent.seq);
+		format_ago( tmp3, state->last_sent.ts, current );
+		printf(" - Last sent trigger:     %s (%s), ID: %s, SeqNo %d\n",
+		       tmp, tmp3, tmp2, state->last_sent.seq);
 	}
 
 	printf(" - Dead time:             %" PRIu64 " ns\n",
@@ -145,11 +147,18 @@ static int wrtd_cmd_state(struct wrtd_node *wrtd, int input,
 {
 	struct wrtd_input_state state;
 	int err;
+	struct wr_timestamp current;
 
 	err = wrtd_in_state_get(wrtd, input, &state);
 	if (err)
 		return err;
-	dump_input_state(&state);
+
+	err = wrtd_in_base_time(wrtd, &current);
+    
+        if(err)
+    	    return err;
+
+	dump_input_state(&state, current);
 	return 0;
 }
 static int wrtd_cmd_enable(struct wrtd_node *wrtd, int input,

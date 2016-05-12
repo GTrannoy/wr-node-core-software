@@ -32,6 +32,7 @@ extern void decode_flags(char *buf, uint32_t flags);
 extern void decode_mode(char *buf, int mode);
 extern void decode_log_level(char *buf, uint32_t flags);
 extern void format_ts(char *buf, struct wr_timestamp ts, int with_seconds);
+extern void format_ago(char *buf, struct wr_timestamp ts, struct wr_timestamp current);
 extern void format_id(char *buf, struct wrtd_trig_id id);
 extern uint64_t ts_to_picos(struct wr_timestamp ts);
 extern int parse_delay(char *dly, uint64_t *delay_ps);

@@ -168,6 +168,10 @@ extern int wrtd_load_application(struct wrtd_node *dev, char *rt_tdc,
 					 char *rt_fd);
 extern int wrtd_white_rabbit_sync(struct wrtd_node *dev,
 				  unsigned long timeout_s);
+extern int wrtd_cpu_restart(struct wrtd_node *dev);
+extern int wrtd_time_get(struct wrtd_node *dev, unsigned int input,
+			struct wr_timestamp *current_time);
+
 /**@}*/
 
 /**
@@ -252,6 +256,8 @@ extern int wrtd_in_dead_time_get(struct wrtd_node *dev, unsigned int input,
 				 uint64_t *dead_time_ps);
 extern int wrtd_in_delay_get(struct wrtd_node *dev, unsigned int input,
 			     uint64_t *delay_ps);
+
+
 /**@}*/
 
 /**

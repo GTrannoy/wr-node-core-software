@@ -1,3 +1,5 @@
+include Makefile.specific
+
 OBJS := wrtd-rt-fd.o
 OBJS += ../common/loop-queue.o
 OUTPUT = wrtd-rt-fd

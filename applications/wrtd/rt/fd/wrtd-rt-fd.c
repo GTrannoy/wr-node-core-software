@@ -30,6 +30,9 @@
 #define OUT_ST_TEST_PENDING 2
 #define OUT_ST_CONDITION_HIT 3
 
+#define OUT_TIMEOUT 10
+
+
 static const uint32_t version = GIT_VERSION;
 static uint32_t promiscuous_mode = 0;
 
@@ -459,6 +462,14 @@ static int check_output_timeout (struct lrt_output *out)
 	   get latched on reading secs register. */
 	tc.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
 	tc.ticks = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
+
+	if( out->last_programmed.seconds > tc.seconds + OUT_TIMEOUT )
+	{
+	    struct lrt_pulse_queue *q = &out->queue;
+	    struct pulse_queue_entry *pq_ent = pulse_queue_front(q);           
+	    pp_printf("Enqueued timestamp very far in the future [id %x:%x:%x]. Dropping.", pq_ent->trig.id.system, pq_ent->trig.id.source_port, pq_ent->trig.id.trigger);
+	    pp_printf("Offending TS: %d:%d", out->last_programmed.seconds, out->last_programmed.ticks);
+	}
 
 	int delta = tc.seconds - out->last_programmed.seconds;
 	delta *= 125 * 1000 * 1000;
@@ -1185,6 +1196,8 @@ static inline void ctl_software_trigger (uint32_t seq, struct wrnc_msg *ibuf)
 		wrnc_msg_timestamp(ibuf, &tc);
 	}
 
+//	pp_printf("SoftwareTrig: %d %d\n", tc.seconds, tc.ticks);
+
 	struct wrnc_msg obuf = ctl_claim_out_buf();
 
 	uint32_t id_timestamp = WRTD_REP_TIMESTAMP;
@@ -1290,6 +1303,7 @@ static inline void ctl_chan_set_log_level (uint32_t seq, struct wrnc_msg *ibuf)
 	for (i = 0; i < FD_NUM_CHANNELS; i++)
 		promiscuous_mode |= (outputs[i].log_level & WRTD_LOG_PROMISC);
 }
+
 /* Receives command messages and call matching command handlers */
 static inline void do_control()
 {
@@ -1334,6 +1348,7 @@ static inline void do_control()
 	_CMD(WRTD_CMD_FD_PING,                          ctl_ping)
 	_CMD(WRTD_CMD_FD_CHAN_DEAD_TIME,                ctl_chan_set_dead_time)
 	_CMD(WRTD_CMD_FD_VERSION,                       ctl_version)
+
 	default:
 	break;
 	}

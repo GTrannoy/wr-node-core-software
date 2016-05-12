@@ -275,11 +275,23 @@ static int wrtd_in_trigger_sw(struct wrnc_proto_header *hin, void *pin,
 
 	/* trigger entity ts from the host contains the delay.
 	   So add to it the current time */
+
+	struct wr_timestamp ts_orig;
+	
+	ts_orig.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
+	ts_orig.ticks = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
+
 	ts.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
 	ts.ticks = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
 	ts.frac = 0;
 	ts_add(&ent.ts, &ts);
 
+
+	if( ent.ts.seconds > ts_orig.seconds + 1000 )
+	{
+    	    pp_printf("Warning: suspiciously long software trigger delay %d tai-secs %d", (int)ent.ts.seconds, (int)ts_orig.seconds);
+	}
+	
 	/* Send trigger */
 	send_trigger(&ent);
 

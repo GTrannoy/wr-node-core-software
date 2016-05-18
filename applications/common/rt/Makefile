@@ -1,3 +1,5 @@
+-include Makefile.specific
+
 # and don't touch the rest unless you know what you're doing.
 CROSS_COMPILE_TARGET ?= lm32-elf-
 INSTALL_PREFIX ?= .

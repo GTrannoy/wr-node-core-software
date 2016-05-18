@@ -1,4 +1,4 @@
-include Makefile.specific
+-include Makefile.specific
 
 OBJS := wrtd-rt-tdc.o
 OBJS += ../common/loop-queue.o

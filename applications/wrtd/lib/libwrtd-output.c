@@ -934,7 +934,7 @@ int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
 		return err;
 
 	chan.config.mode = mode;
-	chan.config.flags &= (WRTD_TRIGGERED | WRTD_LAST_VALID);
+	chan.config.flags &= ~(WRTD_TRIGGERED | WRTD_LAST_VALID);
 	if (chan.config.mode == WRTD_TRIGGER_MODE_SINGLE) {
 		chan.config.flags &= ~WRTD_ARMED;
 		chan.config.state = OUT_ST_IDLE;

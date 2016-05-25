@@ -537,22 +537,27 @@ static inline uint32_t fd_ch_readl (struct lrt_output *out,  uint32_t reg)
 
 static int check_output_timeout (struct lrt_output *out)
 {
+	struct lrt_pulse_queue *q = &out->queue;
+	struct pulse_queue_entry *pq_ent = pulse_queue_front(q);
 	struct wr_timestamp tc;
+	int delta;
 
 	/* Read the current WR time, order is important: first seconds, then cycles (cycles
 	   get latched on reading secs register. */
 	tc.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
 	tc.ticks = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
 
-	if( out->last_programmed.seconds > tc.seconds + OUT_TIMEOUT )
-	{
-	    struct lrt_pulse_queue *q = &out->queue;
-	    struct pulse_queue_entry *pq_ent = pulse_queue_front(q);           
-	    pp_printf("Enqueued timestamp very far in the future [id %x:%x:%x]. Dropping.", pq_ent->trig.id.system, pq_ent->trig.id.source_port, pq_ent->trig.id.trigger);
-	    pp_printf("Offending TS: %d:%d", out->last_programmed.seconds, out->last_programmed.ticks);
+	if (out->last_programmed.seconds > tc.seconds + OUT_TIMEOUT) {
+	    pp_printf("Enqueued timestamp very far in the future [id %x:%x:%x]. Dropping.",
+		      pq_ent->trig.id.system,
+		      pq_ent->trig.id.source_port,
+		      pq_ent->trig.id.trigger);
+	    pp_printf("Offending TS: %d:%d",
+		      out->last_programmed.seconds,
+		      out->last_programmed.ticks);
 	}
 
-	int delta = tc.seconds - out->last_programmed.seconds;
+	delta = tc.seconds - out->last_programmed.seconds;
 	delta *= 125 * 1000 * 1000;
 	delta += tc.ticks - out->last_programmed.ticks;
 

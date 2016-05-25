@@ -317,7 +317,7 @@ static int check_dead_time(struct wrtd_out_channel *out,
  */
 static int check_output_timeout (struct wrtd_out_channel *out)
 {
-	struct lrt_pulse_queue *q = &out->queue;
+	struct lrt_pulse_queue *q = &out->priv.queue;
 	struct pulse_queue_entry *pq_ent = pulse_queue_front(q);
 	struct wr_timestamp tc;
 	int delta;
@@ -335,8 +335,8 @@ static int check_output_timeout (struct wrtd_out_channel *out)
 		      pq_ent->trig.id.source_port,
 		      pq_ent->trig.id.trigger);
 	    pp_printf("Offending TS: %d:%d",
-		      out->last_programmed.seconds,
-		      out->last_programmed.ticks);
+		      out->stats.last_programmed.seconds,
+		      out->stats.last_programmed.ticks);
 	}
 
 	delta = tc.seconds - out->stats.last_programmed.seconds;

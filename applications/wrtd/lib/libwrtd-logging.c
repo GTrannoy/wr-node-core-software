@@ -250,49 +250,48 @@ void wrtd_log_close(struct wrnc_hmq *hmq)
 static int wrtd_log_level_set(struct wrtd_node *dev, unsigned int channel,
 			      uint32_t log_level, enum wrtd_core core)
 {
-	struct wrnc_msg msg = wrnc_msg_init(4);
-	uint32_t seq = 0;
+	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
+	struct wrnc_structure_tlv tlv;
+	struct wrnc_proto_header hdr;
+	struct wrtd_out_channel ochan;
+	struct wrtd_in_channel ichan;
+	int err;
 
-	if (core) { /* Output */
-		uint32_t id = WRTD_CMD_FD_CHAN_SET_LOG_LEVEL;
-
+	hdr.flags = WRNC_PROTO_FLAG_SYNC;
+	if (core) {
 		if (channel >= FD_NUM_CHANNELS) {
 			errno = EWRTD_INVALID_CHANNEL;
 			return -1;
 		}
 
-		/* Build the message */
-		wrnc_msg_header(&msg, &id, &seq);
-		wrnc_msg_uint32(&msg, &channel);
-		wrnc_msg_uint32(&msg, &log_level);
-
-		return wrtd_trivial_request(dev, &msg, core);
-	} else { /* Input */
-		struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-		struct wrtd_in_channel chan;
-		struct wrnc_structure_tlv tlv = {
-			.index = IN_STRUCT_CHAN_0 + channel,
-			.size = sizeof(struct wrtd_in_channel),
-			.structure = &chan,
-		};
-		struct wrnc_proto_header hdr = {
-			.slot_io = (WRTD_IN_TDC_CONTROL << 4) |
-				   (WRTD_OUT_TDC_CONTROL & 0xF),
-			.flags = WRNC_PROTO_FLAG_SYNC,
-		};
-		int err;
-
+		tlv.index = OUT_STRUCT_CHAN_0 + channel;
+		tlv.size = sizeof(struct wrtd_out_channel);
+		tlv.structure = &ochan;
+		hdr.slot_io = (WRTD_IN_FD_CONTROL << 4) |
+			(WRTD_OUT_FD_CONTROL & 0xF);
+		/* TODO set promiscuous mode */
+	} else {
 		if (channel >= TDC_NUM_CHANNELS) {
 			errno = EWRTD_INVALID_CHANNEL;
 			return -1;
 		}
-		err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
-		if (err)
-			return err;
-
-		chan.config.log_level = log_level;
-		return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
+		tlv.index = IN_STRUCT_CHAN_0 + channel;
+		tlv.size = sizeof(struct wrtd_in_channel);
+		tlv.structure = &ichan;
+		hdr.slot_io = (WRTD_IN_TDC_CONTROL << 4) |
+			(WRTD_OUT_TDC_CONTROL & 0xF);
 	}
+
+	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	if (err)
+		return err;
+
+	if (core)
+		ochan.config.log_level = log_level;
+	else
+		ichan.config.log_level = log_level;
+
+	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
 }
 
 

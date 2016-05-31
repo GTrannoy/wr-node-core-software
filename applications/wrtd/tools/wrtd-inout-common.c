@@ -196,7 +196,7 @@ int parse_mode (char *mode_str, enum wrtd_trigger_mode *mode)
 
 int parse_trigger_id(const char *str, struct wrtd_trig_id *id)
 {
-    return (sscanf(str,"%i:%i:%i", &id->system, &id->source_port, &id->trigger) == 3 ? 0 : -1);
+    return (sscanf(str,"%x:%x:%x", &id->system, &id->source_port, &id->trigger) == 3 ? 0 : -1);
 }
 
 int parse_log_level (char *list[], int count, int *log_level)

@@ -14,6 +14,17 @@ struct rt_application *_app;
 
 
 /**
+ * Since the hardware does not allow byte addressing, copy word by word
+ */
+void rt_memcpy(uint32_t *dest, uint32_t *src, size_t n)
+{
+	int i;
+
+	for (i = 0; i < n / 4; ++i)
+		dest[i] = src[i];
+}
+
+/**
  * it sets a structure coming from the host
  */
 int rt_structure_setter(struct wrnc_proto_header *hin, void *pin,
@@ -34,13 +45,13 @@ int rt_structure_setter(struct wrnc_proto_header *hin, void *pin,
 		delay(100000);
 #endif
 		if (_app->structures[index].len == size) {
-			memcpy(_app->structures[index].struct_ptr,
-			       &din[offset], size);
+			rt_memcpy((uint32_t *)_app->structures[index].struct_ptr,
+				  &din[offset], size);
 		}
 #ifdef LIBRT_ERROR
 		else {
-			pp_printf("%s:%d structure len not correct %d != %d\n",
-				  __func__, __LINE__,
+			pp_printf("%s:%d structure %d len not correct %d != %d\n",
+				  __func__, __LINE__, index,
 				  _app->structures[index].len, size);
 		}
 #endif
@@ -82,13 +93,14 @@ int rt_structure_getter(struct wrnc_proto_header *hin, void *pin,
 		delay(100000);
 #endif
 		if (_app->structures[index].len == size) {
-			memcpy(&dout[offset], _app->structures[index].struct_ptr,
-			       size);
+			rt_memcpy(&dout[offset],
+				  (uint32_t *)_app->structures[index].struct_ptr,
+				  size);
 		}
 #ifdef LIBRT_ERROR
 		else {
-			pp_printf("%s: structure len not correct %d != %d\n",
-				  __func__, _app->structures[index].len, size);
+			pp_printf("%s: structure %d len not correct %d != %d\n",
+				  __func__, index, _app->structures[index].len, size);
 		}
 #endif
 		offset += (size / 4); /* Next TLV record */
@@ -109,7 +121,8 @@ int rt_version_getter(struct wrnc_proto_header *hin, void *pin,
 
 	hout->msg_id = RT_ACTION_SEND_VERSION;
 	hout->len = sizeof(struct wrnc_rt_version) / 4;
-	memcpy(dout, &_app->version, sizeof(struct wrnc_rt_version));
+	rt_memcpy(dout, (uint32_t *)&_app->version,
+		  sizeof(struct wrnc_rt_version));
 
 	return 0;
 }
@@ -256,7 +269,7 @@ static inline int rt_action_run(struct wrnc_proto_header *hin, void *pin)
 	/* Do not write directly the header on the buffer because it does not
 	 work for fields size different than 32bit */
 	pout = rt_proto_payload_get((void *) out_buf.data);
-	memcpy(&hout, hin, sizeof(struct wrnc_proto_header));
+	rt_memcpy((uint32_t *)&hout, (uint32_t *)hin, sizeof(struct wrnc_proto_header));
 
 	err = action(hin, pin, &hout, pout);
 	if (err)

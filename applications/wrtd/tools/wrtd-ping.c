@@ -25,11 +25,31 @@ void help()
 	fprintf(stderr, "  -v             show device version\n");
 }
 
+static void print_time(struct wr_timestamp *t)
+{
+	fprintf(stdout,	"\tbase time\ts:%"PRIu64" t:%d f:%d\n",
+		t->seconds, t->ticks, t->frac);
+}
+
+static void print_version(struct wrnc_rt_version *v)
+{
+	fprintf(stdout, "\tRealTime Application Version:");
+	fprintf(stdout, "\tfpga_id\t\t%x\n",
+		v->fpga_id);
+	fprintf(stdout, "\trt_id\t\t%x\n",
+		v->rt_id);
+	fprintf(stdout, "\trt_version\t\t%x\n",
+		v->rt_version);
+	fprintf(stdout, "\tgit_version\t\t%x\n",
+		v->git_version);
+}
+
+
 int main(int argc, char *argv[])
 {
 	struct wrtd_node *wrtd;
-	uint32_t dev_id = 0, n = 1, vo;
-	struct wrnc_rt_version vi;
+	uint32_t dev_id = 0, n = 1;
+	struct wrnc_rt_version vi, vo;
 	uint64_t period = 0;
 	struct wr_timestamp tsi, tso;
 	int err, time = 0, version = 0;
@@ -108,20 +128,9 @@ int main(int argc, char *argv[])
 
 		fprintf(stdout, "input  : it is running!\n");
 		if (time)
-			fprintf(stdout,
-				"\tbase time\ts:%"PRIu64" t:%d f:%d\n",
-				tsi.seconds, tsi.ticks, tsi.frac);
-		if (version) {
-			fprintf(stdout, "\tRealTime Application Version:");
-			fprintf(stdout, "\tfpga_id\t\t%x\n",
-				vi.fpga_id);
-			fprintf(stdout, "\trt_id\t\t%x\n",
-				vi.rt_id);
-			fprintf(stdout, "\trt_version\t\t%x\n",
-				vi.rt_version);
-			fprintf(stdout, "\tgit_version\t\t%x\n",
-				vi.git_version);
-		}
+			print_time(&tsi);
+		if (version)
+			print_version(&vi);
 	skip_input:
 		/* check output */
 		err = wrtd_out_ping(wrtd);
@@ -133,12 +142,10 @@ int main(int argc, char *argv[])
 
 		fprintf(stdout, "output : it is running!\n");
 		if (time)
-			fprintf(stdout,
-				"\tbase time\ts:%"PRIu64" t:%d f:%d\n",
-				tso.seconds, tso.ticks, tso.frac);
+		        print_time(&tso);
 		if (version)
-			fprintf(stdout,
-				"\tversion\t\t%x\n", vo);
+			print_version(&vo);
+
 	skip_output:
 		fprintf(stdout, "\n");
 		usleep(period);

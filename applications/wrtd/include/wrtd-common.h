@@ -103,6 +103,15 @@ enum wrtd_in_actions {
 	WRTD_IN_ACTION_SW_TRIG = __RT_ACTION_RECV_STANDARD_NUMBER,
 	WRTD_IN_ACTION_LOG,
 };
+enum wrtd_out_actions {
+	WRTD_OUT_ACTION_SW_TRIG = __RT_ACTION_RECV_STANDARD_NUMBER,
+	WRTD_OUT_ACTION_TRIG_IDX,
+	WRTD_OUT_ACTION_TRIG_FRE,
+	WRTD_OUT_ACTION_TRIG_ADD,
+	WRTD_OUT_ACTION_TRIG_DEL,
+	WRTD_OUT_ACTION_LOG,
+	WRTD_OUT_ACTION_DISABLE,
+};
 
 enum wrtd_in_variables_indexes {
 	IN_VAR_CHAN_ENABLE = 0,
@@ -121,6 +130,19 @@ enum wrtd_in_structures_indexes {
 	IN_STRUCT_CHAN_3,
 	IN_STRUCT_CHAN_4,
 	__WRTD_IN_STRUCT_MAX,
+};
+enum wrtd_out_variables_indexes {
+	OUT_VAR_DEVICE_TIME_S=0,
+	OUT_VAR_DEVICE_TIME_T,
+	__WRTD_OUT_VAR_MAX,
+};
+enum wrtd_out_structures_indexes {
+	OUT_STRUCT_DEVICE = 0,
+	OUT_STRUCT_CHAN_0,
+	OUT_STRUCT_CHAN_1,
+	OUT_STRUCT_CHAN_2,
+	OUT_STRUCT_CHAN_3,
+	__WRTD_OUT_STRUCT_MAX,
 };
 
 /**
@@ -215,7 +237,12 @@ struct wrtd_trig_id {
 
 
 /**
- * Trigger event
+ * Trigger event. It is shared between the user-space and the
+ * real time application. Those end-point use this structure to share
+ * information.
+ * It should have 32bit fields to avoid toubles with the muck turtle
+ * bit swapping. If not possible on user space you must fix the bit swapping
+ * manually where necessary.
  */
 struct wrtd_trigger_entry {
 	struct wr_timestamp ts; /**< when it fired */
@@ -341,4 +368,128 @@ struct wrtd_in {
 	uint32_t dead_time; /**< TDC dead time, in 8ns ticks */
 };
 
+
+enum wrtd_out_state_machine_steps {
+    OUT_ST_IDLE = 0,
+    OUT_ST_ARMED,
+    OUT_ST_TEST_PENDING,
+    OUT_ST_CONDITION_HIT,
+};
+
+
+/**
+ * Rule defining the behaviour of a trigger output upon reception of a
+ * trigger message with matching ID
+ */
+struct lrt_output_rule {
+	uint32_t delay_cycles; /**< Delay to add to the timestamp enclosed
+				  within the trigger message */
+	uint16_t delay_frac;
+	uint16_t state; /**< State of the rule (empty, disabled,
+			   conditional action, condition, etc.) */
+	uint32_t cond_ptr; /**< index pointing do the condition trigger */
+	uint32_t latency_worst; /**< Worst-case latency (in 8ns ticks)*/
+	uint32_t latency_avg_sum; /**< Average latency accumulator and
+				     number of samples */
+	uint32_t latency_avg_nsamples;
+	uint32_t hits; /**< Number of times the rule has successfully produced
+			  a pulse */
+	uint32_t misses; /**< Number of times the rule has missed a pulse
+			    (for any reason) */
+};
+
+/* Structure describing a single pulse in the Fine Delay software output queue */
+struct pulse_queue_entry {
+/* Trigger that produced the pulse */
+	struct wrtd_trigger_entry trig;
+/* Origin timestamp cycles count (for latency statistics) */
+	int origin_cycles;
+/* Rule that produced the pulse */
+	struct lrt_output_rule *rule;
+};
+
+/* Pulse FIFO for a single Fine Delay output */
+struct lrt_pulse_queue {
+	struct pulse_queue_entry data[FD_MAX_QUEUE_PULSES];
+	int head, tail, count;
+};
+
+struct wrtd_out_trigger {
+	unsigned int flags;
+	struct wrtd_trig_id id; /**< trigger identifier */
+	struct lrt_output_rule ocfg[FD_NUM_CHANNELS]; /**< specific rule
+							 for each channel*/
+};
+#define ENTRY_FLAG_VALID (1 << 0)
+
+struct wrtd_out_channel_stats {
+	uint32_t hits;
+	uint32_t miss_timeout;
+	uint32_t miss_deadtime;
+	uint32_t miss_overflow;
+	uint32_t miss_no_timing;
+
+	struct wrtd_trigger_entry last_executed; /**< Last enqueued trigger
+						    (i.e. the last one that
+						    entered the output queue) */
+	struct wrtd_trigger_entry last_enqueued; /**< Last timestamp value
+						    written to output config */
+	struct wr_timestamp last_programmed; /**< Last timestamp value written
+						to output config */
+	struct wrtd_trigger_entry last_lost;
+};
+
+/**
+ * Channel configuration parameters. It is shared between the user-space and the
+ * real time application. Those end-point use this structure to share
+ * information.
+ * It should have 32bit fields to avoid toubles with the muck turtle
+ * bit swapping. If not possible on user space you must fix the bit swapping
+ * manually where necessary.
+ */
+struct wrtd_out_channel_config {
+	uint32_t state; /**< Arm state */
+	uint32_t mode; /**< Trigger mode */
+	uint32_t flags; /**< Flags (logging, etc) */
+	uint32_t log_level; /**< Current logging level */
+	uint32_t dead_time; /**< Dead time (8ns cycles) */
+	uint32_t width_cycles; /**< Pulse width (8ns cycles) */
+};
+
+struct wrtd_out_channel_private {
+	uint32_t idle; /**< Idle flag */
+	struct lrt_pulse_queue queue; /**< Output pulse queue */
+	struct lrt_output_rule *pending_trig; /**< Pending conditonal trigger */
+	struct wr_timestamp prev_pulse; /**< Last enqueued trigger + delay
+					   (for dead time checking). */
+};
+
+struct wrtd_out_channel {
+	uint32_t base_addr;
+	uint32_t n;
+	struct wrtd_out_channel_stats stats;
+	struct wrtd_out_channel_config config;
+	struct wrtd_out_channel_private priv;
+};
+
+struct wrtd_out {
+	uint32_t counter_loopback;
+	uint32_t counter_etherbone;
+	struct wrtd_trigger_entry last_received;
+};
+
+/**
+ * Hash function, returing the hash table index corresponding to a given
+ * trigger ID
+ */
+static inline int wrtd_hash_func(struct wrtd_trig_id *id)
+{
+    int h = 0;
+
+    h += id->system * 10291;
+    h += id->source_port * 10017;
+    h += id->trigger * 3111;
+
+    return h & (FD_HASH_ENTRIES - 1); // hash table size must be a power of 2
+}
 #endif

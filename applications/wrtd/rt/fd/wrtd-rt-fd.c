@@ -627,7 +627,8 @@ static void filter_trigger(struct wrtd_trigger_entry *trig)
 
 void do_rx(void)
 {
-	struct wrtd_trigger_entry *ent;
+        volatile struct wrtd_trigger_entry *ent;
+	struct wrtd_trigger_entry trig;
 	struct wrtd_trigger_message *msg;
 	int i;
 
@@ -646,7 +647,8 @@ void do_rx(void)
 	/* Check from the loopback */
 	ent = loop_queue_pop();
 	if (ent) {
-		filter_trigger (ent);
+		trig = *ent;
+		filter_trigger (&trig);
 		wrtd_out_device.counter_loopback++;
 	}
 }

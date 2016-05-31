@@ -23,8 +23,9 @@
 #define LOOP_QUEUE_SIZE 16
 
 void loop_queue_init();
-void loop_queue_push(struct wrtd_trig_id *id, uint32_t seq, struct wr_timestamp *ts);
-struct wrtd_trigger_entry *loop_queue_pop();
+void loop_queue_push(struct wrtd_trig_id *id, uint32_t seq,
+		     struct wr_timestamp *ts);
+volatile struct wrtd_trigger_entry *loop_queue_pop(void);
 
 #endif
 

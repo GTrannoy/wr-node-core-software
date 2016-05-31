@@ -19,7 +19,7 @@
 
 #define LOOP_QUEUE_SIZE 16
 
-static SMEM unsigned int head, tail, count;
+static SMEM int head, tail, count;
 static SMEM struct wrtd_trigger_entry buf[16];
 
 void loop_queue_init()
@@ -45,9 +45,9 @@ void loop_queue_push(struct wrtd_trig_id *id, uint32_t seq,
 	smem_atomic_add(&count, 1);
 }
 
-struct wrtd_trigger_entry *loop_queue_pop(void)
+volatile struct wrtd_trigger_entry *loop_queue_pop(void)
 {
-	struct wrtd_trigger_entry *rv;
+	volatile struct wrtd_trigger_entry *rv;
 
 	if (count == 0)
 		return NULL;  /* No entry */

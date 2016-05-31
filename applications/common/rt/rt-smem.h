@@ -22,7 +22,7 @@
 #define SMEM_RANGE_CLEAR	0x40000
 #define SMEM_RANGE_FLIP		0x50000
 
-#define SMEM __attribute__((section(".smem")))
+#define SMEM volatile __attribute__((section(".smem")))
 
 /**
  * Perform an operation on a given pointer. Operation can be performed only

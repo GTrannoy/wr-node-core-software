@@ -19,7 +19,7 @@
 
 #define LOOP_QUEUE_SIZE 16
 
-static SMEM int head, tail, count;
+static SMEM unsigned int head, tail, count;
 static SMEM struct wrtd_trigger_entry buf[16];
 
 void loop_queue_init()

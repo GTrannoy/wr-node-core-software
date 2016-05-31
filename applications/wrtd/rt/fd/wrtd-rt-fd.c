@@ -334,7 +334,7 @@ static int check_output_timeout (struct wrtd_out_channel *out)
 		      pq_ent->trig.id.system,
 		      pq_ent->trig.id.source_port,
 		      pq_ent->trig.id.trigger);
-	    pp_printf("Offending TS: %d:%d",
+	    pp_printf("Offending TS: %"PRIu64":%u",
 		      out->stats.last_programmed.seconds,
 		      out->stats.last_programmed.ticks);
 	}

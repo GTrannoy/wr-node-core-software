@@ -28,7 +28,7 @@
  * Perform an operation on a given pointer. Operation can be performed only
  * on integer variables
  */
-static inline void __smem_atomic_op(int *p, int x, unsigned int range)
+static inline void __smem_atomic_op(volatile int *p, int x, unsigned int range)
 {
 	*(volatile int *)(p + (range >> 2)) = x;
 }
@@ -37,7 +37,7 @@ static inline void __smem_atomic_op(int *p, int x, unsigned int range)
 /**
  * Add x to the value in the shared memory pointed by p
  */
-static inline void smem_atomic_add(int *p, int x)
+static inline void smem_atomic_add(volatile int *p, int x)
 {
 	__smem_atomic_op(p, x, SMEM_RANGE_ADD);
 }
@@ -46,7 +46,7 @@ static inline void smem_atomic_add(int *p, int x)
 /**
  * Subtract x to the value in the shared memory pointed by p
  */
-static inline void smem_atomic_sub(int *p, int x)
+static inline void smem_atomic_sub(volatile int *p, int x)
 {
 	__smem_atomic_op(p, x, SMEM_RANGE_SUB);
 }
@@ -55,7 +55,7 @@ static inline void smem_atomic_sub(int *p, int x)
 /**
  * Do "OR" between x and the value in the shared memory pointed by p
  */
-static inline void smem_atomic_or(int *p, int x)
+static inline void smem_atomic_or(volatile int *p, int x)
 {
 	__smem_atomic_op(p, x, SMEM_RANGE_SET);
 }
@@ -64,7 +64,7 @@ static inline void smem_atomic_or(int *p, int x)
 /**
  * Do "AND ~" between x and the value in the shared memory pointed by p
  */
-static inline void smem_atomic_and_not(int *p, int x)
+static inline void smem_atomic_and_not(volatile int *p, int x)
 {
 	__smem_atomic_op(p, x, SMEM_RANGE_CLEAR);
 }

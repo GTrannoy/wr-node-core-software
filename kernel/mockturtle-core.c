@@ -30,23 +30,23 @@
 
 #include "mockturtle-drv.h"
 
-static int wrnc_dev_uevent(struct device *dev, struct kobj_uevent_env *env)
+static int trtl_dev_uevent(struct device *dev, struct kobj_uevent_env *env)
 {
 	add_uevent_var(env, "DEVMODE=%#o", 0440);
 
 	return 0;
 }
 
-static char *wrnc_devnode(struct device *dev, umode_t *mode)
+static char *trtl_devnode(struct device *dev, umode_t *mode)
 {
-	return kasprintf(GFP_KERNEL, "wr-node-core/%s", dev_name(dev));
+	return kasprintf(GFP_KERNEL, "mockturtle/%s", dev_name(dev));
 }
 
-static struct class wrnc_cdev_class = {
-	.name		= "wr-node-core",
+static struct class trtl_cdev_class = {
+	.name		= "mockturtle",
 	.owner		= THIS_MODULE,
-	.dev_uevent	= wrnc_dev_uevent,
-	.devnode	= wrnc_devnode,
+	.dev_uevent	= trtl_dev_uevent,
+	.devnode	= trtl_devnode,
 };
 
 static dev_t basedev;
@@ -54,28 +54,28 @@ static struct cdev cdev_dev;
 static struct cdev cdev_cpu;
 static struct cdev cdev_hmq;
 
-struct device *minors[WRNC_MAX_MINORS];
+struct device *minors[TRTL_MAX_MINORS];
 
 
 /**
  * It return the first available char device minor for a given type.
  */
-static int wrnc_minor_get(struct device *dev, enum wrnc_dev_type type)
+static int trtl_minor_get(struct device *dev, enum trtl_dev_type type)
 {
 	int i, start, end;
 
 	switch (type) {
-	case WRNC_DEV:
+	case TRTL_DEV:
 		start = 0;
-		end = start + WRNC_MAX_CARRIER;
+		end = start + TRTL_MAX_CARRIER;
 		break;
-	case WRNC_CPU:
-		start = WRNC_MAX_CARRIER;
-		end = start + WRNC_MAX_CPU_MINORS;
+	case TRTL_CPU:
+		start = TRTL_MAX_CARRIER;
+		end = start + TRTL_MAX_CPU_MINORS;
 		break;
-	case WRNC_HMQ:
-		start = WRNC_MAX_CARRIER + WRNC_MAX_CPU_MINORS;
-		end = start + WRNC_MAX_HMQ_MINORS;
+	case TRTL_HMQ:
+		start = TRTL_MAX_CARRIER + TRTL_MAX_CPU_MINORS;
+		end = start + TRTL_MAX_HMQ_MINORS;
 		break;
 	default:
 		return -1;
@@ -95,11 +95,11 @@ static int wrnc_minor_get(struct device *dev, enum wrnc_dev_type type)
 /**
  * It releases the char device minor is use by a given device
  */
-static void wrnc_minor_put(struct device *dev)
+static void trtl_minor_put(struct device *dev)
 {
 	int i;
 
-	for (i = 0; i < WRNC_MAX_CPU_MINORS + WRNC_MAX_HMQ_MINORS; ++i) {
+	for (i = 0; i < TRTL_MAX_CPU_MINORS + TRTL_MAX_HMQ_MINORS; ++i) {
 		if (minors[i] == dev) {
 			minors[i] = NULL;
 			break;
@@ -118,40 +118,40 @@ static void wrnc_minor_put(struct device *dev)
 /**
  * It returns the application ID
  */
-static ssize_t wrnc_show_app_id(struct device *dev,
+static ssize_t trtl_show_app_id(struct device *dev,
 				struct device_attribute *attr,
 				char *buf)
 {
-	struct wrnc_dev *wrnc = to_wrnc_dev(dev);
+	struct trtl_dev *trtl = to_trtl_dev(dev);
 
-	return sprintf(buf, "0x%x\n", wrnc->app_id);
+	return sprintf(buf, "0x%x\n", trtl->app_id);
 }
 
 /**
  * It returns the number of CPU in the FPGA
  */
-static ssize_t wrnc_show_n_cpu(struct device *dev,
+static ssize_t trtl_show_n_cpu(struct device *dev,
 			       struct device_attribute *attr,
 			       char *buf)
 {
-	struct wrnc_dev *wrnc = to_wrnc_dev(dev);
+	struct trtl_dev *trtl = to_trtl_dev(dev);
 
-	return sprintf(buf, "%d\n", wrnc->n_cpu);
+	return sprintf(buf, "%d\n", trtl->n_cpu);
 }
 
 
 /**
  * It returns the current enable status of the CPU
  */
-static ssize_t wrnc_show_enable_mask(struct device *dev,
+static ssize_t trtl_show_enable_mask(struct device *dev,
 				     struct device_attribute *attr,
 				     char *buf)
 {
-	struct wrnc_dev *wrnc = to_wrnc_dev(dev);
-	struct fmc_device *fmc = to_fmc_dev(wrnc);
+	struct trtl_dev *trtl = to_trtl_dev(dev);
+	struct fmc_device *fmc = to_fmc_dev(trtl);
 	uint32_t reg_val;
 
-	reg_val = fmc_readl(fmc, wrnc->base_csr + WRN_CPU_CSR_REG_ENABLE);
+	reg_val = fmc_readl(fmc, trtl->base_csr + WRN_CPU_CSR_REG_ENABLE);
 
 	return sprintf(buf, "0x%04x\n", reg_val);
 }
@@ -159,18 +159,18 @@ static ssize_t wrnc_show_enable_mask(struct device *dev,
 /**
  * It enable or disable the CPU
  */
-static ssize_t wrnc_store_enable_mask(struct device *dev,
+static ssize_t trtl_store_enable_mask(struct device *dev,
 				      struct device_attribute *attr,
 				      const char *buf, size_t count)
 {
-	struct wrnc_dev *wrnc = to_wrnc_dev(dev);
-	struct fmc_device *fmc = to_fmc_dev(wrnc);
+	struct trtl_dev *trtl = to_trtl_dev(dev);
+	struct fmc_device *fmc = to_fmc_dev(trtl);
 	long val;
 
 	if (kstrtol(buf, 16, &val))
 		return -EINVAL;
 
-	fmc_writel(fmc, val, wrnc->base_csr + WRN_CPU_CSR_REG_ENABLE);
+	fmc_writel(fmc, val, trtl->base_csr + WRN_CPU_CSR_REG_ENABLE);
 
 	return count;
 }
@@ -178,15 +178,15 @@ static ssize_t wrnc_store_enable_mask(struct device *dev,
 /**
  * It returns the running status of the CPU
  */
-static ssize_t wrnc_show_reset_mask(struct device *dev,
+static ssize_t trtl_show_reset_mask(struct device *dev,
 				    struct device_attribute *attr,
 				    char *buf)
 {
-	struct wrnc_dev *wrnc = to_wrnc_dev(dev);
-	struct fmc_device *fmc = to_fmc_dev(wrnc);
+	struct trtl_dev *trtl = to_trtl_dev(dev);
+	struct fmc_device *fmc = to_fmc_dev(trtl);
 	uint32_t reg_val;
 
-	reg_val = fmc_readl(fmc, wrnc->base_csr + WRN_CPU_CSR_REG_RESET);
+	reg_val = fmc_readl(fmc, trtl->base_csr + WRN_CPU_CSR_REG_RESET);
 
 	return sprintf(buf, "0x%04x\n", reg_val);
 }
@@ -194,62 +194,62 @@ static ssize_t wrnc_show_reset_mask(struct device *dev,
 /**
  * It run or pause the CPU
  */
-static ssize_t wrnc_store_reset_mask(struct device *dev,
+static ssize_t trtl_store_reset_mask(struct device *dev,
 				     struct device_attribute *attr,
 				     const char *buf, size_t count)
 {
-	struct wrnc_dev *wrnc = to_wrnc_dev(dev);
-	struct fmc_device *fmc = to_fmc_dev(wrnc);
+	struct trtl_dev *trtl = to_trtl_dev(dev);
+	struct fmc_device *fmc = to_fmc_dev(trtl);
 	long val;
 
 	if (kstrtol(buf, 16, &val))
 		return -EINVAL;
 
-	fmc_writel(fmc, val, wrnc->base_csr + WRN_CPU_CSR_REG_RESET);
+	fmc_writel(fmc, val, trtl->base_csr + WRN_CPU_CSR_REG_RESET);
 
 	return count;
 }
 
 
-static ssize_t wrnc_show_smem_op(struct device *dev,
+static ssize_t trtl_show_smem_op(struct device *dev,
 				 struct device_attribute *attr,
 				 char *buf)
 {
-	struct wrnc_dev *wrnc = to_wrnc_dev(dev);
+	struct trtl_dev *trtl = to_trtl_dev(dev);
 
-	return sprintf(buf, "%d", wrnc->mod);
+	return sprintf(buf, "%d", trtl->mod);
 }
 
-static ssize_t wrnc_store_smem_op(struct device *dev,
+static ssize_t trtl_store_smem_op(struct device *dev,
 				  struct device_attribute *attr,
 				  const char *buf, size_t count)
 {
-	struct wrnc_dev *wrnc = to_wrnc_dev(dev);
+	struct trtl_dev *trtl = to_trtl_dev(dev);
 	long val;
 
 	if (kstrtol(buf, 0, &val))
 		return -EINVAL;
 
-	if (val < WRNC_SMEM_DIRECT || val > WRNC_SMEM_ADD) {
-		dev_err(&wrnc->dev, "Unsupported operation %ld\n", val);
+	if (val < TRTL_SMEM_DIRECT || val > TRTL_SMEM_ADD) {
+		dev_err(&trtl->dev, "Unsupported operation %ld\n", val);
 		return -EINVAL;
 	}
 
-	wrnc->mod = val;
+	trtl->mod = val;
 
 	return count;
 }
 
-DEVICE_ATTR(application_id, S_IRUGO, wrnc_show_app_id, NULL);
-DEVICE_ATTR(n_cpu, S_IRUGO, wrnc_show_n_cpu, NULL);
+DEVICE_ATTR(application_id, S_IRUGO, trtl_show_app_id, NULL);
+DEVICE_ATTR(n_cpu, S_IRUGO, trtl_show_n_cpu, NULL);
 DEVICE_ATTR(enable_mask, (S_IRUGO | S_IWUSR),
-	    wrnc_show_enable_mask, wrnc_store_enable_mask);
+	    trtl_show_enable_mask, trtl_store_enable_mask);
 DEVICE_ATTR(reset_mask, (S_IRUGO | S_IWUSR),
-	    wrnc_show_reset_mask, wrnc_store_reset_mask);
+	    trtl_show_reset_mask, trtl_store_reset_mask);
 DEVICE_ATTR(smem_operation, (S_IRUGO | S_IWUSR),
-	    wrnc_show_smem_op, wrnc_store_smem_op);
+	    trtl_show_smem_op, trtl_store_smem_op);
 
-static struct attribute *wrnc_dev_attr[] = {
+static struct attribute *trtl_dev_attr[] = {
 	&dev_attr_application_id.attr,
 	&dev_attr_n_cpu.attr,
 	&dev_attr_enable_mask.attr,
@@ -257,12 +257,12 @@ static struct attribute *wrnc_dev_attr[] = {
 	NULL,
 };
 
-static const struct attribute_group wrnc_dev_group = {
-	.attrs = wrnc_dev_attr,
+static const struct attribute_group trtl_dev_group = {
+	.attrs = trtl_dev_attr,
 };
 
-static const struct attribute_group *wrnc_dev_groups[] = {
-	&wrnc_dev_group,
+static const struct attribute_group *trtl_dev_groups[] = {
+	&trtl_dev_group,
 	NULL,
 };
 
@@ -277,7 +277,7 @@ static const struct attribute_group *wrnc_dev_groups[] = {
 /**
  * Things to do after device release
  */
-static void wrnc_dev_release(struct device *dev)
+static void trtl_dev_release(struct device *dev)
 {
 
 }
@@ -285,42 +285,42 @@ static void wrnc_dev_release(struct device *dev)
 /**
  * ioctl command to read/write shared memory
  */
-static long wrnc_ioctl_io(struct wrnc_dev *wrnc, void __user *uarg)
+static long trtl_ioctl_io(struct trtl_dev *trtl, void __user *uarg)
 {
-	struct fmc_device *fmc = to_fmc_dev(wrnc);
-	struct wrnc_smem_io io;
+	struct fmc_device *fmc = to_fmc_dev(trtl);
+	struct trtl_smem_io io;
 	uint32_t addr;
 	int err;
 
 	/* Copy the message from user space*/
-	err = copy_from_user(&io, uarg, sizeof(struct wrnc_smem_io));
+	err = copy_from_user(&io, uarg, sizeof(struct trtl_smem_io));
 	if (err)
 		return err;
 
 	if (io.is_input) {
 		/* read */
-		addr = wrnc->base_smem + io.addr;
+		addr = trtl->base_smem + io.addr;
 	} else {
-		fmc_writel(fmc, io.mod, wrnc->base_csr + WRN_CPU_CSR_REG_SMEM_OP);
+		fmc_writel(fmc, io.mod, trtl->base_csr + WRN_CPU_CSR_REG_SMEM_OP);
 		/* write */
-		addr = wrnc->base_smem + io.addr;
+		addr = trtl->base_smem + io.addr;
 		fmc_writel(fmc, io.value, addr);
 	}
 
 	/* read value from SMEM */
 	io.value = fmc_readl(fmc, addr);
 
-	return copy_to_user(uarg, &io, sizeof(struct wrnc_smem_io));
+	return copy_to_user(uarg, &io, sizeof(struct trtl_smem_io));
 }
 
-static long wrnc_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
+static long trtl_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
-	struct wrnc_dev *wrnc = f->private_data;
+	struct trtl_dev *trtl = f->private_data;
 	void __user *uarg = (void __user *)arg;
 	int err = 0;
 
 	/* Check type and command number */
-	if (_IOC_TYPE(cmd) != WRNC_IOCTL_MAGIC)
+	if (_IOC_TYPE(cmd) != TRTL_IOCTL_MAGIC)
 		return -ENOTTY;
 
 	/* Validate user pointer */
@@ -333,8 +333,8 @@ static long wrnc_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 
 	/* Perform commands */
 	switch (cmd) {
-	case WRNC_IOCTL_SMEM_IO:
-		err = wrnc_ioctl_io(wrnc, uarg);
+	case TRTL_IOCTL_SMEM_IO:
+		err = trtl_ioctl_io(trtl, uarg);
 		break;
 	default:
 		pr_warn("ual: invalid ioctl command %d\n", cmd);
@@ -347,26 +347,26 @@ static long wrnc_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 /**
  * It writes on the shared memory
  */
-static ssize_t wrnc_write(struct file *f, const char __user *buf,
+static ssize_t trtl_write(struct file *f, const char __user *buf,
 			  size_t count, loff_t *offp)
 {
-	struct wrnc_dev *wrnc = f->private_data;
-	struct fmc_device *fmc = to_fmc_dev(wrnc);
+	struct trtl_dev *trtl = f->private_data;
+	struct fmc_device *fmc = to_fmc_dev(trtl);
 	uint32_t val, addr;
 	int err, i;
 
-	if (*offp + count >= WRNC_SMEM_MAX_SIZE)
+	if (*offp + count >= TRTL_SMEM_MAX_SIZE)
 		return -EINVAL;
 	if (*offp % 4 || count % 4) {
-		dev_warn(&wrnc->dev, "Only word size access allowed\n");
+		dev_warn(&trtl->dev, "Only word size access allowed\n");
 		return -EINVAL;
 	}
 
-	addr = wrnc->base_smem + (wrnc->mod * WRNC_SMEM_MAX_SIZE) + *offp;
+	addr = trtl->base_smem + (trtl->mod * TRTL_SMEM_MAX_SIZE) + *offp;
 	for (i = 0; i < count; i += 4) {
 		err = copy_from_user(&val, buf + i, 4);
 		if (err) {
-			dev_err(&wrnc->dev,
+			dev_err(&trtl->dev,
 				"Incomplete write on shared memory addr 0x%llx size %zu\n",
 				*offp, count);
 			return -EFAULT;
@@ -383,22 +383,22 @@ static ssize_t wrnc_write(struct file *f, const char __user *buf,
 /**
  * It reads from the shared memory
  */
-static ssize_t wrnc_read(struct file *f, char __user *buf,
+static ssize_t trtl_read(struct file *f, char __user *buf,
 			 size_t count, loff_t *offp)
 {
-	struct wrnc_dev *wrnc = f->private_data;
-	struct fmc_device *fmc = to_fmc_dev(wrnc);
+	struct trtl_dev *trtl = f->private_data;
+	struct fmc_device *fmc = to_fmc_dev(trtl);
 	uint32_t val, addr;
 	int err, i;
 
-	if (*offp + count >= WRNC_SMEM_MAX_SIZE)
+	if (*offp + count >= TRTL_SMEM_MAX_SIZE)
 		return -EINVAL;
 	if (*offp % 4 || count % 4) {
-		dev_warn(&wrnc->dev, "Only word size access allowed\n");
+		dev_warn(&trtl->dev, "Only word size access allowed\n");
 		return -EINVAL;
 	}
 
-	addr = wrnc->base_smem + *offp;
+	addr = trtl->base_smem + *offp;
 	for (i = 0; i < count; i += 4) {
 		val = fmc_readl(fmc,  addr + i);
 		err = copy_to_user(buf + i, &val, 4);
@@ -415,22 +415,22 @@ static ssize_t wrnc_read(struct file *f, char __user *buf,
 /**
  * Open the char device on the top of the hierarchy
  */
-static int wrnc_dev_simple_open(struct inode *inode, struct file *file)
+static int trtl_dev_simple_open(struct inode *inode, struct file *file)
 {
 	int m = iminor(inode);
 
-	file->private_data = to_wrnc_dev(minors[m]);
+	file->private_data = to_trtl_dev(minors[m]);
 
 	return 0;
 }
 
-static const struct file_operations wrnc_dev_fops = {
+static const struct file_operations trtl_dev_fops = {
 	.owner = THIS_MODULE,
-	.open  = wrnc_dev_simple_open,
-	.read = wrnc_read,
-	.write = wrnc_write,
+	.open  = trtl_dev_simple_open,
+	.read = trtl_read,
+	.write = trtl_write,
 	.llseek = generic_file_llseek,
-	.unlocked_ioctl = wrnc_ioctl,
+	.unlocked_ioctl = trtl_ioctl,
 };
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -440,46 +440,46 @@ static const struct file_operations wrnc_dev_fops = {
 /**
  * Things to do after CPU device release
  */
-static void wrnc_cpu_release(struct device *dev)
+static void trtl_cpu_release(struct device *dev)
 {
-	/*wrnc_minor_put(dev);*/
+	/*trtl_minor_put(dev);*/
 }
 
 /**
  * Things to do after HMQ device release
  */
-static void wrnc_hmq_release(struct device *dev)
+static void trtl_hmq_release(struct device *dev)
 {
-	struct wrnc_hmq *hmq = to_wrnc_hmq(dev);
-	/*wrnc_minor_put(dev);*/
+	struct trtl_hmq *hmq = to_trtl_hmq(dev);
+	/*trtl_minor_put(dev);*/
 	kfree(hmq->buf.mem);
 }
 
-#define WRNC_SLOT_CFG(_name, _val)                          \
+#define TRTL_SLOT_CFG(_name, _val)                          \
 	(1 << ((_val & MQUEUE_SLOT_STATUS_LOG2_##_name##_MASK) \
 	       >> MQUEUE_SLOT_STATUS_LOG2_##_name##_SHIFT))
 /**
  * It initializes and registers a HMQ device
  */
-static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
+static int trtl_probe_hmq(struct trtl_dev *trtl, unsigned int slot,
 			  unsigned int is_input)
 {
-	struct fmc_device *fmc = to_fmc_dev(wrnc);
-	struct wrnc_hmq *hmq;
+	struct fmc_device *fmc = to_fmc_dev(trtl);
+	struct trtl_hmq *hmq;
 	uint32_t val;
 	int err;
 
-	hmq = is_input ? &wrnc->hmq_in[slot] : &wrnc->hmq_out[slot];
+	hmq = is_input ? &trtl->hmq_in[slot] : &trtl->hmq_out[slot];
 
 	hmq->index = slot;
 	if (hmq_shared)
-		hmq->flags |= WRNC_FLAG_HMQ_SHR_USR;
+		hmq->flags |= TRTL_FLAG_HMQ_SHR_USR;
 
-	err = wrnc_minor_get(&hmq->dev, WRNC_HMQ);
+	err = trtl_minor_get(&hmq->dev, TRTL_HMQ);
 	if (err)
 		return err;
 
-	err = dev_set_name(&hmq->dev, "wrnc-%04x-hmq-%c-%02d",
+	err = dev_set_name(&hmq->dev, "trtl-%04x-hmq-%c-%02d",
 			   fmc->device_id, is_input ? 'i':'o', hmq->index);
 	if (err)
 		return err;
@@ -493,10 +493,10 @@ static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
 		return -ENOMEM;
 
 	init_waitqueue_head(&hmq->q_msg);
-	hmq->dev.class = &wrnc_cdev_class;
-	hmq->dev.parent = &wrnc->dev;
-	hmq->dev.groups = wrnc_hmq_groups;
-	hmq->dev.release = wrnc_hmq_release;
+	hmq->dev.class = &trtl_cdev_class;
+	hmq->dev.parent = &trtl->dev;
+	hmq->dev.groups = trtl_hmq_groups;
+	hmq->dev.release = trtl_hmq_release;
 	err = device_register(&hmq->dev);
 	if (err) {
 		kfree(hmq->buf.mem);
@@ -509,16 +509,16 @@ static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
 	INIT_LIST_HEAD(&hmq->list_usr);
 
 	if (is_input) { /* CPU input */
-		hmq->flags |= WRNC_FLAG_HMQ_DIR;
-		hmq->base_sr = wrnc->base_hmq +	MQUEUE_BASE_IN(slot);
+		hmq->flags |= TRTL_FLAG_HMQ_DIR;
+		hmq->base_sr = trtl->base_hmq +	MQUEUE_BASE_IN(slot);
 	} else { /* CPU output */
-		hmq->base_sr = wrnc->base_hmq +	MQUEUE_BASE_OUT(slot);
+		hmq->base_sr = trtl->base_hmq +	MQUEUE_BASE_OUT(slot);
 	}
 
 	/* Get HMQ dimensions */
 	val = fmc_readl(fmc, hmq->base_sr + MQUEUE_SLOT_STATUS);
-	hmq->max_width = WRNC_SLOT_CFG(WIDTH, val);
-	hmq->max_depth = WRNC_SLOT_CFG(ENTRIES, val);
+	hmq->max_width = TRTL_SLOT_CFG(WIDTH, val);
+	hmq->max_depth = TRTL_SLOT_CFG(ENTRIES, val);
 	hmq->buf.max_msg_size = hmq->max_width * 4;
 
 	dev_dbg(&hmq->dev, " 0x%x -> %d %d\n",
@@ -534,123 +534,123 @@ static int wrnc_probe_hmq(struct wrnc_dev *wrnc, unsigned int slot,
 /**
  * It initialize the WRNC device (device, CPUs, HMQs)
  */
-int wrnc_probe(struct fmc_device *fmc)
+int trtl_probe(struct fmc_device *fmc)
 {
-	struct wrnc_dev *wrnc;
+	struct trtl_dev *trtl;
 	char tmp_name[128];
 	int err, i;
 	uint32_t tmp;
 
 	/* Create a WRNC instance */
-	wrnc = devm_kzalloc(&fmc->dev, sizeof(struct wrnc_dev), GFP_KERNEL);
-	if (!wrnc)
+	trtl = devm_kzalloc(&fmc->dev, sizeof(struct trtl_dev), GFP_KERNEL);
+	if (!trtl)
 		return -ENOMEM;
-	fmc_set_drvdata(fmc, wrnc);
+	fmc_set_drvdata(fmc, trtl);
 
 	err = fmc_scan_sdb_tree(fmc, 0x0);
 	if (err < 0 && err != -EBUSY) {
 		dev_err(fmc->hwdev, "SDB is missing\n");
 		return err;
 	}
-	wrnc->base_core = fmc_find_sdb_device(fmc->sdb, 0xce42, 0x90de, NULL);
+	trtl->base_core = fmc_find_sdb_device(fmc->sdb, 0xce42, 0x90de, NULL);
 	/* FIXME use SDB - <base> + <CSR offset> */
-	wrnc->base_csr  = wrnc->base_core + 0xC000;
-	wrnc->base_smem = wrnc->base_core + 0x10000;
-	wrnc->base_hmq  = wrnc->base_core + BASE_HMQ;
-	wrnc->base_gcr  = wrnc->base_hmq + MQUEUE_BASE_GCR;
+	trtl->base_csr  = trtl->base_core + 0xC000;
+	trtl->base_smem = trtl->base_core + 0x10000;
+	trtl->base_hmq  = trtl->base_core + BASE_HMQ;
+	trtl->base_gcr  = trtl->base_hmq + MQUEUE_BASE_GCR;
 
 	/* Register the device */
-	err = dev_set_name(&wrnc->dev, "wrnc-%04x", fmc->device_id);
+	err = dev_set_name(&trtl->dev, "trtl-%04x", fmc->device_id);
 	if (err)
 		return err;
-	err = wrnc_minor_get(&wrnc->dev, WRNC_DEV);
+	err = trtl_minor_get(&trtl->dev, TRTL_DEV);
 	if (err)
 		return err;
-	wrnc->dev.class = &wrnc_cdev_class;
-	wrnc->dev.parent = &fmc->dev;
-	wrnc->dev.groups = wrnc_dev_groups;
-	wrnc->dev.release = wrnc_dev_release;
-	err = device_register(&wrnc->dev);
+	trtl->dev.class = &trtl_cdev_class;
+	trtl->dev.parent = &fmc->dev;
+	trtl->dev.groups = trtl_dev_groups;
+	trtl->dev.release = trtl_dev_release;
+	err = device_register(&trtl->dev);
 	if (err)
 		return err;
 
-	wrnc->dbg_dir = debugfs_create_dir(dev_name(&wrnc->dev), NULL);
-	if (IS_ERR_OR_NULL(wrnc->dbg_dir)) {
+	trtl->dbg_dir = debugfs_create_dir(dev_name(&trtl->dev), NULL);
+	if (IS_ERR_OR_NULL(trtl->dbg_dir)) {
 		pr_err("UAL: Cannot create debugfs\n");
-		err = PTR_ERR(wrnc->dbg_dir);
+		err = PTR_ERR(trtl->dbg_dir);
 		goto out_dbg;
 	}
 
 
 	/* Get the Application ID */
-	wrnc->app_id = fmc_readl(fmc, wrnc->base_csr + WRN_CPU_CSR_REG_APP_ID);
-	dev_info(&fmc->dev, "Application ID: 0x%08x\n", wrnc->app_id);
+	trtl->app_id = fmc_readl(fmc, trtl->base_csr + WRN_CPU_CSR_REG_APP_ID);
+	dev_info(&fmc->dev, "Application ID: 0x%08x\n", trtl->app_id);
 
 	/* Get and check the number of COREs */
-	wrnc->n_cpu = fmc_readl(fmc,
-				wrnc->base_csr + WRN_CPU_CSR_REG_CORE_COUNT);
-	if (wrnc->n_cpu < 1 || wrnc->n_cpu > WRNC_MAX_CPU) {
-		dev_err(&fmc->dev, "invalid number of CPU (%d)\n", wrnc->n_cpu);
+	trtl->n_cpu = fmc_readl(fmc,
+				trtl->base_csr + WRN_CPU_CSR_REG_CORE_COUNT);
+	if (trtl->n_cpu < 1 || trtl->n_cpu > TRTL_MAX_CPU) {
+		dev_err(&fmc->dev, "invalid number of CPU (%d)\n", trtl->n_cpu);
 		err = -EINVAL;
 		goto out_n_cpu;
 	}
-	dev_info(&fmc->dev, "Detected %d CPUs\n", wrnc->n_cpu);
+	dev_info(&fmc->dev, "Detected %d CPUs\n", trtl->n_cpu);
 
 	/* Pause all CPUs */
-	wrnc_cpu_enable_set(wrnc, (1 << wrnc->n_cpu) - 1);
+	trtl_cpu_enable_set(trtl, (1 << trtl->n_cpu) - 1);
 	/* Reset all CPUs */
-	wrnc_cpu_reset_set(wrnc, (1 << wrnc->n_cpu) - 1);
+	trtl_cpu_reset_set(trtl, (1 << trtl->n_cpu) - 1);
 
 	/* Configure CPUs */
-	for (i = 0; i < wrnc->n_cpu; ++i) {
-		wrnc->cpu[i].index = i;
-		spin_lock_init(&wrnc->cpu[i].lock);
+	for (i = 0; i < trtl->n_cpu; ++i) {
+		trtl->cpu[i].index = i;
+		spin_lock_init(&trtl->cpu[i].lock);
 
-		err = wrnc_minor_get(&wrnc->cpu[i].dev, WRNC_CPU);
+		err = trtl_minor_get(&trtl->cpu[i].dev, TRTL_CPU);
 		if (err)
 			goto out_cpu;
-		err = dev_set_name(&wrnc->cpu[i].dev, "wrnc-%04x-cpu-%02d",
-				   fmc->device_id, wrnc->cpu[i].index);
+		err = dev_set_name(&trtl->cpu[i].dev, "trtl-%04x-cpu-%02d",
+				   fmc->device_id, trtl->cpu[i].index);
 		if (err)
 			goto out_cpu;
-		wrnc->cpu[i].dev.class = &wrnc_cdev_class;
-		wrnc->cpu[i].dev.parent = &wrnc->dev;
-		wrnc->cpu[i].dev.groups = wrnc_cpu_groups;
-		wrnc->cpu[i].dev.release = wrnc_cpu_release;
-		err = device_register(&wrnc->cpu[i].dev);
+		trtl->cpu[i].dev.class = &trtl_cdev_class;
+		trtl->cpu[i].dev.parent = &trtl->dev;
+		trtl->cpu[i].dev.groups = trtl_cpu_groups;
+		trtl->cpu[i].dev.release = trtl_cpu_release;
+		err = device_register(&trtl->cpu[i].dev);
 		if (err)
 			goto out_cpu;
-		snprintf(tmp_name, 128, "%s-dbg", dev_name(&wrnc->cpu[i].dev));
-		wrnc->cpu[i].dbg_msg = debugfs_create_file(tmp_name, 0444,
-							   wrnc->dbg_dir,
-							   &wrnc->cpu[i],
-							   &wrnc_cpu_dbg_fops);
-		if (IS_ERR_OR_NULL(wrnc->cpu[i].dbg_msg))
-			dev_err(&wrnc->cpu[i].dev, "Cannot create debug interface\n");
+		snprintf(tmp_name, 128, "%s-dbg", dev_name(&trtl->cpu[i].dev));
+		trtl->cpu[i].dbg_msg = debugfs_create_file(tmp_name, 0444,
+							   trtl->dbg_dir,
+							   &trtl->cpu[i],
+							   &trtl_cpu_dbg_fops);
+		if (IS_ERR_OR_NULL(trtl->cpu[i].dbg_msg))
+			dev_err(&trtl->cpu[i].dev, "Cannot create debug interface\n");
 	}
 
 	/* Get and check the number of HMQ slots */
-	tmp = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_SLOT_COUNT);
-	wrnc->n_hmq_in = tmp & MQUEUE_GCR_SLOT_COUNT_N_IN_MASK;
-	wrnc->n_hmq_out = (tmp & MQUEUE_GCR_SLOT_COUNT_N_OUT_MASK) >>
+	tmp = fmc_readl(fmc, trtl->base_gcr + MQUEUE_GCR_SLOT_COUNT);
+	trtl->n_hmq_in = tmp & MQUEUE_GCR_SLOT_COUNT_N_IN_MASK;
+	trtl->n_hmq_out = (tmp & MQUEUE_GCR_SLOT_COUNT_N_OUT_MASK) >>
 		MQUEUE_GCR_SLOT_COUNT_N_OUT_SHIFT;
-	if (wrnc->n_hmq_in + wrnc->n_hmq_out >= WRNC_MAX_HMQ_SLOT) {
-		dev_err(&fmc->dev, "wrnc: invalid number of HMQ slots (in %d out %d)\n",
-			 wrnc->n_hmq_in, wrnc->n_hmq_out);
+	if (trtl->n_hmq_in + trtl->n_hmq_out >= TRTL_MAX_HMQ_SLOT) {
+		dev_err(&fmc->dev, "trtl: invalid number of HMQ slots (in %d out %d)\n",
+			 trtl->n_hmq_in, trtl->n_hmq_out);
 		err = -EINVAL;
 		goto out_n_slot;
 	}
 	dev_info(&fmc->dev, "Detected slots: %d input, %d output\n",
-		wrnc->n_hmq_in, wrnc->n_hmq_out);
+		trtl->n_hmq_in, trtl->n_hmq_out);
 
 	/* Configure slots */
-	for (i = 0; i < wrnc->n_hmq_in; ++i) {
-		err = wrnc_probe_hmq(wrnc, i, 1);
+	for (i = 0; i < trtl->n_hmq_in; ++i) {
+		err = trtl_probe_hmq(trtl, i, 1);
 		if (err)
 			goto out_hmq_in;
 	}
-	for (i = 0; i <  wrnc->n_hmq_out; ++i) {
-		err = wrnc_probe_hmq(wrnc, i, 0);
+	for (i = 0; i <  trtl->n_hmq_out; ++i) {
+		err = trtl_probe_hmq(trtl, i, 0);
 		if (err)
 			goto out_hmq_out;
 	}
@@ -659,35 +659,35 @@ int wrnc_probe(struct fmc_device *fmc)
 	 * Great everything is configured properly, we can enable the interrupts
 	 * now and start working.
 	 */
-	fmc->irq = wrnc->base_core;
-	err = fmc_irq_request(fmc, wrnc_irq_handler,
-			      (char *)dev_name(&wrnc->dev),
+	fmc->irq = trtl->base_core;
+	err = fmc_irq_request(fmc, trtl_irq_handler,
+			      (char *)dev_name(&trtl->dev),
 			      0 /*VIC is used */);
 	if (err) {
-		dev_err(&wrnc->dev,
+		dev_err(&trtl->dev,
 			"Cannot request IRQ 0x%x - we'll not receive/send messages\n",
 			fmc->irq);
 	}
 
 	/* Enable only necessary interrupts */
-	wrnc->irq_mask = 0;
-	if (wrnc->n_hmq_out)
-		wrnc->irq_mask |= (((1 << wrnc->n_hmq_out) - 1)
+	trtl->irq_mask = 0;
+	if (trtl->n_hmq_out)
+		trtl->irq_mask |= (((1 << trtl->n_hmq_out) - 1)
 				   << MQUEUE_GCR_IRQ_MASK_OUT_SHIFT);
 
-	fmc_writel(fmc, wrnc->irq_mask, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
-	tmp = fmc_readl(fmc, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
+	fmc_writel(fmc, trtl->irq_mask, trtl->base_gcr + MQUEUE_GCR_IRQ_MASK);
+	tmp = fmc_readl(fmc, trtl->base_gcr + MQUEUE_GCR_IRQ_MASK);
 
 	/* Enable debug interrupts */
-	fmc->irq = wrnc->base_core + 1;
+	fmc->irq = trtl->base_core + 1;
 
 	/* Enable debug interface interrupts only when we have space
 	   to store it */
-	err = fmc_irq_request(fmc,  wrnc_irq_handler_debug,
-			      (char *)dev_name(&wrnc->cpu[i].dev),
+	err = fmc_irq_request(fmc,  trtl_irq_handler_debug,
+			      (char *)dev_name(&trtl->cpu[i].dev),
 			      0 /*VIC is used */);
 	if (err) {
-		dev_err(&wrnc->dev,
+		dev_err(&trtl->dev,
 			"Cannot request IRQ 0x%x - we'll not receive debug messages\n",
 			fmc->irq);
 	}
@@ -695,8 +695,8 @@ int wrnc_probe(struct fmc_device *fmc)
 	if (dbg_max_msg > 0) {
 		/* Enable interrupts only when we have a buffere where
 		   store messages */
-		fmc_writel(fmc, 0xFFFFFFFF/*(wrnc->n_cpu - 1)*/,
-			   wrnc->base_csr + WRN_CPU_CSR_REG_DBG_IMSK);
+		fmc_writel(fmc, 0xFFFFFFFF/*(trtl->n_cpu - 1)*/,
+			   trtl->base_csr + WRN_CPU_CSR_REG_DBG_IMSK);
 	}
 
 	/* Pin the carrier */
@@ -707,53 +707,53 @@ int wrnc_probe(struct fmc_device *fmc)
 out_mod:
 out_hmq_out:
 	while (--i)
-		device_unregister(&wrnc->hmq_out[i].dev);
-	i = wrnc->n_hmq_out;
+		device_unregister(&trtl->hmq_out[i].dev);
+	i = trtl->n_hmq_out;
 out_hmq_in:
 	while (--i)
-		device_unregister(&wrnc->hmq_in[i].dev);
+		device_unregister(&trtl->hmq_in[i].dev);
 out_n_slot:
-	i = wrnc->n_cpu;
+	i = trtl->n_cpu;
 out_cpu:
 	while (--i)
-		device_unregister(&wrnc->cpu[i].dev);
+		device_unregister(&trtl->cpu[i].dev);
 out_n_cpu:
-	debugfs_remove_recursive(wrnc->dbg_dir);
+	debugfs_remove_recursive(trtl->dbg_dir);
 out_dbg:
-	device_unregister(&wrnc->dev);
+	device_unregister(&trtl->dev);
 	return err;
 }
 
 /**
  * It remove the WRNC device (device, CPUs, HMQs) and free irq handler
  */
-int wrnc_remove(struct fmc_device *fmc)
+int trtl_remove(struct fmc_device *fmc)
 {
-	struct wrnc_dev *wrnc = fmc_get_drvdata(fmc);
+	struct trtl_dev *trtl = fmc_get_drvdata(fmc);
 	int i;
 
-	fmc_writel(fmc, 0x0, wrnc->base_gcr + MQUEUE_GCR_IRQ_MASK);
-	fmc->irq = wrnc->base_core;
+	fmc_writel(fmc, 0x0, trtl->base_gcr + MQUEUE_GCR_IRQ_MASK);
+	fmc->irq = trtl->base_core;
 	fmc_irq_free(fmc);
 
-	fmc_writel(fmc, 0x0, wrnc->base_csr + WRN_CPU_CSR_REG_DBG_IMSK);
-	fmc->irq = wrnc->base_core + 1;
+	fmc_writel(fmc, 0x0, trtl->base_csr + WRN_CPU_CSR_REG_DBG_IMSK);
+	fmc->irq = trtl->base_core + 1;
 	fmc_irq_free(fmc);
 
-	debugfs_remove_recursive(wrnc->dbg_dir);
+	debugfs_remove_recursive(trtl->dbg_dir);
 
-	for (i = 0; i < wrnc->n_cpu; ++i)
-		device_unregister(&wrnc->cpu[i].dev);
+	for (i = 0; i < trtl->n_cpu; ++i)
+		device_unregister(&trtl->cpu[i].dev);
 
-	for (i = 0; i < wrnc->n_hmq_in; ++i)
-		device_unregister(&wrnc->hmq_in[i].dev);
+	for (i = 0; i < trtl->n_hmq_in; ++i)
+		device_unregister(&trtl->hmq_in[i].dev);
 
-	for (i = 0; i < wrnc->n_hmq_out; ++i)
-		device_unregister(&wrnc->hmq_out[i].dev);
+	for (i = 0; i < trtl->n_hmq_out; ++i)
+		device_unregister(&trtl->hmq_out[i].dev);
 
 	/* FIXME cannot explain why, but without sleep the _kernel_ crash */
 	msleep(50);
-	device_unregister(&wrnc->dev);
+	device_unregister(&trtl->dev);
 
 	/* Release the carrier */
 	module_put(fmc->owner);
@@ -765,20 +765,20 @@ int wrnc_remove(struct fmc_device *fmc)
 /**
  * List of device to match.
  */
-static struct fmc_fru_id wrnc_fru_id[] = {
+static struct fmc_fru_id trtl_fru_id[] = {
 	{
 		.product_name = "wr-node-core"
 	},
 };
 
-static struct fmc_driver wrnc_dev_drv = {
+static struct fmc_driver trtl_dev_drv = {
 	.version = FMC_VERSION,
 	.driver.name = KBUILD_MODNAME,
-	.probe = wrnc_probe,
-	.remove = wrnc_remove,
+	.probe = trtl_probe,
+	.remove = trtl_remove,
 	.id_table = {
-		.fru_id = wrnc_fru_id,
-		.fru_id_nr = ARRAY_SIZE(wrnc_fru_id),
+		.fru_id = trtl_fru_id,
+		.fru_id_nr = ARRAY_SIZE(trtl_fru_id),
 	},
 };
 
@@ -786,51 +786,51 @@ static struct fmc_driver wrnc_dev_drv = {
 /**
  * Allocate resources for the driver. Char devices and FMC driver
  */
-static int wrnc_init(void)
+static int trtl_init(void)
 {
 	int err, i;
 
-	for (i = 0; i < WRNC_MAX_CPU_MINORS; ++i)
+	for (i = 0; i < TRTL_MAX_CPU_MINORS; ++i)
 		minors[i] = NULL;
 
-	err = class_register(&wrnc_cdev_class);
+	err = class_register(&trtl_cdev_class);
 	if (err) {
 		pr_err("%s: unable to register class\n", __func__);
 		return err;
 	}
 
 	/* Allocate a char device region for devices, CPUs and slots */
-	err = alloc_chrdev_region(&basedev, 0, WRNC_MAX_MINORS, "wrnc");
+	err = alloc_chrdev_region(&basedev, 0, TRTL_MAX_MINORS, "trtl");
 	if (err) {
 		pr_err("%s: unable to allocate region for %i minors\n",
-		       __func__, WRNC_MAX_CPU_MINORS);
+		       __func__, TRTL_MAX_CPU_MINORS);
 		goto out_all;
 	}
 
 	/* Register the device char-device */
-	cdev_init(&cdev_dev, &wrnc_dev_fops);
+	cdev_init(&cdev_dev, &trtl_dev_fops);
 	cdev_dev.owner = THIS_MODULE;
-	err = cdev_add(&cdev_dev, basedev, WRNC_MAX_CARRIER);
+	err = cdev_add(&cdev_dev, basedev, TRTL_MAX_CARRIER);
 	if (err)
 		goto out_cdev_dev;
 	/* Register the cpu char-device */
-	cdev_init(&cdev_cpu, &wrnc_cpu_fops);
+	cdev_init(&cdev_cpu, &trtl_cpu_fops);
 	cdev_cpu.owner = THIS_MODULE;
-	err = cdev_add(&cdev_cpu, basedev + WRNC_MAX_CARRIER,
-		       WRNC_MAX_CPU_MINORS);
+	err = cdev_add(&cdev_cpu, basedev + TRTL_MAX_CARRIER,
+		       TRTL_MAX_CPU_MINORS);
 	if (err)
 		goto out_cdev_cpu;
 	/* Register the hmq char-device */
-	cdev_init(&cdev_hmq, &wrnc_hmq_fops);
+	cdev_init(&cdev_hmq, &trtl_hmq_fops);
 	cdev_cpu.owner = THIS_MODULE;
 	err = cdev_add(&cdev_hmq,
-		       basedev + WRNC_MAX_CARRIER + WRNC_MAX_CPU_MINORS,
-		       WRNC_MAX_HMQ_MINORS);
+		       basedev + TRTL_MAX_CARRIER + TRTL_MAX_CPU_MINORS,
+		       TRTL_MAX_HMQ_MINORS);
 	if (err)
 		goto out_cdev_hmq;
 
 	/* Register the FMC driver */
-	err = fmc_driver_register(&wrnc_dev_drv);
+	err = fmc_driver_register(&trtl_dev_drv);
 	if (err)
 		goto out_reg;
 
@@ -843,9 +843,9 @@ out_cdev_hmq:
 out_cdev_cpu:
 	cdev_del(&cdev_dev);
 out_cdev_dev:
-	unregister_chrdev_region(basedev, WRNC_MAX_MINORS);
+	unregister_chrdev_region(basedev, TRTL_MAX_MINORS);
 out_all:
-	class_unregister(&wrnc_cdev_class);
+	class_unregister(&trtl_cdev_class);
 	return err;
 }
 
@@ -853,20 +853,20 @@ out_all:
 /**
  * Undo all the resource allocations
  */
-static void wrnc_exit(void)
+static void trtl_exit(void)
 {
-	fmc_driver_unregister(&wrnc_dev_drv);
+	fmc_driver_unregister(&trtl_dev_drv);
 	cdev_del(&cdev_cpu);
 	unregister_chrdev_region(basedev,
-				 WRNC_MAX_CPU_MINORS + WRNC_MAX_HMQ_MINORS);
-	class_unregister(&wrnc_cdev_class);
+				 TRTL_MAX_CPU_MINORS + TRTL_MAX_HMQ_MINORS);
+	class_unregister(&trtl_cdev_class);
 }
 
-module_init(wrnc_init);
-module_exit(wrnc_exit);
+module_init(trtl_init);
+module_exit(trtl_exit);
 
 MODULE_AUTHOR("Federico Vaga <federico.vaga@cern.ch>");
-MODULE_DESCRIPTION("White Rabbit Node Core Linux Driver");
+MODULE_DESCRIPTION("Mock Turtle Linux Driver");
 MODULE_LICENSE("GPL v2");
 MODULE_VERSION(GIT_VERSION);
 

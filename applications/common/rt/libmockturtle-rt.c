@@ -27,8 +27,8 @@ void rt_memcpy(uint32_t *dest, uint32_t *src, size_t n)
 /**
  * it sets a structure coming from the host
  */
-int rt_structure_setter(struct wrnc_proto_header *hin, void *pin,
-			struct wrnc_proto_header *hout, void *pout)
+int rt_structure_setter(struct trtl_proto_header *hin, void *pin,
+			struct trtl_proto_header *hout, void *pout)
 {
 	unsigned int offset = 0, index, size;
 	uint32_t *din = pin;
@@ -60,7 +60,7 @@ int rt_structure_setter(struct wrnc_proto_header *hin, void *pin,
 
 	/* Return back new values. Host can compare with what it sent
 	   to spot errors */
-	if (hin->flags & WRNC_PROTO_FLAG_SYNC)
+	if (hin->flags & TRTL_PROTO_FLAG_SYNC)
 		return rt_structure_getter(hin, pin, hout, pout);
 
 	return 0;
@@ -70,8 +70,8 @@ int rt_structure_setter(struct wrnc_proto_header *hin, void *pin,
 /**
  * it copies a structure to the host
  */
-int rt_structure_getter(struct wrnc_proto_header *hin, void *pin,
-			struct wrnc_proto_header *hout, void *pout)
+int rt_structure_getter(struct trtl_proto_header *hin, void *pin,
+			struct trtl_proto_header *hout, void *pout)
 {
 	unsigned int offset = 0, index, size;
 	uint32_t *din = pin;
@@ -114,15 +114,15 @@ int rt_structure_getter(struct wrnc_proto_header *hin, void *pin,
  * Get the version. It is a structure, but a special one, so it is not using
  * the generic function
  */
-int rt_version_getter(struct wrnc_proto_header *hin, void *pin,
-		      struct wrnc_proto_header *hout, void *pout)
+int rt_version_getter(struct trtl_proto_header *hin, void *pin,
+		      struct trtl_proto_header *hout, void *pout)
 {
 	uint32_t *dout = pout;
 
 	hout->msg_id = RT_ACTION_SEND_VERSION;
-	hout->len = sizeof(struct wrnc_rt_version) / 4;
+	hout->len = sizeof(struct trtl_rt_version) / 4;
 	rt_memcpy(dout, (uint32_t *)&_app->version,
-		  sizeof(struct wrnc_rt_version));
+		  sizeof(struct trtl_rt_version));
 
 	return 0;
 }
@@ -133,8 +133,8 @@ int rt_version_getter(struct wrnc_proto_header *hin, void *pin,
  * to set a set of variable values.
  * We use directly pointers and not an index
  */
-int rt_variable_setter(struct wrnc_proto_header *hin, void *pin,
-		       struct wrnc_proto_header *hout, void *pout)
+int rt_variable_setter(struct trtl_proto_header *hin, void *pin,
+		       struct trtl_proto_header *hout, void *pout)
 {
 	struct rt_variable *var;
 	uint32_t *din = pin, *mem, val;
@@ -168,7 +168,7 @@ int rt_variable_setter(struct wrnc_proto_header *hin, void *pin,
 
 	/* Return back new values. Host can compare with what it sent
 	   to spot errors */
-	if (hin->flags & WRNC_PROTO_FLAG_SYNC)
+	if (hin->flags & TRTL_PROTO_FLAG_SYNC)
 		return rt_variable_getter(hin, pin, hout, pout);
 
 	return 0;
@@ -179,8 +179,8 @@ int rt_variable_setter(struct wrnc_proto_header *hin, void *pin,
  * This is a generic getter that an external system can invoke
  * to get a set of variable values
  */
-int rt_variable_getter(struct wrnc_proto_header *hin, void *pin,
-		       struct wrnc_proto_header *hout, void *pout)
+int rt_variable_getter(struct trtl_proto_header *hin, void *pin,
+		       struct trtl_proto_header *hout, void *pout)
 {
 	struct rt_variable *var;
 	uint32_t *dout = pout, *din = pin, *mem, val;
@@ -224,8 +224,8 @@ int rt_variable_getter(struct wrnc_proto_header *hin, void *pin,
 /**
  * This is a default action that answer on ping messages
  */
-int rt_recv_ping(struct wrnc_proto_header *hin, void *pin,
-		 struct wrnc_proto_header *hout, void *pout)
+int rt_recv_ping(struct trtl_proto_header *hin, void *pin,
+		 struct trtl_proto_header *hout, void *pout)
 {
 	rt_send_ack(hin, pin, hout, pout);
 	return 0;
@@ -238,11 +238,11 @@ int rt_recv_ping(struct wrnc_proto_header *hin, void *pin,
  * @param[in] msg input message for the action
  * @return 0 on success. A negative value on error
  */
-static inline int rt_action_run(struct wrnc_proto_header *hin, void *pin)
+static inline int rt_action_run(struct trtl_proto_header *hin, void *pin)
 {
 	action_t *action;
-	struct wrnc_msg out_buf;
-	struct wrnc_proto_header hout;
+	struct trtl_msg out_buf;
+	struct trtl_proto_header hout;
 	void *pout;
 	int err = 0;
 
@@ -253,7 +253,7 @@ static inline int rt_action_run(struct wrnc_proto_header *hin, void *pin)
 
 	action = _app->actions[hin->msg_id];
 
-	if (!(hin->flags & WRNC_PROTO_FLAG_SYNC)) {
+	if (!(hin->flags & TRTL_PROTO_FLAG_SYNC)) {
 		/* Asynchronous message, then no output */
 		return action(hin, pin, NULL, NULL);
 	}
@@ -269,7 +269,7 @@ static inline int rt_action_run(struct wrnc_proto_header *hin, void *pin)
 	/* Do not write directly the header on the buffer because it does not
 	 work for fields size different than 32bit */
 	pout = rt_proto_payload_get((void *) out_buf.data);
-	rt_memcpy((uint32_t *)&hout, (uint32_t *)hin, sizeof(struct wrnc_proto_header));
+	rt_memcpy((uint32_t *)&hout, (uint32_t *)hin, sizeof(struct trtl_proto_header));
 
 	err = action(hin, pin, &hout, pout);
 	if (err)
@@ -299,7 +299,7 @@ int rt_mq_action_dispatch(unsigned int mq_in)
 #ifdef RTPERFORMANCE
 	uint32_t sec, cyc, sec_n, cyc_n;
 #endif
-	struct wrnc_proto_header *header;
+	struct trtl_proto_header *header;
 	unsigned int mq_in_slot = _app->mq[mq_in].index;
 	unsigned int is_remote = _app->mq[mq_in].flags & RT_MQ_FLAGS_REMOTE;
 	uint32_t *msg;

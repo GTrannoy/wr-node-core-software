@@ -77,9 +77,9 @@ static int wrtd_in_trigger_log(int type, int miss_reason,
 			       struct wrtd_in_channel *st,
 			       struct wrtd_trigger_entry *ent)
 {
-	struct wrnc_msg out_buf;
+	struct trtl_msg out_buf;
 	struct wrtd_log_entry *log;
-	struct wrnc_proto_header hdr = {
+	struct trtl_proto_header hdr = {
 		.rt_app_id = 0,
 		.msg_id = WRTD_IN_ACTION_LOG,
 		.slot_io = WRTD_OUT_TDC_LOGGING,
@@ -257,8 +257,8 @@ static inline void do_input(void)
  * delay, then this function will add it to the current time to compute
  * the correct fire time.
  */
-static int wrtd_in_trigger_sw(struct wrnc_proto_header *hin, void *pin,
-			      struct wrnc_proto_header *hout, void *pout)
+static int wrtd_in_trigger_sw(struct trtl_proto_header *hin, void *pin,
+			      struct trtl_proto_header *hout, void *pout)
 {
 	struct wrtd_trigger_entry ent;
 	struct wr_timestamp ts;

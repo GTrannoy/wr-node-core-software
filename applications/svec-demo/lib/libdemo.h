@@ -37,7 +37,7 @@ extern void demo_exit();
 extern struct demo_node *demo_open_by_fmc(uint32_t device_id);
 extern struct demo_node *demo_open_by_lun(int lun);
 extern void demo_close(struct demo_node *dev);
-extern struct wrnc_dev *demo_get_wrnc_dev(struct demo_node *dev);
+extern struct trtl_dev *demo_get_trtl_dev(struct demo_node *dev);
 
 extern int demo_led_set(struct demo_node *dev, uint32_t value,
 			enum demo_color color);
@@ -45,7 +45,7 @@ extern int demo_lemo_set(struct demo_node *dev, uint32_t value);
 extern int demo_lemo_dir_set(struct demo_node *dev, uint32_t value);
 extern int demo_status_get(struct demo_node *dev, struct demo_status *status);
 extern int demo_run_autodemo(struct demo_node *dev, uint32_t run);
-extern int demo_version(struct demo_node *dev, struct wrnc_rt_version *version);
+extern int demo_version(struct demo_node *dev, struct trtl_rt_version *version);
 extern int demo_test_struct_set(struct demo_node *dev,
 				struct demo_structure *test);
 extern int demo_test_struct_get(struct demo_node *dev,

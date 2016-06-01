@@ -21,7 +21,7 @@
 
 #ifdef WRNODE_RT
 
-enum wrnc_msg_direction {
+enum trtl_msg_direction {
 	WRNC_MSG_DIR_SEND = 0,
 	WRNC_MSG_DIR_RECEIVE = 1
 };
@@ -29,12 +29,12 @@ enum wrnc_msg_direction {
 /**
  * White-Rabbit Node-Core message descriptor
  */
-struct wrnc_msg {
+struct trtl_msg {
 	uint32_t datalen; /**< payload length*/
 	volatile uint32_t *data; /**< payload */
 	uint32_t max_size; /**< maximum message size for chosen slot */
 	uint32_t offset; /**< serialization/deserialization offset */
-	enum wrnc_msg_direction direction; /**< serialization direction (used by wrnc_msg_x functions) */
+	enum trtl_msg_direction direction; /**< serialization direction (used by trtl_msg_x functions) */
 	int error; /** serialization error status */
 	int slot; /** concerned slot */
 };
@@ -44,10 +44,10 @@ struct wrnc_msg {
  * It claims an output slot. This means that you get exclusive access to
  * the slot.
  */
-static inline struct wrnc_msg rt_mq_claim_out(struct wrnc_proto_header *h)
+static inline struct trtl_msg rt_mq_claim_out(struct trtl_proto_header *h)
 {
-	struct wrnc_msg b;
-	int remote = !!(h->flags & WRNC_PROTO_FLAG_REMOTE);
+	struct trtl_msg b;
+	int remote = !!(h->flags & TRTL_PROTO_FLAG_REMOTE);
 	int slot = h->slot_io & 0xF;
 
 	mq_claim(remote, slot);
@@ -65,9 +65,9 @@ static inline struct wrnc_msg rt_mq_claim_out(struct wrnc_proto_header *h)
 /**
  * Obsolete. Use rt_mq_claim_out
  */
-static inline struct wrnc_msg hmq_msg_claim_out(int slot, int max_size)
+static inline struct trtl_msg hmq_msg_claim_out(int slot, int max_size)
 {
-	struct wrnc_proto_header h = {
+	struct trtl_proto_header h = {
 		.slot_io = (slot & 0xF),
 		.len = max_size,
 	};
@@ -79,9 +79,9 @@ static inline struct wrnc_msg hmq_msg_claim_out(int slot, int max_size)
  * It claims an input slot. This mean that you get exclusive access to
  * the slot
  */
-static inline struct wrnc_msg rt_mq_claim_in(struct wrnc_proto_header *h)
+static inline struct trtl_msg rt_mq_claim_in(struct trtl_proto_header *h)
 {
-	struct wrnc_msg b;
+	struct trtl_msg b;
 	int slot = (h->slot_io >> 4) & 0xF;
 
 	b.data = mq_map_in_buffer(0, slot);
@@ -97,9 +97,9 @@ static inline struct wrnc_msg rt_mq_claim_in(struct wrnc_proto_header *h)
 /**
  * Obsolete. Use rt_mq_claim_in
  */
-static inline struct wrnc_msg hmq_msg_claim_in(int slot, int max_size)
+static inline struct trtl_msg hmq_msg_claim_in(int slot, int max_size)
 {
-	struct wrnc_proto_header h = {
+	struct trtl_proto_header h = {
 		.slot_io = (slot & 0xF) << 4,
 		.len = max_size,
 	};
@@ -111,7 +111,7 @@ static inline struct wrnc_msg hmq_msg_claim_in(int slot, int max_size)
 /**
  * It enqueue the message in the slot, and it will be sent as soon as possible
  */
-static inline void hmq_msg_send(struct wrnc_msg *buf)
+static inline void hmq_msg_send(struct trtl_msg *buf)
 {
 	mq_send(0, buf->slot, buf->datalen);
 }

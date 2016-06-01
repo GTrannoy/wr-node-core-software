@@ -20,9 +20,9 @@
 static void help()
 {
 	fprintf(stderr, "\n");
-	fprintf(stderr, "wrnc-smem -D 0x<hex-number> -a 0x<number> [options] [value]\n\n");
+	fprintf(stderr, "mockturtle-smem -D 0x<hex-number> -a 0x<number> [options] [value]\n\n");
 	fprintf(stderr, "This program reads/write to/from the white-rabbit node-core shared memory. If you privide data, it will write these data into the shared memory. Then, it dumps the content after the write operation (if any). If you do not provide any data, it will simply read the current content of the shared memory\n\n");
-	fprintf(stderr, "-D   WRNC device identificator in hexadecimal format\n");
+	fprintf(stderr, "-D   device identificator in hexadecimal format\n");
 	fprintf(stderr, "-a   address where start operation\n");
 	fprintf(stderr, "-n   number of word (32bit) to read/write. The default is 1\n");
 	fprintf(stderr, "-m   write operation mode. The default is 0\n");
@@ -57,10 +57,10 @@ int main(int argc, char *argv[])
 	unsigned int i, n = 1, mod = 0;
 	uint32_t addr, *val, dev_id;
 	int err, do_write;
-	struct wrnc_dev *wrnc;
+	struct trtl_dev *trtl;
 	char c;
 
-	atexit(wrnc_exit);
+	atexit(trtl_exit);
 
 	while ((c = getopt (argc, argv, "hD:a:n:m:v")) != -1) {
 		switch (c) {
@@ -77,8 +77,8 @@ int main(int argc, char *argv[])
 			sscanf(optarg, "%d", &n);
 			break;
 		case 'm':
-		        sscanf(optarg, "%d", &mod);
-			if (mod > WRNC_SMEM_ADD) {
+			sscanf(optarg, "%d", &mod);
+			if (mod > TRTL_SMEM_ADD) {
 				fprintf(stderr, "Invalid operation mode\n");
 				help();
 				exit(1);
@@ -89,16 +89,16 @@ int main(int argc, char *argv[])
 	do_write = (optind != argc);
 	printf("write? %d - %d %d\n", do_write, optind, argc);
 
-	err = wrnc_init();
+	err = trtl_init();
 	if (err) {
-		fprintf(stderr, "Cannot init White Rabbit Node Core lib: %s\n",
-			wrnc_strerror(errno));
+		fprintf(stderr, "Cannot init Mock Turtle lib: %s\n",
+			trtl_strerror(errno));
 		exit(1);
 	}
 
-	wrnc = wrnc_open_by_fmc(dev_id);
-	if (!wrnc) {
-		fprintf(stderr, "Cannot open WRNC: %s\n", wrnc_strerror(errno));
+	trtl = trtl_open_by_fmc(dev_id);
+	if (!trtl) {
+		fprintf(stderr, "Cannot open Mock Turtle device: %s\n", trtl_strerror(errno));
 		exit(1);
 	}
 
@@ -113,17 +113,17 @@ int main(int argc, char *argv[])
 			val[i] = hex_to_int(argv, optind + i);
 		}
 
-		err = wrnc_smem_write(wrnc, addr, val, n, mod);
+		err = trtl_smem_write(trtl, addr, val, n, mod);
 	} else {
-		err = wrnc_smem_read(wrnc, addr, val, n, mod);
+		err = trtl_smem_read(trtl, addr, val, n, mod);
 				printf("%s:%d\n", __func__, __LINE__);
 	}
 
 	if (err) {
 		fprintf(stderr, "Cannot do IO on shared memory: %s\n",
-			wrnc_strerror(errno));
+			trtl_strerror(errno));
 		fprintf(stderr, "Attention maybe the memory was partially written\n");
-	        exit(1);
+		exit(1);
 	}
 
 	/* Show the current status of the shared memory */

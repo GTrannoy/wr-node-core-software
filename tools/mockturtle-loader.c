@@ -15,9 +15,9 @@
 static void help()
 {
 	fprintf(stderr, "\n");
-	fprintf(stderr, "wrnc-loader -D 0x<hex-number> -i <number> -f <path> [options]\n\n");
+	fprintf(stderr, "mockturtle-loader -D 0x<hex-number> -i <number> -f <path> [options]\n\n");
 	fprintf(stderr, "It loads (or dumps) an application to a white-rabbit node-core internal CPU\n\n");
-	fprintf(stderr, "-D   WRNC device identificator\n");
+	fprintf(stderr, "-D   device identificator\n");
 	fprintf(stderr, "-i   CPU index\n");
 	fprintf(stderr, "-f   path to the binary to load. If the option '-d' is set, then\n");
 	fprintf(stderr, "     this is where the program will store the current CPU application\n");
@@ -32,9 +32,9 @@ int main(int argc, char *argv[])
 	int cpu_index = 0, err, dump = 0;
 	uint32_t dev_id = 0, rst;
 	char *file = NULL, c;
-	struct wrnc_dev *wrnc;
+	struct trtl_dev *trtl;
 
-	atexit(wrnc_exit);
+	atexit(trtl_exit);
 
 	while ((c = getopt (argc, argv, "hi:D:f:d")) != -1) {
 		switch (c) {
@@ -63,58 +63,58 @@ int main(int argc, char *argv[])
 	}
 
 	if (!dev_id) {
-		fprintf(stderr, "Invalid wrnc device\n");
+		fprintf(stderr, "Invalid Mock Turtle device\n");
 		exit(1);
 	}
 
-	err = wrnc_init();
+	err = trtl_init();
 	if (err) {
-		fprintf(stderr, "Cannot init White Rabbit Node Core lib: %s\n",
-			wrnc_strerror(errno));
+		fprintf(stderr, "Cannot init Mock Turtle lib: %s\n",
+			trtl_strerror(errno));
 		exit(1);
 	}
 
 
-	wrnc = wrnc_open_by_fmc(dev_id);
-	if (!wrnc) {
-		fprintf(stderr, "Cannot open WRNC: %s\n", wrnc_strerror(errno));
+	trtl = trtl_open_by_fmc(dev_id);
+	if (!trtl) {
+		fprintf(stderr, "Cannot open Mock Turtle device: %s\n", trtl_strerror(errno));
 		exit(1);
 	}
 
-	err = wrnc_cpu_reset_get(wrnc, &rst);
+	err = trtl_cpu_reset_get(trtl, &rst);
 	if (err) {
 		fprintf(stderr, "Cannot get current reset line status: %s\n",
-			wrnc_strerror(errno));
+			trtl_strerror(errno));
 		goto out;
 	}
-	err = wrnc_cpu_reset_set(wrnc, (rst & ~(1 << cpu_index)));
+	err = trtl_cpu_reset_set(trtl, (rst & ~(1 << cpu_index)));
 	if (err) {
 		fprintf(stderr, "Cannot put CPU %d in reset state: %s\n",
-			cpu_index, wrnc_strerror(errno));
+			cpu_index, trtl_strerror(errno));
 		goto out;
 	}
 	if (dump) {
 		/* Read the CPU application memory content to a given file */
-		err = wrnc_cpu_dump_application_file(wrnc, cpu_index, file);
+		err = trtl_cpu_dump_application_file(trtl, cpu_index, file);
 		if (err) {
 			fprintf(stderr,
 				"Cannot load application to CPU %d: %s\n",
 				cpu_index,
-				wrnc_strerror(errno));
+				trtl_strerror(errno));
 		}
 	} else {
 		/* Write the content of a given file to the CPU application memory */
-		err = wrnc_cpu_load_application_file(wrnc, cpu_index, file);
+		err = trtl_cpu_load_application_file(trtl, cpu_index, file);
 		if (err) {
 			fprintf(stderr,
 				"Cannot load application to CPU %d: %s\n",
 				cpu_index,
-				wrnc_strerror(errno));
+				trtl_strerror(errno));
 		}
 	}
-	err = wrnc_cpu_reset_set(wrnc, rst);
+	err = trtl_cpu_reset_set(trtl, rst);
 out:
-	wrnc_close(wrnc);
+	trtl_close(trtl);
 
 	exit(err);
 }

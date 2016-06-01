@@ -16,7 +16,7 @@
  * Description of a White-Rabbit Trigger-Distribution device
  */
 struct demo_desc {
-	struct wrnc_dev *wrnc; /**< WRNC device associated */
+	struct trtl_dev *trtl; /**< WRNC device associated */
 	uint32_t dev_id; /**< fmc device id */
 	uint32_t app_id; /**< Application id */
 	uint32_t n_cpu; /**< Number of CPUs */

@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
 	uint32_t dev_id = 0;
 	char *tdc = NULL, *fd =NULL, c;
 	struct wrtd_node *wrtd;
-	struct wrnc_dev *wrnc;
+	struct trtl_dev *trtl;
 	int32_t offset;
 
 	atexit(wrtd_exit);
@@ -157,14 +157,14 @@ int main(int argc, char *argv[])
 	}
 
 	if (!dev_id) {
-		fprintf(stderr, "Invalid wrnc device\n");
+		fprintf(stderr, "Invalid trtl device\n");
 		exit(1);
 	}
 
 	err = wrtd_init();
 	if (err) {
 		fprintf(stderr, "Cannot init White Rabbit Trigger Distribution lib: %s\n",
-			wrnc_strerror(errno));
+			trtl_strerror(errno));
 		exit(1);
 	}
 
@@ -185,15 +185,15 @@ int main(int argc, char *argv[])
 	}
 
 	/* Get the WRNC token */
-	wrnc = wrtd_get_wrnc_dev(wrtd);
+	trtl = wrtd_get_trtl_dev(wrtd);
 
 	fprintf(stdout, "Reboot applications\n");
 
 	/* Start running application on TDC and FD CPUs */
-	err = wrnc_cpu_start(wrnc, 0);
+	err = trtl_cpu_start(trtl, 0);
 	if (err)
 		exit(1);
-	err = wrnc_cpu_start(wrnc, 1);
+	err = trtl_cpu_start(trtl, 1);
 	if (err)
 		exit(1);
 

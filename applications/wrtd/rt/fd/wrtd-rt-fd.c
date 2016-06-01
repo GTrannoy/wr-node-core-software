@@ -195,7 +195,7 @@ static void ts_adjust_delay(struct wr_timestamp *ts, uint32_t cycles, uint32_t f
 static void log_trigger(int type, int miss_reason, struct wrtd_out_channel *out,
 			struct wrtd_trigger_entry *ent)
 {
-	struct wrnc_proto_header hdr = {
+	struct trtl_proto_header hdr = {
 		.rt_app_id = 0,
 		.msg_id = WRTD_OUT_ACTION_LOG,
 		.slot_io = WRTD_OUT_FD_LOGGING,
@@ -205,7 +205,7 @@ static void log_trigger(int type, int miss_reason, struct wrtd_out_channel *out,
 		.trans = 0x0,
 		.time = 0x0,
 	};
-	struct wrnc_msg out_buf;
+	struct trtl_msg out_buf;
 	struct wrtd_log_entry *log;
 
 	if (!out && (type != WRTD_LOG_PROMISC || !promiscuous_mode ))
@@ -676,8 +676,8 @@ struct wrtd_trigger_sw {
  * It generate a software trigger accorging to the trigger entry coming
  * from the user space.
  */
-static int wrtd_out_trigger_sw(struct wrnc_proto_header *hin, void *pin,
-			       struct wrnc_proto_header *hout, void *pout)
+static int wrtd_out_trigger_sw(struct trtl_proto_header *hin, void *pin,
+			       struct trtl_proto_header *hout, void *pout)
 {
 	struct wrtd_trigger_sw *tsw = pin;
 	struct pulse_queue_entry *pq_ent;
@@ -735,8 +735,8 @@ static int wrtd_out_hash_table_free(struct wrtd_trig_id *tid)
 /**
  * Insert trigger entry in the hash table
  */
-static int wrtd_out_hash_table_insert(struct wrnc_proto_header *hin, void *pin,
-				      struct wrnc_proto_header *hout, void *pout)
+static int wrtd_out_hash_table_insert(struct trtl_proto_header *hin, void *pin,
+				      struct trtl_proto_header *hout, void *pout)
 {
 	uint32_t tidx = *(uint32_t *)pin;
 	int hidx;
@@ -768,8 +768,8 @@ out:
 /**
  * Remove trigger entry from the hash table
  */
-static int wrtd_out_hash_table_remove(struct wrnc_proto_header *hin, void *pin,
-				      struct wrnc_proto_header *hout, void *pout)
+static int wrtd_out_hash_table_remove(struct trtl_proto_header *hin, void *pin,
+				      struct trtl_proto_header *hout, void *pout)
 {
 	uint32_t tidx = *(uint32_t *)pin;
 	int hidx;
@@ -798,8 +798,8 @@ static int wrtd_out_hash_table_remove(struct wrnc_proto_header *hin, void *pin,
 /**
  * It gets the trigger index for a given trigger ID
  */
-static int wrtd_out_trigger_index(struct wrnc_proto_header *hin, void *pin,
-				  struct wrnc_proto_header *hout, void *pout)
+static int wrtd_out_trigger_index(struct trtl_proto_header *hin, void *pin,
+				  struct trtl_proto_header *hout, void *pout)
 {
 	struct wrtd_trig_id *id = pin;
 	uint32_t *index = pout;
@@ -844,8 +844,8 @@ err:
 /**
  * It disable the given channel and clear its internal queue
  */
-static int wrtd_out_disable(struct wrnc_proto_header *hin, void *pin,
-			    struct wrnc_proto_header *hout, void *pout)
+static int wrtd_out_disable(struct trtl_proto_header *hin, void *pin,
+			    struct trtl_proto_header *hout, void *pout)
 {
 	uint32_t ch = *((uint32_t *)pin);
 

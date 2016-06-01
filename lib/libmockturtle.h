@@ -21,19 +21,19 @@ extern "C" {
 #include "mockturtle-common.h"
 #include "mockturtle.h"
 
-extern const unsigned int wrnc_default_timeout_ms;
+extern const unsigned int trtl_default_timeout_ms;
 
-struct wrnc_dev;
+struct trtl_dev;
 
-#define WRNC_SYSFS_PATH_LEN 128
+#define TRTL_SYSFS_PATH_LEN 128
 
 /**
  * Debug descriptor. It is not obfuscated because it is meant for debugging
  * purpose. This way, it leaves the user all the freedom to read/poll the
  * debug channel as (s)he wants.
  */
-struct wrnc_dbg {
-	struct wrnc_dev *wrnc; /**< token of the device */
+struct trtl_dbg {
+	struct trtl_dev *trtl; /**< token of the device */
 	unsigned int cpu_index; /**< CPU where read debug messages */
 	int fd; /**< file descriptor of the debug interface */
 };
@@ -42,9 +42,9 @@ struct wrnc_dbg {
 /**
  * HMQ slot descriptor
  */
-struct wrnc_hmq {
-	struct wrnc_dev *wrnc; /**< where this slot belong to */
-	char syspath[WRNC_SYSFS_PATH_LEN];
+struct trtl_hmq {
+	struct trtl_dev *trtl; /**< where this slot belong to */
+	char syspath[TRTL_SYSFS_PATH_LEN];
 	unsigned int index; /* index of the slot. Note that we have
 			       different kind of slot and each kind start
 			       counting from 0*/
@@ -52,66 +52,66 @@ struct wrnc_hmq {
 	int fd; /**< file descriptor */
 };
 
-#define WRNC_FMC_OFFSET 2 /* FIXME this is an hack because fmc-bus does not allow
+#define TRTL_FMC_OFFSET 2 /* FIXME this is an hack because fmc-bus does not allow
 			   us a dynamic allocation of fake fmc devices */
 
-#define WRNC_NAME_LEN 16
-#define WRNC_PATH_LEN 32
+#define TRTL_NAME_LEN 16
+#define TRTL_PATH_LEN 32
 
-#define WRNC_SYSFS_READ_LEN 32
-#define WRNC_DEVICE_PATH_LEN 64
+#define TRTL_SYSFS_READ_LEN 32
+#define TRTL_DEVICE_PATH_LEN 64
 
 
-#define WRNC_HMQ_INCOMING	(1 << 0)
-#define WRNC_HMQ_OUTCOMING	0x0
-#define WRNC_HMQ_EXCLUSIVE	(1 << 1)
-#define WRNC_HMQ_SHARED		0x0
+#define TRTL_HMQ_INCOMING	(1 << 0)
+#define TRTL_HMQ_OUTCOMING	0x0
+#define TRTL_HMQ_EXCLUSIVE	(1 << 1)
+#define TRTL_HMQ_SHARED		0x0
 
 
 /**
  * Error codes for white-rabbit node-core applications
  */
-enum wrnc_error_number {
-	EWRNC_INVAL_PARSE = 83630, /**< cannot parse data from sysfs */
-	EWRNC_INVAL_SLOT, /**< invalid slot */
-	EWRNC_NO_IMPLEMENTATION, /**< a prototype is not implemented */
-	EWRNC_HMQ_CLOSE, /**< The HMQ is closed */
-	EWRNC_INVALID_MESSAGE, /**< Invalid message */
-	EWRNC_HMQ_READ, /**< Error while reading messages */
-	__EWRNC_MAX,
+enum trtl_error_number {
+	ETRTL_INVAL_PARSE = 83630, /**< cannot parse data from sysfs */
+	ETRTL_INVAL_SLOT, /**< invalid slot */
+	ETRTL_NO_IMPLEMENTATION, /**< a prototype is not implemented */
+	ETRTL_HMQ_CLOSE, /**< The HMQ is closed */
+	ETRTL_INVALID_MESSAGE, /**< Invalid message */
+	ETRTL_HMQ_READ, /**< Error while reading messages */
+	__ETRTL_MAX,
 };
 
 
 /**
  * TLV structure used to embed structures within a message
  */
-struct wrnc_structure_tlv {
+struct trtl_structure_tlv {
 	uint32_t index; /**< structure index (type) */
 	void *structure; /**< pointer to the structure */
 	size_t size; /**< structure size in byte */
 };
 
 /**
- * @file libwrnc.c
+ * @file libmockturtle.c
  */
 /**
  * @defgroup dev Device
  * Set of functions to perform basic openartion on the device
  * @{
  */
-extern char *wrnc_strerror(int err);
-extern int wrnc_init();
-extern void wrnc_exit();
-extern uint32_t wrnc_count();
-extern char **wrnc_list();
-extern void wrnc_list_free(char **list);
+extern char *trtl_strerror(int err);
+extern int trtl_init();
+extern void trtl_exit();
+extern uint32_t trtl_count();
+extern char **trtl_list();
+extern void trtl_list_free(char **list);
 
-extern struct wrnc_dev *wrnc_open(const char *device);
-extern struct wrnc_dev *wrnc_open_by_fmc(uint32_t device_id);
-extern struct wrnc_dev *wrnc_open_by_lun(unsigned int lun);
-extern void wrnc_close(struct wrnc_dev *wrnc);
-extern char *wrnc_name_get(struct wrnc_dev *wrnc);
-extern int wrnc_app_id_get(struct wrnc_dev *wrnc, uint32_t *app_id);
+extern struct trtl_dev *trtl_open(const char *device);
+extern struct trtl_dev *trtl_open_by_fmc(uint32_t device_id);
+extern struct trtl_dev *trtl_open_by_lun(unsigned int lun);
+extern void trtl_close(struct trtl_dev *trtl);
+extern char *trtl_name_get(struct trtl_dev *trtl);
+extern int trtl_app_id_get(struct trtl_dev *trtl, uint32_t *app_id);
 /**@}*/
 
 /**
@@ -119,33 +119,33 @@ extern int wrnc_app_id_get(struct wrnc_dev *wrnc, uint32_t *app_id);
  * Set of function that allow you to manage the FPGA cores
  * @{
  */
-extern int wrnc_cpu_load_application_raw(struct wrnc_dev *wrnc,
+extern int trtl_cpu_load_application_raw(struct trtl_dev *trtl,
 					 unsigned int index,
 					 void *code, size_t length,
 					 unsigned int offset);
-extern int wrnc_cpu_load_application_file(struct wrnc_dev *wrnc,
+extern int trtl_cpu_load_application_file(struct trtl_dev *trtl,
 					  unsigned int index,
 					  char *path);
-extern int wrnc_cpu_dump_application_raw(struct wrnc_dev *wrnc,
+extern int trtl_cpu_dump_application_raw(struct trtl_dev *trtl,
 					 unsigned int index,
 					 void *code, size_t length,
 					 unsigned int offset);
-extern int wrnc_cpu_dump_application_file(struct wrnc_dev *wrnc,
+extern int trtl_cpu_dump_application_file(struct trtl_dev *trtl,
 					  unsigned int index,
 					  char *path);
 
-extern int wrnc_cpu_count(struct wrnc_dev *wrnc, uint32_t *n_cpu);
-extern int wrnc_cpu_reset_set(struct wrnc_dev *wrnc, uint32_t mask);
-extern int wrnc_cpu_reset_get(struct wrnc_dev *wrnc, uint32_t *mask);
-extern int wrnc_cpu_run_set(struct wrnc_dev *wrnc, uint32_t mask);
-extern int wrnc_cpu_run_get(struct wrnc_dev *wrnc, uint32_t *mask);
-extern int wrnc_cpu_enable(struct wrnc_dev *wrnc, unsigned int index);
-extern int wrnc_cpu_disable(struct wrnc_dev *wrnc, unsigned int index);
-extern int wrnc_cpu_is_enable(struct wrnc_dev *wrnc, unsigned int index,
+extern int trtl_cpu_count(struct trtl_dev *trtl, uint32_t *n_cpu);
+extern int trtl_cpu_reset_set(struct trtl_dev *trtl, uint32_t mask);
+extern int trtl_cpu_reset_get(struct trtl_dev *trtl, uint32_t *mask);
+extern int trtl_cpu_run_set(struct trtl_dev *trtl, uint32_t mask);
+extern int trtl_cpu_run_get(struct trtl_dev *trtl, uint32_t *mask);
+extern int trtl_cpu_enable(struct trtl_dev *trtl, unsigned int index);
+extern int trtl_cpu_disable(struct trtl_dev *trtl, unsigned int index);
+extern int trtl_cpu_is_enable(struct trtl_dev *trtl, unsigned int index,
 			      unsigned int *enable);
-extern int wrnc_cpu_start(struct wrnc_dev *wrnc, unsigned int index);
-extern int wrnc_cpu_stop(struct wrnc_dev *wrnc, unsigned int index);
-extern int wrnc_cpu_is_running(struct wrnc_dev *wrnc, unsigned int index,
+extern int trtl_cpu_start(struct trtl_dev *trtl, unsigned int index);
+extern int trtl_cpu_stop(struct trtl_dev *trtl, unsigned int index);
+extern int trtl_cpu_is_running(struct trtl_dev *trtl, unsigned int index,
 			       unsigned int *run);
 /**@}*/
 
@@ -154,33 +154,33 @@ extern int wrnc_cpu_is_running(struct wrnc_dev *wrnc, unsigned int index,
  * Functions to manage the HMQ slots: configuration and transmission
  * @{
  */
-extern struct wrnc_hmq *wrnc_hmq_open(struct wrnc_dev *wrnc,
+extern struct trtl_hmq *trtl_hmq_open(struct trtl_dev *trtl,
 				      unsigned int index,
 				      unsigned long flags);
-extern void wrnc_hmq_close(struct wrnc_hmq *hmq);
-extern int wrnc_hmq_share_set(struct wrnc_dev *wrnc, unsigned int dir,
+extern void trtl_hmq_close(struct trtl_hmq *hmq);
+extern int trtl_hmq_share_set(struct trtl_dev *trtl, unsigned int dir,
 			      unsigned int index, unsigned int status);
-extern int wrnc_hmq_share_get(struct wrnc_dev *wrnc, unsigned int dir,
+extern int trtl_hmq_share_get(struct trtl_dev *trtl, unsigned int dir,
 			      unsigned int index, unsigned int *status);
-extern int wrnc_hmq_receive_n(struct wrnc_hmq *hmq,
-			      struct wrnc_msg *msg, unsigned int n);
-extern struct wrnc_msg *wrnc_hmq_receive(struct wrnc_hmq *hmq);
-extern int wrnc_hmq_send(struct wrnc_hmq *hmq, struct wrnc_msg *msg);
-extern int wrnc_hmq_send_and_receive_sync(struct wrnc_hmq *hmq,
+extern int trtl_hmq_receive_n(struct trtl_hmq *hmq,
+			      struct trtl_msg *msg, unsigned int n);
+extern struct trtl_msg *trtl_hmq_receive(struct trtl_hmq *hmq);
+extern int trtl_hmq_send(struct trtl_hmq *hmq, struct trtl_msg *msg);
+extern int trtl_hmq_send_and_receive_sync(struct trtl_hmq *hmq,
 					   unsigned int index_out,
-					   struct wrnc_msg *msg,
+					   struct trtl_msg *msg,
 					   unsigned int timeout_ms);
-extern int wrnc_hmq_buffer_size_set(struct wrnc_hmq *hmq, uint32_t size);
-extern int wrnc_hmq_buffer_size_get(struct wrnc_hmq *hmq, uint32_t *size);
-extern int wrnc_hmq_count_max_hw_get(struct wrnc_hmq *hmq, uint32_t *max);
-extern int wrnc_hmq_width_get(struct wrnc_hmq *hmq, uint32_t *width);
-extern int wrnc_hmq_msg_max_get(struct wrnc_hmq *hmq, uint32_t *max);
+extern int trtl_hmq_buffer_size_set(struct trtl_hmq *hmq, uint32_t size);
+extern int trtl_hmq_buffer_size_get(struct trtl_hmq *hmq, uint32_t *size);
+extern int trtl_hmq_count_max_hw_get(struct trtl_hmq *hmq, uint32_t *max);
+extern int trtl_hmq_width_get(struct trtl_hmq *hmq, uint32_t *width);
+extern int trtl_hmq_msg_max_get(struct trtl_hmq *hmq, uint32_t *max);
 /* FIXME to be tested */
-extern int wrnc_hmq_filter_add(struct wrnc_hmq *hmq,
-			       struct wrnc_msg_filter *filter);
+extern int trtl_hmq_filter_add(struct trtl_hmq *hmq,
+			       struct trtl_msg_filter *filter);
 /* FIXME to be tested */
-extern int wrnc_hmq_filter_clean(struct wrnc_hmq *hmq);
-extern int wrnc_bind(struct wrnc_dev *wrnc, struct wrnc_msg_filter *flt,
+extern int trtl_hmq_filter_clean(struct trtl_hmq *hmq);
+extern int trtl_bind(struct trtl_dev *trtl, struct trtl_msg_filter *flt,
 		     unsigned int length);
 /**@}*/
 
@@ -189,10 +189,10 @@ extern int wrnc_bind(struct wrnc_dev *wrnc, struct wrnc_msg_filter *flt,
  * Functions to access the shared memory from the host
  * @{
  */
-extern int wrnc_smem_read(struct wrnc_dev *wrnc, uint32_t addr, uint32_t *data,
-			  size_t count, enum wrnc_smem_modifier mod);
-extern int wrnc_smem_write(struct wrnc_dev *wrnc, uint32_t addr, uint32_t *data,
-			   size_t count, enum wrnc_smem_modifier mod);
+extern int trtl_smem_read(struct trtl_dev *trtl, uint32_t addr, uint32_t *data,
+			  size_t count, enum trtl_smem_modifier mod);
+extern int trtl_smem_write(struct trtl_dev *trtl, uint32_t addr, uint32_t *data,
+			   size_t count, enum trtl_smem_modifier mod);
 /**@}*/
 
 /**
@@ -200,10 +200,10 @@ extern int wrnc_smem_write(struct wrnc_dev *wrnc, uint32_t addr, uint32_t *data,
  * Functions to access the debug serial stream
  * @{
  */
-extern struct wrnc_dbg *wrnc_debug_open(struct wrnc_dev *wrnc,
+extern struct trtl_dbg *trtl_debug_open(struct trtl_dev *trtl,
 					unsigned int index);
-extern void wrnc_debug_close(struct wrnc_dbg *dbg);
-extern int wrnc_debug_message_get(struct wrnc_dbg *dbg,
+extern void trtl_debug_close(struct trtl_dbg *dbg);
+extern int trtl_debug_message_get(struct trtl_dbg *dbg,
 				  char *buf, size_t count);
 /**@}*/
 
@@ -213,22 +213,22 @@ extern int wrnc_debug_message_get(struct wrnc_dbg *dbg,
  * Set of utilities to properly handle the protocol
  * @{
  */
-extern void wrnc_message_header_set(struct wrnc_msg *msg,
-				    struct wrnc_proto_header *hdr);
-extern void wrnc_message_header_get(struct wrnc_msg *msg,
-				    struct wrnc_proto_header *hdr);
-extern void wrnc_message_pack(struct wrnc_msg *msg,
-			      struct wrnc_proto_header *hdr,
+extern void trtl_message_header_set(struct trtl_msg *msg,
+				    struct trtl_proto_header *hdr);
+extern void trtl_message_header_get(struct trtl_msg *msg,
+				    struct trtl_proto_header *hdr);
+extern void trtl_message_pack(struct trtl_msg *msg,
+			      struct trtl_proto_header *hdr,
 			      void *payload);
-extern void wrnc_message_unpack(struct wrnc_msg *msg,
-				struct wrnc_proto_header *hdr,
+extern void trtl_message_unpack(struct trtl_msg *msg,
+				struct trtl_proto_header *hdr,
 				void *payload);
-extern void wrnc_message_structure_push(struct wrnc_msg *msg,
-					struct wrnc_proto_header *hdr,
-					struct wrnc_structure_tlv *tlv);
-extern void wrnc_message_structure_pop(struct wrnc_msg *msg,
-				       struct wrnc_proto_header *hdr,
-				       struct wrnc_structure_tlv *tlv);
+extern void trtl_message_structure_push(struct trtl_msg *msg,
+					struct trtl_proto_header *hdr,
+					struct trtl_structure_tlv *tlv);
+extern void trtl_message_structure_pop(struct trtl_msg *msg,
+				       struct trtl_proto_header *hdr,
+				       struct trtl_structure_tlv *tlv);
 /**@}*/
 
 /**
@@ -236,24 +236,24 @@ extern void wrnc_message_structure_pop(struct wrnc_msg *msg,
  * Message builders for RT service messages
  * @{
  */
-extern int wrnc_rt_version_get(struct wrnc_dev *wrnc,
-			       struct wrnc_rt_version *version,
+extern int trtl_rt_version_get(struct trtl_dev *trtl,
+			       struct trtl_rt_version *version,
 			       unsigned int hmq_in, unsigned int hmq_out);
-extern int wrnc_rt_ping(struct wrnc_dev *wrnc,
+extern int trtl_rt_ping(struct trtl_dev *trtl,
 			unsigned int hmq_in, unsigned int hmq_out);
-extern int wrnc_rt_variable_set(struct wrnc_dev *wrnc,
-				struct wrnc_proto_header *hdr,
+extern int trtl_rt_variable_set(struct trtl_dev *trtl,
+				struct trtl_proto_header *hdr,
 				uint32_t *var, unsigned int n_var);
-extern int wrnc_rt_variable_get(struct wrnc_dev *wrnc,
-				struct wrnc_proto_header *hdr,
+extern int trtl_rt_variable_get(struct trtl_dev *trtl,
+				struct trtl_proto_header *hdr,
 				uint32_t *var, unsigned int n_var);
-extern int wrnc_rt_structure_set(struct wrnc_dev *wrnc,
-				 struct wrnc_proto_header *hdr,
-				 struct wrnc_structure_tlv *tlv,
+extern int trtl_rt_structure_set(struct trtl_dev *trtl,
+				 struct trtl_proto_header *hdr,
+				 struct trtl_structure_tlv *tlv,
 				 unsigned int n_tlv);
-extern int wrnc_rt_structure_get(struct wrnc_dev *wrnc,
-				 struct wrnc_proto_header *hdr,
-				 struct wrnc_structure_tlv *tlv,
+extern int trtl_rt_structure_get(struct trtl_dev *trtl,
+				 struct trtl_proto_header *hdr,
+				 struct trtl_structure_tlv *tlv,
 				 unsigned int n_tlv);
 /**@}*/
 #ifdef __cplusplus

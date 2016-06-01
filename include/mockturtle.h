@@ -7,34 +7,34 @@
 #define  __TRTL_USER_H__
 /** @file mock-turtle.h */
 
-#define WRNC_MAX_CARRIER 20 /**< Maximum number of WRNC components on a
+#define TRTL_MAX_CARRIER 20 /**< Maximum number of WRNC components on a
 			       single computer*/
-#define WRNC_MAX_CPU 8 /**< Maximum number of CPU core in a WRNC bitstream */
-#define WRNC_MAX_HMQ_SLOT 32 /**< Maximum number of HMQ slots in a
+#define TRTL_MAX_CPU 8 /**< Maximum number of CPU core in a WRNC bitstream */
+#define TRTL_MAX_HMQ_SLOT 32 /**< Maximum number of HMQ slots in a
 				WRNC bitstream */
 
-#define WRNC_MAX_PAYLOAD_SIZE 128
+#define TRTL_MAX_PAYLOAD_SIZE 128
 
 /**
- * @enum wrnc_smem_modifier
+ * @enum trtl_smem_modifier
  * Shared memory operation modifier. This is a list of operation modifier
  * that you can use to access the shared memory.
  */
-enum wrnc_smem_modifier {
-	WRNC_SMEM_DIRECT = 0, /**< direct read/write of the memory */
-	WRNC_SMEM_ADD, /**< on write, atomic ADD to memory content */
-	WRNC_SMEM_SUB, /**< on write, atomic SUB to memory content */
-	WRNC_SMEM_OR, /**< on write, atomic OR with memory content */
-	WRNC_SMEM_CLR_AND, /**< on write, atomic AND with complemented memory
+enum trtl_smem_modifier {
+	TRTL_SMEM_DIRECT = 0, /**< direct read/write of the memory */
+	TRTL_SMEM_ADD, /**< on write, atomic ADD to memory content */
+	TRTL_SMEM_SUB, /**< on write, atomic SUB to memory content */
+	TRTL_SMEM_OR, /**< on write, atomic OR with memory content */
+	TRTL_SMEM_CLR_AND, /**< on write, atomic AND with complemented memory
 			      content */
-	WRNC_SMEM_XOR, /**< on write, atomic XOR with memory content */
+	TRTL_SMEM_XOR, /**< on write, atomic XOR with memory content */
 };
 
 /**
- * @enum wrnc_msg_direction
+ * @enum trtl_msg_direction
  * Message direction on the Host Message Queue
  */
-enum wrnc_msg_direction {
+enum trtl_msg_direction {
 	WRNC_MSG_DIR_SEND = 0, /**< from Host to RealTime Application */
 	WRNC_MSG_DIR_RECEIVE = 1, /**< from RealTime application to Host */ 
 };
@@ -42,22 +42,22 @@ enum wrnc_msg_direction {
 /**
  * Messages descriptor
  */
-struct wrnc_msg {
+struct trtl_msg {
 	uint32_t datalen; /**< payload length*/
-	uint32_t data[WRNC_MAX_PAYLOAD_SIZE]; /**< payload, free content
+	uint32_t data[TRTL_MAX_PAYLOAD_SIZE]; /**< payload, free content
 						 (no official protocol) */
 	uint32_t max_size; /**< maximum message size for chosen slot */
 	uint32_t offset; /**< serialization/deserialization offset */
-	enum wrnc_msg_direction direction; /**< serialization direction
-					      (used by wrnc_msg_x functions) */
+	enum trtl_msg_direction direction; /**< serialization direction
+					      (used by trtl_msg_x functions) */
 	int error; /** serialization error status */
 };
 
 /**
  * Message descriptor used to send synchronous messages
  */
-struct wrnc_msg_sync {
-	struct wrnc_msg *msg; /**< the message to send. It will be overwritten by
+struct trtl_msg_sync {
+	struct trtl_msg *msg; /**< the message to send. It will be overwritten by
 				the synchronous answer */
 	uint16_t index_in; /**< where write the message */
 	uint16_t index_out; /**< where we expect the synchronous answer */
@@ -65,20 +65,20 @@ struct wrnc_msg_sync {
 };
 
 /**
- * @enum wrnc_msg_filter_operation_type
+ * @enum trtl_msg_filter_operation_type
  * List of available filter's operations
  */
-enum wrnc_msg_filter_operation_type {
-	WRNC_MSG_FILTER_AND,
-	WRNC_MSG_FILTER_OR,
-	WRNC_MSG_FILTER_NOT,
-	WRNC_MSG_FILTER_EQ,
+enum trtl_msg_filter_operation_type {
+	TRTL_MSG_FILTER_AND,
+	TRTL_MSG_FILTER_OR,
+	TRTL_MSG_FILTER_NOT,
+	TRTL_MSG_FILTER_EQ,
 };
 
 /**
  * It describe a filter to apply to messages
  */
-struct wrnc_msg_filter {
+struct trtl_msg_filter {
 	uint32_t operation; /**< kind of operation to perform */
 	uint32_t word_offset; /**< offset of the word to check */
 	uint32_t mask; /**< mask to apply before the operation */
@@ -89,36 +89,36 @@ struct wrnc_msg_filter {
 /**
  * Descriptor of the IO operation on Shared Memory
  */
-struct wrnc_smem_io {
+struct trtl_smem_io {
 	uint32_t addr; /**< address to access */
 	uint32_t value; /**< value to write. After ioctl it will be overwritte
 			   with the new value in the shared memory */
 	int is_input; /**< flag to determinte data direction */
-	enum wrnc_smem_modifier mod;  /**< the kind of operation to do */
+	enum trtl_smem_modifier mod;  /**< the kind of operation to do */
 };
 
 /**
- * @enum wrnc_ioctl_commands
+ * @enum trtl_ioctl_commands
  * Available ioctl() messages
  */
-enum wrnc_ioctl_commands {
-        WRNC_MSG_SYNC, /**< send a synchronous message */
-	WRNC_SMEM_IO, /**< access to shared memory */
-	WRNC_MSG_FILTER_ADD, /**< add a message filter */
-	WRNC_MSG_FILTER_CLEAN, /**< remove all filters */
+enum trtl_ioctl_commands {
+        TRTL_MSG_SYNC, /**< send a synchronous message */
+	TRTL_SMEM_IO, /**< access to shared memory */
+	TRTL_MSG_FILTER_ADD, /**< add a message filter */
+	TRTL_MSG_FILTER_CLEAN, /**< remove all filters */
 };
 
 
-#define WRNC_IOCTL_MAGIC 's'
-#define WRNC_IOCTL_MSG_SYNC _IOWR(WRNC_IOCTL_MAGIC, WRNC_MSG_SYNC, \
-				    struct wrnc_msg_sync)
-#define WRNC_IOCTL_SMEM_IO _IOWR(WRNC_IOCTL_MAGIC, WRNC_SMEM_IO, \
-				    struct wrnc_smem_io)
+#define TRTL_IOCTL_MAGIC 's'
+#define TRTL_IOCTL_MSG_SYNC _IOWR(TRTL_IOCTL_MAGIC, TRTL_MSG_SYNC, \
+				    struct trtl_msg_sync)
+#define TRTL_IOCTL_SMEM_IO _IOWR(TRTL_IOCTL_MAGIC, TRTL_SMEM_IO, \
+				    struct trtl_smem_io)
 
-#define WRNC_IOCTL_MSG_FILTER_ADD _IOW(WRNC_IOCTL_MAGIC,	\
-				       WRNC_MSG_FILTER_ADD,	\
-				       struct wrnc_msg_filter)
-#define WRNC_IOCTL_MSG_FILTER_CLEAN _IOW(WRNC_IOCTL_MAGIC,		\
-					 WRNC_MSG_FILTER_CLEAN,		\
-					 struct wrnc_msg_filter)
+#define TRTL_IOCTL_MSG_FILTER_ADD _IOW(TRTL_IOCTL_MAGIC,	\
+				       TRTL_MSG_FILTER_ADD,	\
+				       struct trtl_msg_filter)
+#define TRTL_IOCTL_MSG_FILTER_CLEAN _IOW(TRTL_IOCTL_MAGIC,		\
+					 TRTL_MSG_FILTER_CLEAN,		\
+					 struct trtl_msg_filter)
 #endif

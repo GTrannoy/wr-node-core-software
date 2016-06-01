@@ -342,8 +342,8 @@ struct wrtd_in_channel_config {
 						public, set from the internal
 						calibration data of the TDC
 						driver. */
-	uint32_t flags; /**< Channel flags (enum wrnc_io_flags) */
-	uint32_t log_level; /**< Log level (enum wrnc_log_level) */
+	uint32_t flags; /**< Channel flags (enum trtl_io_flags) */
+	uint32_t log_level; /**< Log level (enum trtl_log_level) */
         uint32_t mode; /**< Triggering mode (enum wrtd_triger_mode) */
 };
 

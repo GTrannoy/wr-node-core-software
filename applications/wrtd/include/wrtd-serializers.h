@@ -23,7 +23,7 @@
 #include "rt-message.h"
 #endif
 
-static inline int _wrnc_msg_check_buffer( struct wrnc_msg *buf, int n_words )
+static inline int _trtl_msg_check_buffer( struct trtl_msg *buf, int n_words )
 {
 #ifndef WRNODE_RT
     if(buf->error) 
@@ -51,9 +51,9 @@ static inline int _wrnc_msg_check_buffer( struct wrnc_msg *buf, int n_words )
     return 0;
 }
 
-static inline int wrnc_msg_int32 ( struct wrnc_msg *buf, int *value )
+static inline int trtl_msg_int32 ( struct trtl_msg *buf, int *value )
 {
-    if ( _wrnc_msg_check_buffer ( buf, 1 ) < 0 )
+    if ( _trtl_msg_check_buffer ( buf, 1 ) < 0 )
 	return -1;
 
     if (buf->direction == WRNC_MSG_DIR_SEND)
@@ -69,9 +69,9 @@ static inline int wrnc_msg_int32 ( struct wrnc_msg *buf, int *value )
 }
 
 
-static inline int wrnc_msg_int16 ( struct wrnc_msg *buf, int16_t *value )
+static inline int trtl_msg_int16 ( struct trtl_msg *buf, int16_t *value )
 {
-    if ( _wrnc_msg_check_buffer ( buf, 1 ) < 0 )
+    if ( _trtl_msg_check_buffer ( buf, 1 ) < 0 )
 	return -1;
 
     if (buf->direction == WRNC_MSG_DIR_SEND)
@@ -86,20 +86,20 @@ static inline int wrnc_msg_int16 ( struct wrnc_msg *buf, int16_t *value )
     return 0;
 }
 
-static inline int wrnc_msg_uint32 ( struct wrnc_msg *buf, uint32_t *value )
+static inline int trtl_msg_uint32 ( struct trtl_msg *buf, uint32_t *value )
 {
-    return wrnc_msg_int32( buf, (int *) value);
+    return trtl_msg_int32( buf, (int *) value);
 }
 
-static inline int wrnc_msg_uint16 ( struct wrnc_msg *buf, uint16_t *value )
+static inline int trtl_msg_uint16 ( struct trtl_msg *buf, uint16_t *value )
 {
-    return wrnc_msg_int16( buf, (int16_t *) value);
+    return trtl_msg_int16( buf, (int16_t *) value);
 }
 
 
-static inline int wrnc_msg_header ( struct wrnc_msg *buf, uint32_t *id, uint32_t *seq_no )
+static inline int trtl_msg_header ( struct trtl_msg *buf, uint32_t *id, uint32_t *seq_no )
 {
-    if (_wrnc_msg_check_buffer ( buf, 2 ) < 0)
+    if (_trtl_msg_check_buffer ( buf, 2 ) < 0)
 	return -1;
 
     if (buf->direction == WRNC_MSG_DIR_SEND)
@@ -116,24 +116,24 @@ static inline int wrnc_msg_header ( struct wrnc_msg *buf, uint32_t *id, uint32_t
     return 0;
 }
 
-static inline void wrnc_msg_skip ( struct wrnc_msg *buf, int n_words )
+static inline void trtl_msg_skip ( struct trtl_msg *buf, int n_words )
 {
-    _wrnc_msg_check_buffer ( buf, n_words );
+    _trtl_msg_check_buffer ( buf, n_words );
     if (buf->direction == WRNC_MSG_DIR_SEND)
 	buf->datalen += n_words;
     else
 	buf->offset += n_words;
 }
 
-static inline void wrnc_msg_seek ( struct wrnc_msg *buf, int pos )
+static inline void trtl_msg_seek ( struct trtl_msg *buf, int pos )
 {
     buf->offset = pos;
     buf->datalen = pos;
 }
 
-static inline int wrtd_msg_timestamp ( struct wrnc_msg *buf, struct wr_timestamp *ts )
+static inline int wrtd_msg_timestamp ( struct trtl_msg *buf, struct wr_timestamp *ts )
 {
-    if (_wrnc_msg_check_buffer ( buf, 4 ) < 0)
+    if (_trtl_msg_check_buffer ( buf, 4 ) < 0)
 	return -1;
 
     if (buf->direction == WRNC_MSG_DIR_SEND)
@@ -154,9 +154,9 @@ static inline int wrtd_msg_timestamp ( struct wrnc_msg *buf, struct wr_timestamp
     return 0;
 }
 
-static inline int wrtd_msg_trig_id ( struct wrnc_msg *buf, struct wrtd_trig_id *id )
+static inline int wrtd_msg_trig_id ( struct trtl_msg *buf, struct wrtd_trig_id *id )
 {
-    if (_wrnc_msg_check_buffer ( buf, 3 ) < 0)
+    if (_trtl_msg_check_buffer ( buf, 3 ) < 0)
 	return -1;
     
     if (buf->direction == WRNC_MSG_DIR_SEND)
@@ -175,19 +175,19 @@ static inline int wrtd_msg_trig_id ( struct wrnc_msg *buf, struct wrtd_trig_id *
     return 0;
 }
 
-static inline int wrtd_msg_trigger_entry ( struct wrnc_msg *buf, struct wrtd_trigger_entry *ent )
+static inline int wrtd_msg_trigger_entry ( struct trtl_msg *buf, struct wrtd_trigger_entry *ent )
 {
     if (wrtd_msg_timestamp (buf, &ent->ts) < 0)
 	return -1;
     if (wrtd_msg_trig_id (buf, &ent->id) < 0)
 	return -1;
     
-    return wrnc_msg_int32 (buf, (int *) &ent->seq);
+    return trtl_msg_int32 (buf, (int *) &ent->seq);
 }
 
-static inline struct wrnc_msg wrnc_msg_init(int max_size)
+static inline struct trtl_msg trtl_msg_init(int max_size)
 {
-    struct wrnc_msg b;
+    struct trtl_msg b;
 
     b.direction = WRNC_MSG_DIR_SEND;
     b.max_size = max_size;
@@ -198,7 +198,7 @@ static inline struct wrnc_msg wrnc_msg_init(int max_size)
     return b;
 }
 
-static inline int wrnc_msg_check_error (struct wrnc_msg *buf)
+static inline int trtl_msg_check_error (struct trtl_msg *buf)
 {
     return buf->error;
 }

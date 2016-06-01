@@ -22,14 +22,14 @@ const char *demo_errors[] = {
 
 /**
  * It returns a string messages corresponding to a given error code. If
- * it is not a libwrtd error code, it will run wrnc_strerror()
+ * it is not a libwrtd error code, it will run trtl_strerror()
  * @param[in] err error code
  * @return a message error
  */
 const char *demo_strerror(unsigned int err)
 {
 	if (err < EDEMO_INVALID_ANSWER_ACK || err >= __EDEMO_MAX_ERROR_NUMBER)
-		return wrnc_strerror(err);
+		return trtl_strerror(err);
 
 	return demo_errors[err - EDEMO_INVALID_ANSWER_ACK];
 }
@@ -38,7 +38,7 @@ const char *demo_strerror(unsigned int err)
 /**
  * It initializes the DEMO library. It must be called before doing
  * anything else.
- * This library is based on the libwrnc, so internally, this function also
+ * This library is based on the libmockturtle, so internally, this function also
  * run demo_init() in order to initialize the WRNC library.
  * @return 0 on success, otherwise -1 and errno is appropriately set
  */
@@ -46,7 +46,7 @@ int demo_init()
 {
 	int err;
 
-	err = wrnc_init();
+	err = trtl_init();
 	if (err)
 		return err;
 
@@ -61,7 +61,7 @@ int demo_init()
  */
 void demo_exit()
 {
-	wrnc_exit();
+	trtl_exit();
 }
 
 
@@ -79,8 +79,8 @@ struct demo_node *demo_open_by_fmc(uint32_t device_id)
 	if (!demo)
 		return NULL;
 
-	demo->wrnc = wrnc_open_by_fmc(device_id);
-	if (!demo->wrnc)
+	demo->trtl = trtl_open_by_fmc(device_id);
+	if (!demo->trtl)
 		goto out;
 
 	demo->dev_id = device_id;
@@ -107,8 +107,8 @@ struct demo_node *demo_open_by_lun(int lun)
 	if (!demo)
 		return NULL;
 
-	demo->wrnc = wrnc_open_by_lun(lun);
-	if (!demo->wrnc)
+	demo->trtl = trtl_open_by_lun(lun);
+	if (!demo->trtl)
 		goto out;
 
 	demo->dev_id = lun;
@@ -130,7 +130,7 @@ void demo_close(struct demo_node *dev)
 {
 	struct demo_desc *demo = (struct demo_desc *)dev;
 
-	wrnc_close(demo->wrnc);
+	trtl_close(demo->trtl);
 	free(demo);
 	dev = NULL;
 }
@@ -142,24 +142,24 @@ void demo_close(struct demo_node *dev)
  * @param[in] dev device token
  * @return the WRNC token
  */
-struct wrnc_dev *demo_get_wrnc_dev(struct demo_node *dev)
+struct trtl_dev *demo_get_trtl_dev(struct demo_node *dev)
 {
 	struct demo_desc *demo = (struct demo_desc *)dev;
 
-	return (struct wrnc_dev *)demo->wrnc;
+	return (struct trtl_dev *)demo->trtl;
 }
 
 int demo_lemo_dir_set(struct demo_node *dev, uint32_t value)
 {
 	struct demo_desc *demo = (struct demo_desc *)dev;
 	uint32_t fields[] = {DEMO_VAR_LEMO_DIR, value};
-	struct wrnc_proto_header hdr = {
+	struct trtl_proto_header hdr = {
 		.slot_io = (DEMO_HMQ_IN << 4) |
 			   (DEMO_HMQ_OUT & 0xF),
 		.len = 2,
 	};
 
-	return wrnc_rt_variable_set(demo->wrnc, &hdr, fields, 1);
+	return trtl_rt_variable_set(demo->trtl, &hdr, fields, 1);
 }
 
 int demo_lemo_set(struct demo_node *dev, uint32_t value)
@@ -167,13 +167,13 @@ int demo_lemo_set(struct demo_node *dev, uint32_t value)
 	struct demo_desc *demo = (struct demo_desc *)dev;
 	uint32_t fields[] = {DEMO_VAR_LEMO_SET, value,
 			     DEMO_VAR_LEMO_CLR, ~value};
-	struct wrnc_proto_header hdr = {
+	struct trtl_proto_header hdr = {
 		.slot_io = (DEMO_HMQ_IN << 4) |
 			   (DEMO_HMQ_OUT & 0xF),
 		.len = 4,
 	};
 
-	return wrnc_rt_variable_set(demo->wrnc, &hdr, fields, 2);
+	return trtl_rt_variable_set(demo->trtl, &hdr, fields, 2);
 }
 
 
@@ -212,12 +212,12 @@ int demo_led_set(struct demo_node *dev, uint32_t value, enum demo_color color)
 	uint32_t real_value = demo_apply_color(value, color);
 	uint32_t fields[] = {DEMO_VAR_LED_SET, real_value,
 			     DEMO_VAR_LED_CLR, ~real_value};
-	struct wrnc_proto_header hdr = {
+	struct trtl_proto_header hdr = {
 		.slot_io = (DEMO_HMQ_IN << 4) |
 			   (DEMO_HMQ_OUT & 0xF),
 		.len = 6,
 	};
-	return wrnc_rt_variable_set(demo->wrnc, &hdr, fields, 2);
+	return trtl_rt_variable_set(demo->trtl, &hdr, fields, 2);
 }
 
 
@@ -230,15 +230,15 @@ int demo_status_get(struct demo_node *dev, struct demo_status *status)
 	uint32_t fields[] = {DEMO_VAR_LEMO_STA, 0,
 			     DEMO_VAR_LED_STA, 0,
 			     DEMO_VAR_LEMO_DIR, 0};
-	struct wrnc_proto_header hdr = {
+	struct trtl_proto_header hdr = {
 		.slot_io = (DEMO_HMQ_IN << 4) |
 			   (DEMO_HMQ_OUT & 0xF),
-		.flags = WRNC_PROTO_FLAG_SYNC,
+		.flags = TRTL_PROTO_FLAG_SYNC,
 		.len = 6,
 	};
 	int err;
 
-	err = wrnc_rt_variable_get(demo->wrnc, &hdr, fields, 3);
+	err = trtl_rt_variable_get(demo->trtl, &hdr, fields, 3);
 	if (err)
 		return err;
 
@@ -251,43 +251,43 @@ int demo_status_get(struct demo_node *dev, struct demo_status *status)
 
 int demo_run_autodemo(struct demo_node *dev, uint32_t run){ return 0; }
 
-int demo_version(struct demo_node *dev, struct wrnc_rt_version *version)
+int demo_version(struct demo_node *dev, struct trtl_rt_version *version)
 {
 	struct demo_desc *demo = (struct demo_desc *)dev;
 
-	return wrnc_rt_version_get(demo->wrnc, version,
+	return trtl_rt_version_get(demo->trtl, version,
 				   DEMO_HMQ_IN, DEMO_HMQ_OUT);
 }
 
 int demo_test_struct_get(struct demo_node *dev, struct demo_structure *test)
 {
 	struct demo_desc *demo = (struct demo_desc *)dev;
-	struct wrnc_structure_tlv tlv = {
+	struct trtl_structure_tlv tlv = {
 		.index = DEMO_STRUCT_TEST,
 		.size = sizeof(struct demo_structure),
 		.structure = test,
 	};
-	struct wrnc_proto_header hdr = {
+	struct trtl_proto_header hdr = {
 		.slot_io = (DEMO_HMQ_IN << 4) |
 			   (DEMO_HMQ_OUT & 0xF),
-		.flags = WRNC_PROTO_FLAG_SYNC,
+		.flags = TRTL_PROTO_FLAG_SYNC,
 	};
 
-	return wrnc_rt_structure_get(demo->wrnc, &hdr, &tlv, 1);
+	return trtl_rt_structure_get(demo->trtl, &hdr, &tlv, 1);
 }
 
 int demo_test_struct_set(struct demo_node *dev, struct demo_structure *test)
 {
 	struct demo_desc *demo = (struct demo_desc *)dev;
-	struct wrnc_structure_tlv tlv = {
+	struct trtl_structure_tlv tlv = {
 		.index = DEMO_STRUCT_TEST,
 		.size = sizeof(struct demo_structure),
 		.structure = test,
 	};
-	struct wrnc_proto_header hdr = {
+	struct trtl_proto_header hdr = {
 		.slot_io = (DEMO_HMQ_IN << 4) |
 			   (DEMO_HMQ_OUT & 0xF),
 	};
 
-	return wrnc_rt_structure_set(demo->wrnc, &hdr, &tlv, 1);
+	return trtl_rt_structure_set(demo->trtl, &hdr, &tlv, 1);
 }

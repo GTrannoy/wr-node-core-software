@@ -103,18 +103,18 @@ enum wrtd_log_level wrtd_strlogging_to_level(char *log)
  * @param[in] core WRTD core to use
  * @return a HMQ token on success, NULL on error and errno is set appropriately
  */
-static struct wrnc_hmq *wrtd_log_open(struct wrtd_node *dev,
+static struct trtl_hmq *wrtd_log_open(struct wrtd_node *dev,
 				      int channel,
 				      enum wrtd_core core)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_msg_filter filter = {
-		.operation = WRNC_MSG_FILTER_EQ,
+	struct trtl_msg_filter filter = {
+		.operation = TRTL_MSG_FILTER_EQ,
 		.word_offset = 3, /* channel field */
 		.mask = 0xFFFF, /* entire field */
 		.value = channel, /* required channel */
 	};
-	struct wrnc_hmq *hmq = NULL;
+	struct trtl_hmq *hmq = NULL;
 	int err;
 	int n_chan = core ? FD_NUM_CHANNELS : TDC_NUM_CHANNELS;
 	unsigned int hmq_back_index = core ? WRTD_OUT_FD_LOGGING :
@@ -125,7 +125,7 @@ static struct wrnc_hmq *wrtd_log_open(struct wrtd_node *dev,
 		return NULL;
 	}
 
-	hmq = wrnc_hmq_open(wrtd->wrnc, hmq_back_index, 0);
+	hmq = trtl_hmq_open(wrtd->trtl, hmq_back_index, 0);
 	if (!hmq)
 		return NULL;
 
@@ -135,7 +135,7 @@ static struct wrnc_hmq *wrtd_log_open(struct wrtd_node *dev,
 			filter.word_offset = 6;
 		}
 		/* the user want to filter per channel */
-		err = wrnc_hmq_filter_add(hmq, &filter);
+		err = trtl_hmq_filter_add(hmq, &filter);
 		if (err)
 			goto out_close;
 	}
@@ -143,7 +143,7 @@ static struct wrnc_hmq *wrtd_log_open(struct wrtd_node *dev,
 	return hmq;
 
 out_close:
-	wrnc_hmq_close(hmq);
+	trtl_hmq_close(hmq);
 	return NULL;
 }
 
@@ -158,12 +158,12 @@ out_close:
  * @return number of read messages on success (check errno if it returns less
  *         messages than expected), -1 on error and errno is set appropriately
  */
-int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
+int wrtd_log_read(struct trtl_hmq *hmq_log, struct wrtd_log_entry *log,
 		  int count, int poll_timeout)
 {
-	struct wrnc_proto_header hdr;
+	struct trtl_proto_header hdr;
 	struct wrtd_log_entry *cur = log;
-	struct wrnc_msg *msg;
+	struct trtl_msg *msg;
 	struct pollfd p;
 	int remaining = count;
 	int n_read = 0, ret;
@@ -182,13 +182,13 @@ int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
 		if (ret <= 0 || !(p.revents & POLLIN))
 			break;
 
-		msg = wrnc_hmq_receive(hmq_log);
+		msg = trtl_hmq_receive(hmq_log);
 		if (!msg)
 			break;
 
 		if (hmq_log->index == WRTD_OUT_FD_LOGGING) {
 			/* Output */
-			wrnc_msg_header (msg, &id, &seq);
+			trtl_msg_header (msg, &id, &seq);
 
 			if (id != WRTD_REP_LOG_MESSAGE)
 			{
@@ -197,23 +197,23 @@ int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
 				break;
 			}
 
-			wrnc_msg_uint32 (msg, &cur->type);
-			wrnc_msg_int32 (msg, &cur->channel);
-			wrnc_msg_uint32 (msg, &cur->miss_reason);
+			trtl_msg_uint32 (msg, &cur->type);
+			trtl_msg_int32 (msg, &cur->channel);
+			trtl_msg_uint32 (msg, &cur->miss_reason);
 			wrtd_msg_trigger_entry(msg, &ent);
 
 			cur->ts = ent.ts;
 			cur->seq = ent.seq;
 			cur->id = ent.id;
 
-			if ( wrnc_msg_check_error(msg) ) {
+			if ( trtl_msg_check_error(msg) ) {
 				free(msg);
 				errno = EWRTD_INVALID_ANSWER_STATE;
 				break;
 			}
 		} else {
 			/* Input */
-			wrnc_message_unpack(msg, &hdr, cur);
+			trtl_message_unpack(msg, &hdr, cur);
 			if (hdr.msg_id != WRTD_IN_ACTION_LOG) {
 				free(msg);
 				errno = EWRTD_INVALID_ANSWER_STATE;
@@ -235,9 +235,9 @@ int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
  * It closes the logging interface
  * @param[in] hmq HMQ token to close
  */
-void wrtd_log_close(struct wrnc_hmq *hmq)
+void wrtd_log_close(struct trtl_hmq *hmq)
 {
-	wrnc_hmq_close(hmq);
+	trtl_hmq_close(hmq);
 }
 
 
@@ -251,13 +251,13 @@ static int wrtd_log_level_set(struct wrtd_node *dev, unsigned int channel,
 			      uint32_t log_level, enum wrtd_core core)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
-	struct wrnc_structure_tlv tlv;
-	struct wrnc_proto_header hdr;
+	struct trtl_structure_tlv tlv;
+	struct trtl_proto_header hdr;
 	struct wrtd_out_channel ochan;
 	struct wrtd_in_channel ichan;
 	int err;
 
-	hdr.flags = WRNC_PROTO_FLAG_SYNC;
+	hdr.flags = TRTL_PROTO_FLAG_SYNC;
 	if (core) {
 		if (channel >= FD_NUM_CHANNELS) {
 			errno = EWRTD_INVALID_CHANNEL;
@@ -282,7 +282,7 @@ static int wrtd_log_level_set(struct wrtd_node *dev, unsigned int channel,
 			(WRTD_OUT_TDC_CONTROL & 0xF);
 	}
 
-	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	err = trtl_rt_structure_get(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 
@@ -291,7 +291,7 @@ static int wrtd_log_level_set(struct wrtd_node *dev, unsigned int channel,
 	else
 		ichan.config.log_level = log_level;
 
-	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
+	return trtl_rt_structure_set(wrtd->trtl, &hdr, &tlv, 1);
 }
 
 
@@ -304,7 +304,7 @@ static int wrtd_log_level_set(struct wrtd_node *dev, unsigned int channel,
  *                   specific one.
  * @return a HMQ token on success, NULL on error and errno is set appropriately
  */
-struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev, int output)
+struct trtl_hmq *wrtd_out_log_open(struct wrtd_node *dev, int output)
 {
 	return wrtd_log_open(dev, output, WRTD_CORE_OUT);
 }
@@ -357,7 +357,7 @@ int wrtd_out_log_level_get(struct wrtd_node *dev, unsigned int input,
  *                  specific one.
  * @return a HMQ token on success, NULL on error and errno is set appropriately
  */
-struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev, int input)
+struct trtl_hmq *wrtd_in_log_open(struct wrtd_node *dev, int input)
 {
 	return wrtd_log_open(dev, input, WRTD_CORE_IN);
 }

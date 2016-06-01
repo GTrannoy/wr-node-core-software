@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2014 CERN (www.cern.ch)
  * Author: Federico Vaga <federico.vaga@cern.ch>
@@ -23,8 +22,8 @@
 #define MAX_CPU 8
 
 
-struct wrnc_thread_desc {
-	struct wrnc_dev *wrnc;
+struct trtl_thread_desc {
+	struct trtl_dev *trtl;
 	uint32_t dev_id;
 	int cpu_index[MAX_CPU];
 	int n_cpu;
@@ -40,9 +39,9 @@ static int timestamp = 0;
 static void help()
 {
 	fprintf(stderr, "\n");
-	fprintf(stderr, "wrnc-messages -D 0x<hex-number> -i <number> [options]\n\n");
+	fprintf(stderr, "mockturtle-messages -D 0x<hex-number> -i <number> [options]\n\n");
 	fprintf(stderr, "It dumps all messages from a given set of white-rabbit node-core slots\n\n");
-	fprintf(stderr, "-D   WRNC device identificator in hexadecimal format\n");
+	fprintf(stderr, "-D   device identificator in hexadecimal format\n");
 	fprintf(stderr, "-i   slot index\n");
 	fprintf(stderr, "-n   number of total messages to read. The default is 0 (infinite)\n");
 	fprintf(stderr, "-t   print message timestamp\n");
@@ -57,21 +56,21 @@ static void help()
 	fprintf(stderr,
 		"e.g. Dumping messagges from slots 2 and 3 of devices 0x0402 and 0x0382\n\n");
 	fprintf(stderr,
-		"        wrnc-messages -D 0x0382 -i 2 -i 3 -D 0x0402 -i 2 -i 3\n\n");
+		"        mockturtle-messages -D 0x0382 -i 2 -i 3 -D 0x0402 -i 2 -i 3\n\n");
 	exit(1);
 }
 
 
 /**
  * It retreives a message from a given slots and it prints its content
- * @param[in] wrnc device to use
+ * @param[in] trtl device to use
  * @param[in] hmq slot to read
  */
-static int dump_message(struct wrnc_dev *wrnc, struct wrnc_hmq *hmq)
+static int dump_message(struct trtl_dev *trtl, struct trtl_hmq *hmq)
 {
-	struct wrnc_proto_header h;
-	struct wrnc_msg *wmsg;
-        time_t tm;
+	struct trtl_proto_header h;
+	struct trtl_msg *wmsg;
+	time_t tm;
 	char stime[64];
 	struct tm *gm;
 	int i;
@@ -83,13 +82,13 @@ static int dump_message(struct wrnc_dev *wrnc, struct wrnc_hmq *hmq)
 		fprintf(stdout, "[%s] ", stime);
 	}
 	fprintf(stdout, "%s :", basename(hmq->syspath));
-	wmsg = wrnc_hmq_receive(hmq);
+	wmsg = trtl_hmq_receive(hmq);
 	if (!wmsg) {
-		fprintf(stdout, " error : %s\n", wrnc_strerror(errno));
+		fprintf(stdout, " error : %s\n", trtl_strerror(errno));
 		return -1;
 	}
 
-	wrnc_message_unpack(wmsg, &h, NULL);
+	trtl_message_unpack(wmsg, &h, NULL);
 
 	fprintf(stdout, "\n    ---- header ----\n");
 	fprintf(stdout, "    app_id 0x%x | msg_id %d | slot_io 0x%x | seq %d\n",
@@ -100,7 +99,7 @@ static int dump_message(struct wrnc_dev *wrnc, struct wrnc_hmq *hmq)
 	if (h.len) {
 		uint32_t payload[h.len];
 
-		wrnc_message_unpack(wmsg, &h, payload);
+		trtl_message_unpack(wmsg, &h, payload);
 		fprintf(stdout, "    ---- payload -----");
 		for (i = 0; i < h.len; ++i) {
 			if (i % 4 == 0)
@@ -115,46 +114,46 @@ static int dump_message(struct wrnc_dev *wrnc, struct wrnc_hmq *hmq)
 	return 0;
 }
 
-int print_debug(struct wrnc_dbg *dbg)
+int print_debug(struct trtl_dbg *dbg)
 {
 	int n;
 	char c[256];
 
-	n = wrnc_debug_message_get(dbg, c, 256);
+	n = trtl_debug_message_get(dbg, c, 256);
 	if (n < 0)
 		return -1;
 	if (strlen(c) > 0)
 		return fprintf(stderr, "%s-cpu-%02d: %s\n",
-			       wrnc_name_get(dbg->wrnc), dbg->cpu_index, c);
+			       trtl_name_get(dbg->trtl), dbg->cpu_index, c);
 	return 0;
 }
 
 void *debug_thread(void *arg)
 {
-	struct wrnc_thread_desc *th_data = arg;
+	struct trtl_thread_desc *th_data = arg;
 	struct pollfd p[MAX_SLOT];
-	struct wrnc_dbg *wdbg[MAX_CPU];
-	struct wrnc_dev *wrnc = th_data->wrnc;
+	struct trtl_dbg *wdbg[MAX_CPU];
+	struct trtl_dev *trtl = th_data->trtl;
 	int ret, i;
 
 	if (!th_data->n_cpu)
 		return NULL;
 
-  	/* Open the device */
-	if (!wrnc)
-    	    wrnc = wrnc_open_by_fmc(th_data->dev_id);
+	/* Open the device */
+	if (!trtl)
+		trtl = trtl_open_by_fmc(th_data->dev_id);
 
-	if (!wrnc) {
-		fprintf(stderr, "Cannot open WRNC: %s\n", wrnc_strerror(errno));
-	        pthread_exit(NULL);
+	if (!trtl) {
+		fprintf(stderr, "Cannot open TRTL: %s\n", trtl_strerror(errno));
+		pthread_exit(NULL);
 	}
 
 	/* If there, open all debug channels */
 	for (i = 0; i < th_data->n_cpu; i++) {
-		wdbg[i] = wrnc_debug_open(wrnc, th_data->cpu_index[i]);
+		wdbg[i] = trtl_debug_open(trtl, th_data->cpu_index[i]);
 		if (!wdbg[i]) {
-			fprintf(stderr, "Cannot open WRNC debug channel: %s\n",
-				wrnc_strerror(errno));
+			fprintf(stderr, "Cannot open Mock Turtle debug channel: %s\n",
+				trtl_strerror(errno));
 			fprintf(stderr,
 				"NOTE: the debug interface is on debugfs, be sure that is mounted\n");
 			goto out;
@@ -186,7 +185,7 @@ void *debug_thread(void *arg)
 			break;
 		case -1:
 			/* error */
-		        goto out;
+			goto out;
 			break;
 		}
 	}
@@ -194,8 +193,8 @@ void *debug_thread(void *arg)
 out:
 	/* Close all debug channels */
 	while (--i >= 0)
-	  wrnc_debug_close(wdbg[i]);
-	wrnc_close(wrnc);
+	  trtl_debug_close(wdbg[i]);
+	trtl_close(trtl);
 
 	return NULL;
 }
@@ -206,33 +205,33 @@ out:
  */
 void *message_thread(void *arg)
 {
-	struct wrnc_thread_desc *th_data = arg;
+	struct trtl_thread_desc *th_data = arg;
 	struct pollfd p[MAX_SLOT];
-	struct wrnc_dev *wrnc = th_data->wrnc;
-	struct wrnc_hmq *hmq[th_data->n_slot];
+	struct trtl_dev *trtl = th_data->trtl;
+	struct trtl_hmq *hmq[th_data->n_slot];
 	int ret, err, i;
 
 	if (!th_data->n_slot)
 		return NULL;
 
 	/* Open the device */
-	if (!wrnc)
-	    wrnc = wrnc_open_by_fmc(th_data->dev_id);
+	if (!trtl)
+		trtl = trtl_open_by_fmc(th_data->dev_id);
 
-	if (!wrnc) {
-		fprintf(stderr, "Cannot open WRNC: %s\n", wrnc_strerror(errno));
-	        pthread_exit(NULL);
+	if (!trtl) {
+		fprintf(stderr, "Cannot open Mock Turtle device: %s\n", trtl_strerror(errno));
+		pthread_exit(NULL);
 	}
 
 	/* Build the polling structures */
 	for (i = 0; i < th_data->n_slot; ++i) {
-		wrnc_hmq_share_set(wrnc, 0 , th_data->slot_index[i], 1);
+		trtl_hmq_share_set(trtl, 0 , th_data->slot_index[i], 1);
 
-		hmq[i] = wrnc_hmq_open(wrnc, th_data->slot_index[i],
-				    WRNC_HMQ_OUTCOMING);
+		hmq[i] = trtl_hmq_open(trtl, th_data->slot_index[i],
+				    TRTL_HMQ_OUTCOMING);
 		if (!hmq[i]) {
 			fprintf(stderr, "Cannot open HMQ: %s\n",
-				wrnc_strerror(errno));
+				trtl_strerror(errno));
 			goto out;
 		}
 		p[i].fd = hmq[i]->fd;
@@ -250,7 +249,7 @@ void *message_thread(void *arg)
 				if (!(p[i].revents & POLLIN))
 					continue;
 
-				err = dump_message(wrnc, hmq[i]);
+				err = dump_message(trtl, hmq[i]);
 				if (err)
 					continue;
 				pthread_mutex_lock(&mtx);
@@ -263,22 +262,22 @@ void *message_thread(void *arg)
 			break;
 		case -1:
 			/* error */
-		        goto out;
+			goto out;
 		}
 	}
 
 out:
 	/* Close all message slots */
 	while (--i >= 0)
-		wrnc_hmq_close(hmq[i]);
-	wrnc_close(wrnc);
+		trtl_hmq_close(hmq[i]);
+	trtl_close(trtl);
 	return NULL;
 }
 
 
 int main(int argc, char *argv[])
 {
-	struct wrnc_thread_desc th_data[MAX_DEV], *last;
+	struct trtl_thread_desc th_data[MAX_DEV], *last;
 	unsigned long i;
 	unsigned int di = 0;
 	int show_all_debug = 0, share = 0;
@@ -286,9 +285,9 @@ int main(int argc, char *argv[])
 	int err;
 	char c;
 
-	atexit(wrnc_exit);
+	atexit(trtl_exit);
 
-	memset(th_data, 0, sizeof(struct wrnc_thread_desc) * MAX_DEV);
+	memset(th_data, 0, sizeof(struct trtl_thread_desc) * MAX_DEV);
 
 	while ((c = getopt (argc, argv, "Qhi:D:n:N:td:s")) != -1) {
 		switch (c) {
@@ -330,7 +329,7 @@ int main(int argc, char *argv[])
 				break;
 
 			sscanf(optarg, "%d", &last->cpu_index[last->n_cpu]);
-		        last->n_cpu++;
+			last->n_cpu++;
 			break;
 		case 'Q':
 			show_all_debug = 1;
@@ -343,10 +342,10 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	err = wrnc_init();
+	err = trtl_init();
 	if (err) {
 		fprintf(stderr, "Cannot init White Rabbit Node Core lib: %s\n",
-			wrnc_strerror(errno));
+			trtl_strerror(errno));
 		exit(1);
 	}
 
@@ -355,27 +354,27 @@ int main(int argc, char *argv[])
 		th_data[i].share = share;
 
 	if(show_all_debug) {
-		char **list = wrnc_list();
+		char **list = trtl_list();
 		unsigned int cpucount = 0;
 
 		for (di = 0; list[di]; ++di) {
 			int j;
-			struct wrnc_dev *wrnc = wrnc_open(list[di]);
+			struct trtl_dev *trtl = trtl_open(list[di]);
 
-			wrnc_cpu_count(wrnc, &cpucount);
+			trtl_cpu_count(trtl, &cpucount);
 			printf("ID %s n_cpu %d\n", list[di], cpucount);
-			th_data[di].wrnc = wrnc;
+			th_data[di].trtl = trtl;
 			for(j = 0; j < cpucount; j++)
 				th_data[di].cpu_index[j] = j;
 			th_data[di].n_cpu = cpucount;
 			th_data[di].n_slot = 0;
 		}
-		wrnc_list_free(list);
+		trtl_list_free(list);
 	}
 
 	/* Run dumping on in parallel from several devices */
 	for (i = 0; i < di; i++) {
-	        err = pthread_create(&tid_msg[i], NULL, message_thread,
+		err = pthread_create(&tid_msg[i], NULL, message_thread,
 				     (void *)(&th_data[i]));
 		if (err)
 			fprintf(stderr,
@@ -385,7 +384,7 @@ int main(int argc, char *argv[])
 
 	/* Run dumping on in parallel from several devices */
 	for (i = 0; i < di; i++) {
-	        err = pthread_create(&tid_dbg[i], NULL, debug_thread,
+		err = pthread_create(&tid_dbg[i], NULL, debug_thread,
 				     (void *)(&th_data[i]));
 		if (err)
 			fprintf(stderr,

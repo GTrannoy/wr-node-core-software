@@ -17,29 +17,29 @@
 				      - sizeof(struct wrtd_out_channel_private))
 
 /* Basic header for synchronous messages */
-static const struct wrnc_proto_header hdr_base_sync = {
+static const struct trtl_proto_header hdr_base_sync = {
 	.slot_io = (WRTD_IN_FD_CONTROL << 4) |(WRTD_OUT_FD_CONTROL & 0xF),
-	.flags = WRNC_PROTO_FLAG_SYNC,
+	.flags = TRTL_PROTO_FLAG_SYNC,
 };
 
 /*
  * Internal helper to send and receive synchronous messages to/from the WRNC
  */
 static inline int wrtd_out_send_and_receive_sync(struct wrtd_desc *wrtd,
-						struct wrnc_msg *msg)
+						struct trtl_msg *msg)
 {
 	/* Send the message and get answer */
-	struct wrnc_hmq *hmq;
+	struct trtl_hmq *hmq;
 	int err;
 
-	hmq = wrnc_hmq_open(wrtd->wrnc, WRTD_IN_FD_CONTROL, WRNC_HMQ_INCOMING);
+	hmq = trtl_hmq_open(wrtd->trtl, WRTD_IN_FD_CONTROL, TRTL_HMQ_INCOMING);
 	if (!hmq)
 		return -1;
 
-	err = wrnc_hmq_send_and_receive_sync(hmq, WRTD_OUT_FD_CONTROL, msg,
+	err = trtl_hmq_send_and_receive_sync(hmq, WRTD_OUT_FD_CONTROL, msg,
 					     WRTD_DEFAULT_TIMEOUT);
 
-	wrnc_hmq_close(hmq);
+	trtl_hmq_close(hmq);
 
 	return err < 0 ? err : 0; /* Ignore timeout */
 }
@@ -71,63 +71,63 @@ static int wrtd_out_trigger_first_free(struct wrtd_node *dev)
 static int wrtd_out_trigger_index_get(struct wrtd_desc *wrtd,
 				      struct wrtd_trig_id *tid)
 {
-	struct wrnc_proto_header hdr = {
+	struct trtl_proto_header hdr = {
 		.msg_id = WRTD_OUT_ACTION_TRIG_IDX,
 		.slot_io = (WRTD_IN_FD_CONTROL << 4) |
 			   (WRTD_OUT_FD_CONTROL & 0xF),
-		.flags = WRNC_PROTO_FLAG_SYNC,
+		.flags = TRTL_PROTO_FLAG_SYNC,
 		.len = sizeof(struct wrtd_trig_id) / 4,
 	};
-	struct wrnc_msg msg;
+	struct trtl_msg msg;
 	void *data;
 	int err;
 
-	memset(&msg, 0, sizeof(struct wrnc_msg));
-	data = &msg.data[sizeof(struct wrnc_proto_header) / 4];
+	memset(&msg, 0, sizeof(struct trtl_msg));
+	data = &msg.data[sizeof(struct trtl_proto_header) / 4];
 	memcpy(data, tid, sizeof(struct wrtd_trig_id));
-	wrnc_message_header_set(&msg, &hdr);
-	msg.datalen = sizeof(struct wrnc_proto_header) / 4 + hdr.len;
+	trtl_message_header_set(&msg, &hdr);
+	msg.datalen = sizeof(struct trtl_proto_header) / 4 + hdr.len;
 	err = wrtd_out_send_and_receive_sync(wrtd, &msg);
 	if (err)
 		return -1;
-	wrnc_message_header_get(&msg, &hdr);
+	trtl_message_header_get(&msg, &hdr);
 	if (hdr.len != 1 || hdr.msg_id == RT_ACTION_SEND_NACK) {
 		errno = EWRTD_NOFOUND_TRIGGER;
 		return -1;
 	}
 	if (hdr.msg_id != WRTD_OUT_ACTION_TRIG_IDX &&
 	    hdr.msg_id != WRTD_OUT_ACTION_TRIG_FRE) {
-		errno = EWRNC_INVALID_MESSAGE;
+		errno = ETRTL_INVALID_MESSAGE;
 		return -1;
 	}
 
 	/* return the trigger index */
-	return msg.data[sizeof(struct wrnc_proto_header) / 4];
+	return msg.data[sizeof(struct trtl_proto_header) / 4];
 }
 
 static int wrtd_out_action_one_word(struct wrtd_desc *wrtd,
 				    uint8_t msgid, uint32_t word)
 {
-	struct wrnc_proto_header hdr = {
+	struct trtl_proto_header hdr = {
 		.msg_id = msgid,
 		.slot_io = (WRTD_IN_FD_CONTROL << 4) |
 			   (WRTD_OUT_FD_CONTROL & 0xF),
-		.flags = WRNC_PROTO_FLAG_SYNC,
+		.flags = TRTL_PROTO_FLAG_SYNC,
 		.len = 1,
 	};
-	struct wrnc_msg msg;
+	struct trtl_msg msg;
 	uint32_t *data;
 	int err;
 
-	memset(&msg, 0, sizeof(struct wrnc_msg));
-	data = &msg.data[sizeof(struct wrnc_proto_header) / 4];
+	memset(&msg, 0, sizeof(struct trtl_msg));
+	data = &msg.data[sizeof(struct trtl_proto_header) / 4];
 	data[0] = word;
-	wrnc_message_header_set(&msg, &hdr);
-	msg.datalen = sizeof(struct wrnc_proto_header) / 4 + hdr.len;
+	trtl_message_header_set(&msg, &hdr);
+	msg.datalen = sizeof(struct trtl_proto_header) / 4 + hdr.len;
 	err = wrtd_out_send_and_receive_sync(wrtd, &msg);
 	if (err)
 		return -1;
-	wrnc_message_header_get(&msg, &hdr);
+	trtl_message_header_get(&msg, &hdr);
 
 	if (hdr.msg_id != RT_ACTION_SEND_ACK) {
 		errno = EWRTD_INVALID_ANSWER_ACK;
@@ -154,10 +154,10 @@ static inline int wrtd_out_rt_disable(struct wrtd_desc *wrtd,
 	return wrtd_out_action_one_word(wrtd, WRTD_OUT_ACTION_DISABLE, output);
 }
 
-static struct wrnc_structure_tlv wrtd_trigger_tlv(uint32_t index,
+static struct trtl_structure_tlv wrtd_trigger_tlv(uint32_t index,
 						  struct wrtd_out_trigger *trig)
 {
-	struct wrnc_structure_tlv tlv = {
+	struct trtl_structure_tlv tlv = {
 		.index = __WRTD_OUT_STRUCT_MAX + index,
 		.size = sizeof(struct wrtd_out_trigger),
 		.structure = trig,
@@ -165,10 +165,10 @@ static struct wrnc_structure_tlv wrtd_trigger_tlv(uint32_t index,
 
 	return tlv;
 }
-static struct wrnc_structure_tlv wrtd_channel_tlv(uint32_t index,
+static struct trtl_structure_tlv wrtd_channel_tlv(uint32_t index,
 						  struct wrtd_out_channel *chan)
 {
-	struct wrnc_structure_tlv tlv = {
+	struct trtl_structure_tlv tlv = {
 		.index = OUT_STRUCT_CHAN_0 + index,
 		.size = WRTD_OUT_CHANNEL_PUBLIC_SIZE,
 		.structure = chan,
@@ -194,8 +194,8 @@ int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrtd_out out;
 	struct wrtd_out_channel chan;
-	struct wrnc_structure_tlv tlv = wrtd_channel_tlv(output, &chan);
-	struct wrnc_proto_header hdr = hdr_base_sync;
+	struct trtl_structure_tlv tlv = wrtd_channel_tlv(output, &chan);
+	struct trtl_proto_header hdr = hdr_base_sync;
 	int err;
 
 	if (output >= FD_NUM_CHANNELS) {
@@ -208,7 +208,7 @@ int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 		return -1;
 	}
 
-	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	err = trtl_rt_structure_get(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 
@@ -243,7 +243,7 @@ int wrtd_out_state_get(struct wrtd_node *dev, unsigned int output,
 	tlv.index = OUT_STRUCT_DEVICE;
 	tlv.size = sizeof(struct wrtd_out);
 	tlv.structure = &out;
-	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	err = trtl_rt_structure_get(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 	state->received_messages = out.counter_etherbone;
@@ -266,8 +266,8 @@ int wrtd_out_enable(struct wrtd_node *dev, unsigned int output,
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrtd_out_channel chan;
-	struct wrnc_structure_tlv tlv = wrtd_channel_tlv(output, &chan);
-	struct wrnc_proto_header hdr = hdr_base_sync;
+	struct trtl_structure_tlv tlv = wrtd_channel_tlv(output, &chan);
+	struct trtl_proto_header hdr = hdr_base_sync;
 	int err;
 
 	if (output >= FD_NUM_CHANNELS) {
@@ -275,7 +275,7 @@ int wrtd_out_enable(struct wrtd_node *dev, unsigned int output,
 		return -1;
 	}
 
-	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	err = trtl_rt_structure_get(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 
@@ -291,7 +291,7 @@ int wrtd_out_enable(struct wrtd_node *dev, unsigned int output,
 			return -1;
 	}
 
-	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
+	return trtl_rt_structure_set(wrtd->trtl, &hdr, &tlv, 1);
 }
 
 
@@ -302,8 +302,8 @@ static int wrtd_out_trig_assign_condition_by_index(struct wrtd_node *dev,
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrtd_out_trigger trig;
-	struct wrnc_structure_tlv tlv;
-	struct wrnc_proto_header hdr = hdr_base_sync;
+	struct trtl_structure_tlv tlv;
+	struct trtl_proto_header hdr = hdr_base_sync;
 	int err;
 
 	if (output >= FD_NUM_CHANNELS) {
@@ -312,7 +312,7 @@ static int wrtd_out_trig_assign_condition_by_index(struct wrtd_node *dev,
 	}
 
 	tlv = wrtd_trigger_tlv(trig_idx, &trig);
-	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	err = trtl_rt_structure_get(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 	wrtd_output_rule_endianess_fix(&trig.ocfg[output]);
@@ -328,12 +328,12 @@ static int wrtd_out_trig_assign_condition_by_index(struct wrtd_node *dev,
 	trig.ocfg[output].cond_ptr = cond_idx;
 
 	wrtd_output_rule_endianess_fix(&trig.ocfg[output]);
-	err = wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
+	err = trtl_rt_structure_set(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 
 	tlv = wrtd_trigger_tlv(cond_idx, &trig);
-	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	err = trtl_rt_structure_get(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 	wrtd_output_rule_endianess_fix(&trig.ocfg[output]);
@@ -349,7 +349,7 @@ static int wrtd_out_trig_assign_condition_by_index(struct wrtd_node *dev,
 	trig.ocfg[output].cond_ptr = -1;
 
 	wrtd_output_rule_endianess_fix(&trig.ocfg[output]);
-	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
+	return trtl_rt_structure_set(wrtd->trtl, &hdr, &tlv, 1);
 }
 
 
@@ -361,8 +361,8 @@ static int wrtd_out_flag_set(struct wrtd_node *dev, unsigned int output,
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrtd_out_channel chan;
-	struct wrnc_structure_tlv tlv = wrtd_channel_tlv(output, &chan);
-	struct wrnc_proto_header hdr = hdr_base_sync;
+	struct trtl_structure_tlv tlv = wrtd_channel_tlv(output, &chan);
+	struct trtl_proto_header hdr = hdr_base_sync;
 	int err;
 
 	if (output >= FD_NUM_CHANNELS) {
@@ -370,13 +370,13 @@ static int wrtd_out_flag_set(struct wrtd_node *dev, unsigned int output,
 		return -1;
 	}
 
-	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	err = trtl_rt_structure_get(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 
 	chan.config.flags |= flags;
 
-	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
+	return trtl_rt_structure_set(wrtd->trtl, &hdr, &tlv, 1);
 }
 
 /**
@@ -388,8 +388,8 @@ static int wrtd_out_flag_clr(struct wrtd_node *dev, unsigned int output,
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrtd_out_channel chan;
-	struct wrnc_structure_tlv tlv = wrtd_channel_tlv(output, &chan);
-	struct wrnc_proto_header hdr = hdr_base_sync;
+	struct trtl_structure_tlv tlv = wrtd_channel_tlv(output, &chan);
+	struct trtl_proto_header hdr = hdr_base_sync;
 	int err;
 
 	if (output >= FD_NUM_CHANNELS) {
@@ -397,13 +397,13 @@ static int wrtd_out_flag_clr(struct wrtd_node *dev, unsigned int output,
 		return -1;
 	}
 
-	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	err = trtl_rt_structure_get(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 
 	chan.config.flags &= ~flags;
 
-	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
+	return trtl_rt_structure_set(wrtd->trtl, &hdr, &tlv, 1);
 }
 
 static int wrtd_out_trig_assign_one(struct wrtd_node *dev, unsigned int output,
@@ -412,8 +412,8 @@ static int wrtd_out_trig_assign_one(struct wrtd_node *dev, unsigned int output,
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrtd_out_trigger trig;
-	struct wrnc_structure_tlv tlv;
-	struct wrnc_proto_header hdr = hdr_base_sync;
+	struct trtl_structure_tlv tlv;
+	struct trtl_proto_header hdr = hdr_base_sync;
 	int err, ret;
 
 	handle->channel = output;
@@ -428,7 +428,7 @@ static int wrtd_out_trig_assign_one(struct wrtd_node *dev, unsigned int output,
 	handle->ptr_trig = ret;
 
 	tlv = wrtd_trigger_tlv(handle->ptr_trig, &trig);
-	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	err = trtl_rt_structure_get(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 
@@ -441,7 +441,7 @@ static int wrtd_out_trig_assign_one(struct wrtd_node *dev, unsigned int output,
 	trig.ocfg[handle->channel].cond_ptr = -1;
 	wrtd_output_rule_endianess_fix(&trig.ocfg[handle->channel]);
 
-	err = wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
+	err = trtl_rt_structure_set(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 
@@ -503,9 +503,9 @@ int wrtd_out_trig_unassign(struct wrtd_node *dev,
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrtd_output_trigger_state triggers[256];
 	struct wrtd_out_trigger trig;
-	struct wrnc_structure_tlv tlv = wrtd_trigger_tlv(handle->ptr_trig,
+	struct trtl_structure_tlv tlv = wrtd_trigger_tlv(handle->ptr_trig,
 							 &trig);
-	struct wrnc_proto_header hdr = hdr_base_sync;
+	struct trtl_proto_header hdr = hdr_base_sync;
 	struct wrtd_output_trigger_state state;
 	int err, cnt = 0, i;
 	volatile int cond;
@@ -515,7 +515,7 @@ int wrtd_out_trig_unassign(struct wrtd_node *dev,
 		return -1;
 	}
 
-	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	err = trtl_rt_structure_get(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 	wrtd_output_rule_endianess_fix(&trig.ocfg[handle->channel]);
@@ -529,7 +529,7 @@ int wrtd_out_trig_unassign(struct wrtd_node *dev,
 		trig.flags &= ~ENTRY_FLAG_VALID;
 
 	wrtd_output_rule_endianess_fix(&trig.ocfg[handle->channel]);
-        err = wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
+        err = trtl_rt_structure_set(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 	err = wrtd_out_trigger_remove(wrtd, handle->ptr_trig);
@@ -664,12 +664,12 @@ int wrtd_out_trig_state_get_by_index(struct wrtd_node *dev, unsigned int index,
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrtd_out_trigger trig;
-	struct wrnc_structure_tlv tlv = wrtd_trigger_tlv(index, &trig);
-	struct wrnc_proto_header hdr = hdr_base_sync;
+	struct trtl_structure_tlv tlv = wrtd_trigger_tlv(index, &trig);
+	struct trtl_proto_header hdr = hdr_base_sync;
 	struct wrtd_output_trigger_state cond;
 	int err;
 
-	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	err = trtl_rt_structure_get(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 	wrtd_output_rule_endianess_fix(&trig.ocfg[output]);
@@ -722,8 +722,8 @@ static int wrtd_out_rule_delay_set(struct wrtd_node *dev,
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrtd_out_trigger trig;
-	struct wrnc_structure_tlv tlv = wrtd_trigger_tlv(trig_idx, &trig);
-	struct wrnc_proto_header hdr = hdr_base_sync;
+	struct trtl_structure_tlv tlv = wrtd_trigger_tlv(trig_idx, &trig);
+	struct trtl_proto_header hdr = hdr_base_sync;
 	struct wr_timestamp t;
 	int err;
 
@@ -738,7 +738,7 @@ static int wrtd_out_rule_delay_set(struct wrtd_node *dev,
 
 	}
 
-	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	err = trtl_rt_structure_get(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 	wrtd_output_rule_endianess_fix(&trig.ocfg[output]);
@@ -753,7 +753,7 @@ static int wrtd_out_rule_delay_set(struct wrtd_node *dev,
 	trig.ocfg[output].delay_frac = t.frac;
 
 	wrtd_output_rule_endianess_fix(&trig.ocfg[output]);
-	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
+	return trtl_rt_structure_set(wrtd->trtl, &hdr, &tlv, 1);
 }
 
 
@@ -783,8 +783,8 @@ int wrtd_out_pulse_width_set(struct wrtd_node *dev, unsigned int output,
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrtd_out_channel chan;
-	struct wrnc_structure_tlv tlv = wrtd_channel_tlv(output, &chan);
-	struct wrnc_proto_header hdr = hdr_base_sync;
+	struct trtl_structure_tlv tlv = wrtd_channel_tlv(output, &chan);
+	struct trtl_proto_header hdr = hdr_base_sync;
 	int err;
 
 	if (output >= FD_NUM_CHANNELS) {
@@ -798,13 +798,13 @@ int wrtd_out_pulse_width_set(struct wrtd_node *dev, unsigned int output,
 		return -1;
 	}
 
-	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	err = trtl_rt_structure_get(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 
 	chan.config.width_cycles = width_ps / 8000ULL;
 
-	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
+	return trtl_rt_structure_set(wrtd->trtl, &hdr, &tlv, 1);
 }
 
 
@@ -827,8 +827,8 @@ int wrtd_out_dead_time_set(struct wrtd_node *dev, unsigned int output,
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrtd_out_channel chan;
-	struct wrnc_structure_tlv tlv = wrtd_channel_tlv(output, &chan);
-	struct wrnc_proto_header hdr = hdr_base_sync;
+	struct trtl_structure_tlv tlv = wrtd_channel_tlv(output, &chan);
+	struct trtl_proto_header hdr = hdr_base_sync;
 	int err;
 
 	if (output >= FD_NUM_CHANNELS) {
@@ -836,13 +836,13 @@ int wrtd_out_dead_time_set(struct wrtd_node *dev, unsigned int output,
 		return -1;
 	}
 
-	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	err = trtl_rt_structure_get(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 
 	chan.config.dead_time = dead_time_ps / 8000;
 
-	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
+	return trtl_rt_structure_set(wrtd->trtl, &hdr, &tlv, 1);
 }
 
 
@@ -877,9 +877,9 @@ int wrtd_out_trig_enable(struct wrtd_node *dev,
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrtd_out_trigger trig;
-	struct wrnc_structure_tlv tlv = wrtd_trigger_tlv(handle->ptr_trig,
+	struct trtl_structure_tlv tlv = wrtd_trigger_tlv(handle->ptr_trig,
 							 &trig);
-	struct wrnc_proto_header hdr = hdr_base_sync;
+	struct trtl_proto_header hdr = hdr_base_sync;
 	int err;
 
 	if (handle->channel >= FD_NUM_CHANNELS) {
@@ -887,7 +887,7 @@ int wrtd_out_trig_enable(struct wrtd_node *dev,
 		return -1;
 	}
 
-	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	err = trtl_rt_structure_get(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 	wrtd_output_rule_endianess_fix(&trig.ocfg[handle->channel]);
@@ -903,7 +903,7 @@ int wrtd_out_trig_enable(struct wrtd_node *dev,
 		trig.ocfg[handle->channel].state |= HASH_ENT_DISABLED;
 
 	wrtd_output_rule_endianess_fix(&trig.ocfg[handle->channel]);
-	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
+	return trtl_rt_structure_set(wrtd->trtl, &hdr, &tlv, 1);
 }
 
 
@@ -920,8 +920,8 @@ int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrtd_out_channel chan;
-	struct wrnc_structure_tlv tlv = wrtd_channel_tlv(output, &chan);
-	struct wrnc_proto_header hdr = hdr_base_sync;
+	struct trtl_structure_tlv tlv = wrtd_channel_tlv(output, &chan);
+	struct trtl_proto_header hdr = hdr_base_sync;
 	int err;
 
 	if (output >= FD_NUM_CHANNELS) {
@@ -929,7 +929,7 @@ int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
 		return -1;
 	}
 
-	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	err = trtl_rt_structure_get(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 
@@ -940,7 +940,7 @@ int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
 		chan.config.state = OUT_ST_IDLE;
 	}
 
-	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
+	return trtl_rt_structure_set(wrtd->trtl, &hdr, &tlv, 1);
 }
 
 
@@ -955,8 +955,8 @@ int wrtd_out_arm(struct wrtd_node *dev, unsigned int output, int armed)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrtd_out_channel chan;
-	struct wrnc_structure_tlv tlv = wrtd_channel_tlv(output, &chan);
-	struct wrnc_proto_header hdr = hdr_base_sync;
+	struct trtl_structure_tlv tlv = wrtd_channel_tlv(output, &chan);
+	struct trtl_proto_header hdr = hdr_base_sync;
 	int err;
 
 	if (output >= FD_NUM_CHANNELS) {
@@ -964,7 +964,7 @@ int wrtd_out_arm(struct wrtd_node *dev, unsigned int output, int armed)
 		return -1;
 	}
 
-	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	err = trtl_rt_structure_get(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 
@@ -977,7 +977,7 @@ int wrtd_out_arm(struct wrtd_node *dev, unsigned int output, int armed)
 		chan.config.state = OUT_ST_IDLE;
 	}
 
-	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
+	return trtl_rt_structure_set(wrtd->trtl, &hdr, &tlv, 1);
 }
 
 
@@ -990,8 +990,8 @@ int wrtd_out_counters_reset(struct wrtd_node *dev, unsigned int output)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	struct wrtd_out_channel chan;
-	struct wrnc_structure_tlv tlv = wrtd_channel_tlv(output, &chan);
-	struct wrnc_proto_header hdr = hdr_base_sync;
+	struct trtl_structure_tlv tlv = wrtd_channel_tlv(output, &chan);
+	struct trtl_proto_header hdr = hdr_base_sync;
 	int err;
 
 	if (output >= FD_NUM_CHANNELS) {
@@ -999,7 +999,7 @@ int wrtd_out_counters_reset(struct wrtd_node *dev, unsigned int output)
 		return -1;
 	}
 
-	err = wrnc_rt_structure_get(wrtd->wrnc, &hdr, &tlv, 1);
+	err = trtl_rt_structure_get(wrtd->trtl, &hdr, &tlv, 1);
 	if (err)
 		return err;
 
@@ -1009,7 +1009,7 @@ int wrtd_out_counters_reset(struct wrtd_node *dev, unsigned int output)
 	chan.stats.miss_overflow = 0;
 	chan.config.flags &= ~WRTD_LAST_VALID;
 
-	return wrnc_rt_structure_set(wrtd->wrnc, &hdr, &tlv, 1);
+	return trtl_rt_structure_set(wrtd->trtl, &hdr, &tlv, 1);
 }
 
 
@@ -1129,7 +1129,7 @@ int wrtd_out_ping(struct wrtd_node *dev)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 
-	return wrnc_rt_ping(wrtd->wrnc, WRTD_IN_FD_CONTROL,
+	return trtl_rt_ping(wrtd->trtl, WRTD_IN_FD_CONTROL,
 			    WRTD_OUT_FD_CONTROL);
 }
 
@@ -1144,10 +1144,10 @@ int wrtd_out_base_time(struct wrtd_node *dev, struct wr_timestamp *ts)
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	uint32_t variables[] = {OUT_VAR_DEVICE_TIME_S, 0,
 				OUT_VAR_DEVICE_TIME_T, 0};
-	struct wrnc_proto_header hdr = hdr_base_sync;
+	struct trtl_proto_header hdr = hdr_base_sync;
 	int err;
 
-	err = wrnc_rt_variable_get(wrtd->wrnc, &hdr, variables, 2);
+	err = trtl_rt_variable_get(wrtd->trtl, &hdr, variables, 2);
 	if (err)
 		return err;
 	ts->seconds = variables[1];
@@ -1163,10 +1163,10 @@ int wrtd_out_base_time(struct wrtd_node *dev, struct wr_timestamp *ts)
  * @param[out] version the RT application version
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrtd_out_version(struct wrtd_node *dev, struct wrnc_rt_version *version)
+int wrtd_out_version(struct wrtd_node *dev, struct trtl_rt_version *version)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 
-	return wrnc_rt_version_get(wrtd->wrnc, version,
+	return trtl_rt_version_get(wrtd->trtl, version,
 				   WRTD_IN_FD_CONTROL, WRTD_OUT_FD_CONTROL);
 }

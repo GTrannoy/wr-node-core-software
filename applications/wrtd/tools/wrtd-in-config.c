@@ -340,7 +340,7 @@ int main(int argc, char *argv[])
 	err = wrtd_init();
 	if (err) {
 		fprintf(stderr, "Cannot init White Rabbit Trigger Distribution lib: %s\n",
-			wrnc_strerror(errno));
+			trtl_strerror(errno));
 		exit(1);
 	}
 

@@ -25,7 +25,6 @@ void trtl_message_header_set(struct trtl_msg *msg,
 	msg->data[2] = htobe32(hdr32[2]);
 	msg->data[3] = hdr32[3];
 	msg->datalen = sizeof(struct trtl_proto_header) / 4;
-	msg->max_size = msg->datalen;
 }
 
 /**
@@ -68,7 +67,6 @@ void trtl_message_pack(struct trtl_msg *msg,
 	memcpy(data + sizeof(struct trtl_proto_header), payload,
 	       hdr->len * 4);
 	msg->datalen += hdr->len;
-	msg->max_size = msg->datalen;
 }
 
 

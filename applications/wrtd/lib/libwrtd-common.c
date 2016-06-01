@@ -10,7 +10,6 @@
 #include <errno.h>
 #include <libmockturtle.h>
 #include <libwrtd-internal.h>
-#include <wrtd-serializers.h>
 
 static const uint32_t application_id[] = {
 	0x115790de,

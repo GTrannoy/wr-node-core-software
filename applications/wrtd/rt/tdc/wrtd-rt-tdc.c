@@ -41,6 +41,7 @@ enum wrtd_in_wr_link {
 static struct wrtd_in wrtd_in_dev;
 static struct wrtd_in_channel wrtd_in_channels[TDC_NUM_CHANNELS];
 
+struct rt_application app;
 
 uint32_t seq = 0; /**< global sequence number */
 uint32_t sent_packets = 0; /**< Total number of packets sent */
@@ -80,7 +81,7 @@ static int wrtd_in_trigger_log(int type, int miss_reason,
 	struct trtl_msg out_buf;
 	struct wrtd_log_entry *log;
 	struct trtl_proto_header hdr = {
-		.rt_app_id = 0,
+		.rt_app_id = app.version.rt_id,
 		.msg_id = WRTD_IN_ACTION_LOG,
 		.slot_io = WRTD_OUT_TDC_LOGGING,
 		.seq = seq,

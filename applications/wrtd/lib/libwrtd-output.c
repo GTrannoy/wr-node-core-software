@@ -11,10 +11,6 @@
 #include <libmockturtle.h>
 #include <libwrtd-internal.h>
 
-#include "wrtd-serializers.h"
-
-#define WRTD_OUT_CHANNEL_PUBLIC_SIZE (sizeof(struct wrtd_out_channel)	\
-				      - sizeof(struct wrtd_out_channel_private))
 
 /* Basic header for synchronous messages */
 static const struct trtl_proto_header hdr_base_sync = {

@@ -30,14 +30,6 @@ enum trtl_smem_modifier {
 	TRTL_SMEM_XOR, /**< on write, atomic XOR with memory content */
 };
 
-/**
- * @enum trtl_msg_direction
- * Message direction on the Host Message Queue
- */
-enum trtl_msg_direction {
-	WRNC_MSG_DIR_SEND = 0, /**< from Host to RealTime Application */
-	WRNC_MSG_DIR_RECEIVE = 1, /**< from RealTime application to Host */ 
-};
 
 /**
  * Messages descriptor
@@ -46,11 +38,6 @@ struct trtl_msg {
 	uint32_t datalen; /**< payload length*/
 	uint32_t data[TRTL_MAX_PAYLOAD_SIZE]; /**< payload, free content
 						 (no official protocol) */
-	uint32_t max_size; /**< maximum message size for chosen slot */
-	uint32_t offset; /**< serialization/deserialization offset */
-	enum trtl_msg_direction direction; /**< serialization direction
-					      (used by trtl_msg_x functions) */
-	int error; /** serialization error status */
 };
 
 /**

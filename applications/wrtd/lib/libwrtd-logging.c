@@ -11,7 +11,6 @@
 #include <poll.h>
 #include <libmockturtle.h>
 #include <libwrtd-internal.h>
-#include <wrtd-serializers.h>
 
 /**
  * It returns a human readable string that describe a given log level
@@ -167,7 +166,6 @@ int wrtd_log_read(struct trtl_hmq *hmq_log, struct wrtd_log_entry *log,
 	struct pollfd p;
 	int remaining = count;
 	int n_read = 0, ret;
-	uint32_t id = 0, seq = 0;
 
 	p.fd = hmq_log->fd;
 	p.events = POLLIN;
@@ -177,7 +175,6 @@ int wrtd_log_read(struct trtl_hmq *hmq_log, struct wrtd_log_entry *log,
 	   than expected */
 	errno = 0;
 	while (remaining) {
-		struct wrtd_trigger_entry ent;
 		ret = poll(&p, 1, poll_timeout);
 		if (ret <= 0 || !(p.revents & POLLIN))
 			break;
@@ -186,41 +183,14 @@ int wrtd_log_read(struct trtl_hmq *hmq_log, struct wrtd_log_entry *log,
 		if (!msg)
 			break;
 
-		if (hmq_log->index == WRTD_OUT_FD_LOGGING) {
-			/* Output */
-			trtl_msg_header (msg, &id, &seq);
-
-			if (id != WRTD_REP_LOG_MESSAGE)
-			{
-				free(msg);
-				errno = EWRTD_INVALID_ANSWER_STATE;
-				break;
-			}
-
-			trtl_msg_uint32 (msg, &cur->type);
-			trtl_msg_int32 (msg, &cur->channel);
-			trtl_msg_uint32 (msg, &cur->miss_reason);
-			wrtd_msg_trigger_entry(msg, &ent);
-
-			cur->ts = ent.ts;
-			cur->seq = ent.seq;
-			cur->id = ent.id;
-
-			if ( trtl_msg_check_error(msg) ) {
-				free(msg);
-				errno = EWRTD_INVALID_ANSWER_STATE;
-				break;
-			}
-		} else {
-			/* Input */
-			trtl_message_unpack(msg, &hdr, cur);
-			if (hdr.msg_id != WRTD_IN_ACTION_LOG) {
-				free(msg);
-				errno = EWRTD_INVALID_ANSWER_STATE;
-				break;
-			}
-			wrtd_timestamp_endianess_fix(&cur->ts);
+		trtl_message_unpack(msg, &hdr, cur);
+		if (hdr.msg_id != WRTD_IN_ACTION_LOG &&
+		    hdr.msg_id != WRTD_OUT_ACTION_LOG) {
+			free(msg);
+			errno = EWRTD_INVALID_ANSWER_STATE;
+			break;
 		}
+		wrtd_timestamp_endianess_fix(&cur->ts);
 
 		remaining--;
 		n_read++;
@@ -265,7 +235,7 @@ static int wrtd_log_level_set(struct wrtd_node *dev, unsigned int channel,
 		}
 
 		tlv.index = OUT_STRUCT_CHAN_0 + channel;
-		tlv.size = sizeof(struct wrtd_out_channel);
+		tlv.size = WRTD_OUT_CHANNEL_PUBLIC_SIZE;
 		tlv.structure = &ochan;
 		hdr.slot_io = (WRTD_IN_FD_CONTROL << 4) |
 			(WRTD_OUT_FD_CONTROL & 0xF);

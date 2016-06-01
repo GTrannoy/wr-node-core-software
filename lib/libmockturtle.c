@@ -749,10 +749,6 @@ int trtl_hmq_send_and_receive_sync(struct trtl_hmq *hmq,
 	if (err)
 		return -1;
 
-	msg->error = 0;
-	msg->offset = 0;
-	msg->direction = WRNC_MSG_DIR_RECEIVE;
-
 	if (smsg.timeout_ms == 0) {
 		errno = ETIME;
 		return -1;
@@ -1083,7 +1079,7 @@ int trtl_cpu_is_enable(struct trtl_dev *trtl, unsigned int index,
 int trtl_hmq_receive_n(struct trtl_hmq *hmq,
 		       struct trtl_msg *msg, unsigned int n)
 {
-	int ret, size, i;
+	int ret, size;
 
 	if (!hmq || hmq->fd < 0) {
 		errno = ETRTL_HMQ_CLOSE;
@@ -1096,12 +1092,6 @@ int trtl_hmq_receive_n(struct trtl_hmq *hmq,
 	if (ret % sizeof(struct trtl_msg)) {
 		errno = ETRTL_HMQ_CLOSE;
 		return -1;
-	}
-
-	for (i = 0; i < n; ++i) {
-		msg[i].error = 0;
-		msg[i].offset = 0;
-		msg[i].direction = WRNC_MSG_DIR_RECEIVE;
 	}
 
 	return (ret / size);

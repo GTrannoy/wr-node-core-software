@@ -29,6 +29,11 @@ struct wrtd_desc {
 	uint32_t n_cpu; /**< Number of CPUs */
 };
 
+
+#define WRTD_OUT_CHANNEL_PUBLIC_SIZE (sizeof(struct wrtd_out_channel)	\
+				      - sizeof(struct wrtd_out_channel_private))
+
+
 /**
  * @file libwrtd-interal.c
  */

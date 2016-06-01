@@ -31,6 +31,7 @@
 static const uint32_t version = GIT_VERSION;
 static uint32_t promiscuous_mode = 0;
 
+struct rt_application app;
 
 
 #define WR_LINK_OFFLINE		1
@@ -192,11 +193,12 @@ static void ts_adjust_delay(struct wr_timestamp *ts, uint32_t cycles, uint32_t f
 /**
  * Puts a trigger message in the log buffer
  */
-static void log_trigger(int type, int miss_reason, struct wrtd_out_channel *out,
+static void log_trigger(int type, int miss_reason,
+			struct wrtd_out_channel *out,
 			struct wrtd_trigger_entry *ent)
 {
 	struct trtl_proto_header hdr = {
-		.rt_app_id = 0,
+		.rt_app_id = app.version.rt_id,
 		.msg_id = WRTD_OUT_ACTION_LOG,
 		.slot_io = WRTD_OUT_FD_LOGGING,
 		.seq = ent->seq,

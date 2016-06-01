@@ -14,7 +14,7 @@
 #include "wrtd-ut.h"
 #include "CuTest.h"
 
-#include <libwrnc.h>
+#include <libmockturtle.h>
 #include <libwrtd.h>
 
 /**

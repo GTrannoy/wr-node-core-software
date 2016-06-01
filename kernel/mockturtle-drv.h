@@ -4,12 +4,12 @@
  * License: GPL v2
  */
 
-#ifndef __WRNC_H__
-#define __WRNC_H__
+#ifndef __TRTL_H__
+#define __TRTL_H__
 
 #include <linux/circ_buf.h>
-#include "hw/mqueue.h"
-#include "wrnc-user.h"
+#include "hw/mockturtle_queue.h"
+#include "mockturtle.h"
 
 #define WRNC_MAX_CPU_MINORS (WRNC_MAX_CPU * WRNC_MAX_CARRIER)
 #define WRNC_MAX_HMQ_MINORS (WRNC_MAX_HMQ_SLOT * WRNC_MAX_CARRIER)

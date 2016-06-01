@@ -7,7 +7,7 @@
 
 #include <stdint.h>
 #include <errno.h>
-#include <librt.h>
+#include <libmockturtle-rt.h>
 
 uint32_t msg_seq = 0;
 struct rt_application *_app;

@@ -21,9 +21,9 @@
 #include <linux/fmc.h>
 
 
-#include <hw/mqueue.h>
+#include <hw/mockturtle_queue.h>
 
-#include "wrnc.h"
+#include "mockturtle-drv.h"
 
 int hmq_default_buf_size = 8192; /**< default buffer size in byte */
 module_param_named(slot_buffer_size, hmq_default_buf_size, int, 0444);

@@ -12,7 +12,6 @@
 #include <string.h>
 #include <getopt.h>
 #include <libgen.h>
-#include <libwrnc.h>
 #include <libwrtd.h>
 #include <inttypes.h>
 

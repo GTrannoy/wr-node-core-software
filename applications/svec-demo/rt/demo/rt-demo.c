@@ -8,9 +8,9 @@
  */
 
 #include <string.h>
-#include <rt.h>
+#include <mockturtle-rt.h>
 #include <demo-common-rt.h>
-#include <librt.h>
+#include <libmockturtle-rt.h>
 
 #define GPIO_CODR	0x0 /* Clear Data Register */
 #define GPIO_SODR	0x4 /* Set Data Register */

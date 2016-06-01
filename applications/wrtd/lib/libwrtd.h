@@ -15,7 +15,7 @@ extern "C" {
 
 #include <stdint.h>
 #include <stdio.h>
-#include "libwrnc.h"
+#include "libmockturtle.h"
 /**
  * @file wrtd-common.h
  */

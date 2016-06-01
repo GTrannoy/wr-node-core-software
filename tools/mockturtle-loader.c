@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
-#include <libwrnc.h>
+#include <libmockturtle.h>
 #include <getopt.h>
 
 

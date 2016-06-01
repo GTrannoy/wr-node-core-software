@@ -9,7 +9,7 @@
  */
 
 #include <string.h>
-#include "rt.h"
+#include "mockturtle-rt.h"
 #include <demo-common-rt.h>
 
 #define GPIO_CODR 0x0

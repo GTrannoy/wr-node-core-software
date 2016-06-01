@@ -18,7 +18,7 @@
 #include <string.h>
 
 #include "pp-printf.h"
-#include "rt-common.h"
+#include "mockturtle-rt-common.h"
 
 /**
  * It sends a string over the debug interface

@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <libwrnc.h>
+#include <libmockturtle.h>
 
 int main(int argc, char *argv[])
 {

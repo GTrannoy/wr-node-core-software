@@ -18,7 +18,7 @@
 #include <fcntl.h>
 #include <glob.h>
 
-#include "libwrnc-internal.h"
+#include "libmockturtle-internal.h"
 
 const unsigned int wrnc_default_timeout_ms = 1000;
 

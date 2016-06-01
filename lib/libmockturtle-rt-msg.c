@@ -5,7 +5,7 @@
  * Released according to the GNU GPL, version 3
  */
 
-#include <libwrnc.h>
+#include <libmockturtle.h>
 #include <errno.h>
 
 /**

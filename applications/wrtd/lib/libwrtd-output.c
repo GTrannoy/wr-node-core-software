@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <libwrnc.h>
+#include <libmockturtle.h>
 #include <libwrtd-internal.h>
 
 #include "wrtd-serializers.h"

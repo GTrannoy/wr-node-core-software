@@ -5,7 +5,7 @@ CROSS_COMPILE_TARGET ?= lm32-elf-
 INSTALL_PREFIX ?= .
 PATH_COMMON_RT ?= .
 PATH_COMMON_H ?= ../include
-WRNC ?= ../../
+TRTL ?= ../../
 
 CC =		$(CROSS_COMPILE_TARGET)gcc
 LD =		$(CROSS_COMPILE_TARGET)ld
@@ -17,22 +17,22 @@ RT_GIT_VERSION = 0x$(shell cd ../../..; git rev-parse --short=8 HEAD)
 
 CFLAGS += -Wall -DWRNODE_RT -g -Os -mmultiply-enabled -mbarrel-shift-enabled
 CFLAGS += -I.
-CFLAGS += -I$(WRNC)/applications/common/rt
-CFLAGS += -I$(WRNC)/applications/common/include
-CFLAGS += -I$(WRNC)/include
+CFLAGS += -I$(TRTL)/applications/common/rt
+CFLAGS += -I$(TRTL)/applications/common/include
+CFLAGS += -I$(TRTL)/include
 CFLAGS += -DGIT_VERSION=$(RT_GIT_VERSION)
 CFLAGS += $(EXTRA_CFLAGS)
 
 
-OBJS += $(WRNC)/applications/common/rt/wrn-crt0.o
-OBJS += $(WRNC)/applications/common/rt/vsprintf-xint.o
-OBJS += $(WRNC)/applications/common/rt/printf.o
-OBJS += $(WRNC)/applications/common/rt/rt-common.o
+OBJS += $(TRTL)/applications/common/rt/mockturtle-crt0.o
+OBJS += $(TRTL)/applications/common/rt/vsprintf-xint.o
+OBJS += $(TRTL)/applications/common/rt/printf.o
+OBJS += $(TRTL)/applications/common/rt/mockturtle-rt-common.o
 ifdef RT_USE_LIBRT
-OBJS += $(WRNC)/applications/common/rt/librt.o
+OBJS += $(TRTL)/applications/common/rt/libmockturtle-rt.o
 endif
 
-LDSCRIPT = $(WRNC)/applications/common/rt/wrnode.ld
+LDSCRIPT = $(TRTL)/applications/common/rt/mockturtle.ld
 
 all: clean $(OUTPUT)
 

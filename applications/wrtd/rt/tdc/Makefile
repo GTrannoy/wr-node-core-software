@@ -3,11 +3,11 @@
 OBJS := wrtd-rt-tdc.o
 OBJS += ../common/loop-queue.o
 OUTPUT = wrtd-rt-tdc
-WRNC = ../../../../
+TRTL = ../../../../
 
 EXTRA_CFLAGS += -I../../include
 EXTRA_CFLAGS += -I../common
 EXTRA_CFLAGS += -DLIBRT_ERROR
 #EXTRA_CFLAGS += -DLIBRT_DEBUG
 RT_USE_LIBRT := 1
-include $(WRNC)/applications/common/rt/Makefile
+include $(TRTL)/applications/common/rt/Makefile

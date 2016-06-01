@@ -3,12 +3,12 @@
 # build a particular environment.
 -include Makefile.specific
 
-WRNC ?= ../../../
+TRTL ?= ../../../
 
 LIB = libdemo.a
 LOBJ := libdemo.o
 
-CFLAGS += -Wall -ggdb -O0 -I. -I../include -I$(WRNC)/include -I$(WRNC)/lib -I$(WRNC)/kernel $(EXTRACFLAGS)
+CFLAGS += -Wall -ggdb -O0 -I. -I../include -I$(TRTL)/include -I$(TRTL)/lib -I$(TRTL)/kernel $(EXTRACFLAGS)
 LDLIBS += -L. -ldemo
 
 

@@ -8,7 +8,7 @@
 #ifndef __WRTD_TOOLS_INTERNAL_H__
 #define __WRTD_TOOLS_INTERNAL_H__
 
-#include <libwrnc.h>
+#include <libmockturtle.h>
 #include <libwrtd.h>
 #include <wrtd-internal.h>
 

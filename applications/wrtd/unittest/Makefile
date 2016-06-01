@@ -3,13 +3,13 @@
 # build a particular environment.
 -include Makefile.specific
 
-WRNC ?= ../../../
+TRTL ?= ../../../
 
 CFLAGS += -Wall -ggdb -O0
-CFLAGS += -I. -I../include -I$(WRNC)/include -I$(WRNC)/lib -I../lib
+CFLAGS += -I. -I../include -I$(TRTL)/include -I$(TRTL)/lib -I../lib
 CFLAGS += $(EXTRACFLAGS)
 CFLAGS += $(EXTRACFLAGS)
-LDLIBS += -Wl,-Bstatic -L../lib -lwrtd -L$(WRNC)/lib -lwrnc
+LDLIBS += -Wl,-Bstatic -L../lib -lwrtd -L$(TRTL)/lib -lmockturtle
 LDLIBS += -Wl,-Bdynamic
 
 PROG := wrtd-ut

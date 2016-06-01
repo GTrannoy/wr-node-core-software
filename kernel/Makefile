@@ -24,16 +24,16 @@ ccflags-y += -DGIT_VERSION=\"$(GIT_VERSION)\" \
 	-I$(src)/../include
 
 
-ccflags-$(CONFIG_WRNC_DEBUG) += -DDEBUG
+ccflags-$(CONFIG_TRTL_DEBUG) += -DDEBUG
 
 
 subdirs-ccflags-y = $(ccflags-y)
 
-obj-m := wr-node-core.o
-wr-node-core-y :=  wrnc-core.o
-wr-node-core-y +=  wrnc-cpu.o
-wr-node-core-y +=  wrnc-hmq.o
-wr-node-core-y +=  wrnc-dbg.o
+obj-m := mockturtle.o
+mockturtle-y :=  mockturtle-core.o
+mockturtle-y +=  mockturtle-cpu.o
+mockturtle-y +=  mockturtle-hmq.o
+mockturtle-y +=  mockturtle-dbg.o
 
 all modules:
 	$(MAKE) -C $(LINUX) M=$(shell /bin/pwd) modules

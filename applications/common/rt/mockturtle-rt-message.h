@@ -17,7 +17,7 @@
 #ifndef __RT_MESSAGE_H
 #define __RT_MESSAGE_H
 
-#include <wrnc-common.h>
+#include <mockturtle-common.h>
 
 #ifdef WRNODE_RT
 

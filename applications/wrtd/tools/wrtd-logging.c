@@ -14,7 +14,6 @@
 #include <inttypes.h>
 #include <libgen.h>
 #include <pthread.h>
-#include <libwrnc.h>
 #include <libwrtd.h>
 
 static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;

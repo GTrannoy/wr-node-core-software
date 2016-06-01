@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include <libwrnc.h>
+#include <libmockturtle.h>
 #include "libwrtd-internal.h"
 
 

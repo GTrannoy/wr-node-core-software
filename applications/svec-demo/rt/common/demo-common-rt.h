@@ -9,7 +9,7 @@
 
 #ifndef __DEMO_COMMON_RT_H__
 #define __DEMO_COMMON_RT_H__
-#include <rt-smem.h>
+#include <mockturtle-rt-smem.h>
 #include <demo-common.h>
 
 extern volatile int autodemo_run;

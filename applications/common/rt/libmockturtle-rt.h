@@ -9,11 +9,11 @@
 #define __LIBRT_H__
 
 #include <stdint.h>
-#include "wrnc-common.h"
-#include "hw/wrn_cpu_lr.h"
-#include "rt-common.h"
-#include "rt-mqueue.h"
-#include "rt-message.h"
+#include "mockturtle-common.h"
+#include "hw/mockturtle_cpu_lr.h"
+#include "mockturtle-rt-common.h"
+#include "mockturtle-rt-mqueue.h"
+#include "mockturtle-rt-message.h"
 #include "pp-printf.h"
 
 #define RT_VARIABLE_FLAG_REG	(1 << 0)

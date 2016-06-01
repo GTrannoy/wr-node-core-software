@@ -14,15 +14,15 @@
  * rt.h: all common stuff in a single header
  */
 
-#ifndef __WRN_RT_H
-#define __WRN_RT_H
+#ifndef __MOCKTURTLE_RT_H
+#define __MOCKTURTLE_RT_H
 
 #include <stdint.h>
 
-#include "rt-mqueue.h"
-#include "rt-message.h"
-#include "rt-common.h"
-#include "rt-smem.h"
+#include "mockturtle-rt-mqueue.h"
+#include "mockturtle-rt-message.h"
+#include "mockturtle-rt-common.h"
+#include "mockturtle-rt-smem.h"
 #include "pp-printf.h"
 
 #endif

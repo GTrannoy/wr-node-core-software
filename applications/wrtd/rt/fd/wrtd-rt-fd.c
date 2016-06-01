@@ -17,14 +17,14 @@
 
 #include <string.h>
 
-#include "rt.h"
+#include "mockturtle-rt.h"
 #include "wrtd-common.h"
 #include "hw/fd_channel_regs.h"
 #include "hw/fd_main_regs.h"
 
 #include "loop-queue.h"
 
-#include <librt.h>
+#include <libmockturtle-rt.h>
 
 #define OUT_TIMEOUT 10
 

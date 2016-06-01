@@ -5,12 +5,12 @@
 
 DESTDIR ?= /usr/local
 
-WRNC ?= ../../../
+TRTL ?= ../../../
 
-CFLAGS += -Wall -ggdb -I. -I../include -I$(WRNC)/include -I$(WRNC)/lib -I../lib
+CFLAGS += -Wall -ggdb -I. -I../include -I$(TRTL)/include -I$(TRTL)/lib -I../lib
 CFLAGS += $(EXTRACFLAGS)
 
-LDLIBS += -Wl,-Bstatic -L../lib -ldemo -L$(WRNC)/lib -lwrnc
+LDLIBS += -Wl,-Bstatic -L../lib -ldemo -L$(TRTL)/lib -lmockturtle
 LDLIBS += -Wl,-Bdynamic
 
 PROGS := demo

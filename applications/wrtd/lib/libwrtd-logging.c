@@ -9,7 +9,7 @@
 #include <errno.h>
 #include <string.h>
 #include <poll.h>
-#include <libwrnc.h>
+#include <libmockturtle.h>
 #include <libwrtd-internal.h>
 #include <wrtd-serializers.h>
 

@@ -5,9 +5,9 @@
  * License: GPL v3
  */
 
-#ifndef __LIB_WRNC_H__
-#define __LIB_WRNC_H__
-/** @file libwrnc.h */
+#ifndef __LIB_TRTL_H__
+#define __LIB_TRTL_H__
+/** @file libmockturtle.h */
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,8 +18,8 @@ extern "C" {
 #include <stdint.h>
 #include <stdio.h>
 #include <poll.h>
-#include "wrnc-common.h"
-#include "wrnc-user.h"
+#include "mockturtle-common.h"
+#include "mockturtle.h"
 
 extern const unsigned int wrnc_default_timeout_ms;
 

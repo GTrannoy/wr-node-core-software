@@ -5,8 +5,8 @@
  * Released according to the GNU GPL, version 3
  */
 
-#ifndef __WRNC_COMMON_H__
-#define __WRNC_COMMON_H__
+#ifndef __TRTL_COMMON_H__
+#define __TRTL_COMMON_H__
 
 #include <string.h>
 

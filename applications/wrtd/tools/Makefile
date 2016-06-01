@@ -5,13 +5,13 @@
 
 DESTDIR ?= /usr/local
 
-WRNC ?= ../../../
+TRTL ?= ../../../
 
 CFLAGS += -Wall -Werror -ggdb
-CFLAGS += -I. -I../include -I$(WRNC)/include -I$(WRNC)/lib -I../lib
+CFLAGS += -I. -I../include -I$(TRTL)/include -I$(TRTL)/lib -I../lib
 CFLAGS += $(EXTRACFLAGS)
 CFLAGS += $(EXTRACFLAGS)
-LDLIBS += -Wl,-Bstatic -L../lib -lwrtd -L$(WRNC)/lib -lwrnc
+LDLIBS += -Wl,-Bstatic -L../lib -lwrtd -L$(TRTL)/lib -lmockturtle
 LDLIBS += -Wl,-Bdynamic -lpthread
 
 PROGS := wrtd-boot

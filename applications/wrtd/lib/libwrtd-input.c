@@ -7,7 +7,7 @@
 
 #include <stdlib.h>
 #include <errno.h>
-#include <libwrnc.h>
+#include <libmockturtle.h>
 #include "libwrtd-internal.h"
 
 static const struct wrnc_proto_header wrtd_in_hdr_sync = {

@@ -10,7 +10,6 @@
 #include <errno.h>
 #include <string.h>
 #include <getopt.h>
-#include <libwrnc.h>
 #include <libdemo.h>
 #include <inttypes.h>
 

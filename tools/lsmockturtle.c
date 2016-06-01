@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <errno.h>
-#include <libwrnc.h>
+#include <libmockturtle.h>
 
 static void help()
 {

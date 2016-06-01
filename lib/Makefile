@@ -3,16 +3,16 @@
 # build a particular environment.
 -include Makefile.specific
 
-WRNC ?= ../
+TRTL ?= ../
 
-LIBS = libwrnc.so
-LIB = libwrnc.a
-LOBJ := libwrnc.o
-LOBJ += libwrnc-rt-msg.o
+LIBS = libmockturtle.so
+LIB = libmockturtle.a
+LOBJ := libmockturtle.o
+LOBJ += libmockturtle-rt-msg.o
 
 CFLAGS += -Wall -Werror -ggdb -fPIC
-CFLAGS += -I. -I$(WRNC)/include $(EXTRACFLAGS)
-LDFLAGS = -L. -lwrnc
+CFLAGS += -I. -I$(TRTL)/include $(EXTRACFLAGS)
+LDFLAGS = -L. -lmockturtle
 
 
 modules all: $(LIB) $(LIBS)

@@ -11,9 +11,9 @@
 #include <linux/vmalloc.h>
 
 #include <linux/fmc.h>
-#include <hw/wrn_cpu_csr.h>
+#include <hw/mockturtle_cpu_csr.h>
 
-#include "wrnc.h"
+#include "mockturtle-drv.h"
 
 
 /**

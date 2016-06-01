@@ -17,13 +17,13 @@
 
 #include <string.h>
 
-#include "rt.h"
+#include "mockturtle-rt.h"
 #include "wrtd-common.h"
 #include "hw/fmctdc-direct.h"
 #include "hw/tdc_regs.h"
 #include "loop-queue.h"
 
-#include <librt.h>
+#include <libmockturtle-rt.h>
 
 #define DEFAULT_DEAD_TIME (80000/16)
 

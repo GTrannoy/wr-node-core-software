@@ -25,10 +25,10 @@
 #include <linux/fmc.h>
 #include <linux/fmc-sdb.h>
 
-#include <hw/wrn_cpu_csr.h>
-#include <hw/mqueue.h>
+#include <hw/mockturtle_cpu_csr.h>
+#include <hw/mockturtle_queue.h>
 
-#include "wrnc.h"
+#include "mockturtle-drv.h"
 
 static int wrnc_dev_uevent(struct device *dev, struct kobj_uevent_env *env)
 {

@@ -12,7 +12,6 @@
 #include <getopt.h>
 #include <inttypes.h>
 #include <libgen.h>
-#include <libwrnc.h>
 #include <libwrtd.h>
 
 #define WRTD_BOOT_WR_FMC_OFFSET 0x2

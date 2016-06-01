@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-#include <libwrnc.h>
+#include <libmockturtle.h>
 #include <libdemo-internal.h>
 
 const char *demo_errors[] = {

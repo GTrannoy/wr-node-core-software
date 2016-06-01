@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <libwrnc.h>
+#include <libmockturtle.h>
 #include <getopt.h>
 #include <pthread.h>
 #include <time.h>

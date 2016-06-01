@@ -3,9 +3,9 @@
  * Author: Federico Vaga <federico.vaga@cern.ch>
  * License: GPL v3
  */
-#ifndef __WRNC_USER_H__
-#define  __WRNC_USER_H__
-/** @file wrnc-user.h */
+#ifndef __TRT_USER_H__
+#define  __TRTL_USER_H__
+/** @file mock-turtle.h */
 
 #define WRNC_MAX_CARRIER 20 /**< Maximum number of WRNC components on a
 			       single computer*/

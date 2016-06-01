@@ -14,9 +14,9 @@
 #include <linux/circ_buf.h>
 
 #include <linux/fmc.h>
-#include <hw/wrn_cpu_csr.h>
+#include <hw/mockturtle_cpu_csr.h>
 
-#include "wrnc.h"
+#include "mockturtle-drv.h"
 
 int dbg_max_msg = 1024; /**< debug messages buffer */
 module_param_named(max_dbg_msg, dbg_max_msg, int, 0444);

@@ -28,7 +28,7 @@ $(LIBS): $(LIB)
 	$(CC) -shared  -o $@ -Wl,--whole-archive,-soname,$@ $^ -Wl,--no-whole-archive
 
 clean:
-	rm -f $(LIB) .depend *.o *~
+	rm -f $(LIB) $(LIBS) .depend *.o *~
 
 .depend: Makefile $(wildcard *.c *.h)
 	$(CC) $(CFLAGS) -M $(LOBJ:.o=.c) -o $@

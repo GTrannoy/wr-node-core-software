@@ -16,6 +16,7 @@ LOBJ += libwrtd-input.o
 LOBJ += libwrtd-output.o
 
 CFLAGS += -Wall -ggdb -O2 -fPIC -I. -I../include -I$(TRTL)/include -I$(TRTL)/lib -I$(LIBFD) -I$(LIBTDC) -I$(LIBFD)/../kernel
+CFLAGS += -Werror
 CFLAGS += $(EXTRACFLAGS)
 LDLIBS += -L. -lwrtd
 

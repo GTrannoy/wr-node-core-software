@@ -33,14 +33,14 @@ static void print_time(struct wr_timestamp *t)
 
 static void print_version(struct trtl_rt_version *v)
 {
-	fprintf(stdout, "\tRealTime Application Version:");
-	fprintf(stdout, "\tfpga_id\t\t%x\n",
+	fprintf(stdout, "\tRealTime Application Version:\n");
+	fprintf(stdout, "\t  bitstream_id: 0x%08X\n",
 		v->fpga_id);
-	fprintf(stdout, "\trt_id\t\t%x\n",
+	fprintf(stdout, "\tapplication_id: 0x%08X\n",
 		v->rt_id);
-	fprintf(stdout, "\trt_version\t\t%x\n",
+	fprintf(stdout, "\t    rt_version: 0x%08X\n",
 		v->rt_version);
-	fprintf(stdout, "\tgit_version\t\t%x\n",
+	fprintf(stdout, "\t   git_version: 0x%08X\n",
 		v->git_version);
 }
 

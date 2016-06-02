@@ -75,17 +75,17 @@ enum wrtd_log_level wrtd_strlogging_to_level(char *log)
 {
 	if(!strcmp(log, "all"))
 		return WRTD_LOG_ALL;
-        if(!strcmp(log, "promiscuous"))
+	if(!strcmp(log, "promiscuous"))
 		return WRTD_LOG_PROMISC;
-        if(!strcmp(log, "raw"))
+	if(!strcmp(log, "raw"))
 		return WRTD_LOG_RAW;
-        if(!strcmp(log, "executed"))
+	if(!strcmp(log, "executed"))
 		return WRTD_LOG_EXECUTED;
-        if(!strcmp(log, "missed"))
+	if(!strcmp(log, "missed"))
 		return WRTD_LOG_MISSED;
-        if(!strcmp(log, "sent"))
+	if(!strcmp(log, "sent"))
 		return WRTD_LOG_SENT;
-        if(!strcmp(log, "filtered"))
+	if(!strcmp(log, "filtered"))
 		return WRTD_LOG_FILTERED;
 
 	return WRTD_LOG_NOTHING;

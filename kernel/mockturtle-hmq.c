@@ -942,7 +942,7 @@ static void trtl_irq_handler_output(struct trtl_hmq *hmq)
 		spin_unlock_irqrestore(&hmq->lock, flags);
 
 		/* Do not store synchronous answer */
-	        goto out;
+		goto out;
 	}
 
 

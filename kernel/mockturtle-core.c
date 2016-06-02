@@ -485,6 +485,7 @@ static int trtl_probe_hmq(struct trtl_dev *trtl, unsigned int slot,
 		return err;
 
 
+	hmq->stats.count = 0;
 	hmq->buf.ptr_w = 0;
 	hmq->buf.ptr_r = 0;
 	hmq->buf.size = hmq_default_buf_size;

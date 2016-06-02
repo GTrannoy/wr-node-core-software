@@ -286,6 +286,20 @@ static ssize_t trtl_store_share(struct device *dev,
 	return count;
 }
 
+
+/**
+ * It returns the maximum number bytes per message
+ */
+static ssize_t trtl_show_total(struct device *dev,
+			       struct device_attribute *attr,
+			       char *buf)
+{
+	struct trtl_hmq *hmq = to_trtl_hmq(dev);
+
+	return sprintf(buf, "%d\n", hmq->stats.count);
+}
+
+
 DEVICE_ATTR(full, S_IRUGO, trtl_show_full, NULL);
 DEVICE_ATTR(empty, S_IRUGO, trtl_show_empty, NULL);
 DEVICE_ATTR(count_hw, S_IRUGO, trtl_show_count, NULL);
@@ -295,6 +309,7 @@ DEVICE_ATTR(count_max_hw, S_IRUGO, trtl_show_count_max_hw, NULL);
 DEVICE_ATTR(width_max, S_IRUGO, trtl_show_width_max, NULL);
 DEVICE_ATTR(shared_by_users, (S_IRUGO | S_IWUSR | S_IWGRP |  S_IWOTH),
 	    trtl_show_share, trtl_store_share);
+DEVICE_ATTR(total_messages, S_IRUGO, trtl_show_total, NULL);
 
 static struct attribute *trtl_hmq_attr[] = {
 	&dev_attr_full.attr,
@@ -304,6 +319,7 @@ static struct attribute *trtl_hmq_attr[] = {
 	&dev_attr_count_max_hw.attr,
 	&dev_attr_width_max.attr,
 	&dev_attr_shared_by_users.attr,
+	&dev_attr_total_messages.attr,
 	NULL,
 };
 
@@ -543,6 +559,8 @@ static int trtl_message_push(struct trtl_hmq *hmq, void *buf,
 	/* The slot is ready to be sent to the CPU */
 	fmc_writel(fmc, MQUEUE_CMD_READY | ((size / 4) & 0xFF),
 		   hmq->base_sr + MQUEUE_SLOT_COMMAND);
+
+	hmq->stats.count++;
 
 	return 0;
 }
@@ -930,6 +948,8 @@ static void trtl_irq_handler_output(struct trtl_hmq *hmq)
 	/* Discard the slot content */
 	fmc_writel(fmc, MQUEUE_CMD_DISCARD, hmq->base_sr + MQUEUE_SLOT_COMMAND);
 	spin_unlock_irqrestore(&hmq->lock, flags);
+
+	hmq->stats.count++;
 
 	/* If we are waiting a synchronous answer on this HMQ check */
 	if ((hmq->flags & TRTL_FLAG_HMQ_SYNC_WAIT) &&

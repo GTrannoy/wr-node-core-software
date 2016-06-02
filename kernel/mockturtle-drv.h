@@ -78,6 +78,13 @@ struct mturtle_hmq_buffer {
 
 
 /**
+ * Collection of HMQ statistics
+ */
+struct trtl_hmq_stats {
+	unsigned int count; /**< number of messages passed throught the HMQ */
+};
+
+/**
  * It describe the status of a HMQ slot
  */
 struct trtl_hmq {
@@ -108,6 +115,8 @@ struct trtl_hmq {
 	unsigned int max_depth; /**< maximum buffer queue length (HW) */
 
 	struct mturtle_hmq_buffer buf; /**< Circular buffer */
+
+	struct trtl_hmq_stats stats;
 };
 
 /**

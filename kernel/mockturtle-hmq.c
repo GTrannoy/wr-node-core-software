@@ -763,7 +763,9 @@ static ssize_t trtl_hmq_read(struct file *f, char __user *buf,
 
 	/* Calculate the number of messages to read */
 	if (count % sizeof(struct trtl_msg)) {
-		dev_err(&hmq->dev, "we can read only entire messages\n");
+		dev_err(&hmq->dev,
+			"we can read only entire messages (single message size %zu, requested size %zu)\n",
+			sizeof(struct trtl_msg), count);
 		return -EINVAL;
 	}
 	n = count / sizeof(struct trtl_msg);

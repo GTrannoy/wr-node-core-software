@@ -17,7 +17,7 @@
 #ifndef __LOOP_QUEUE_H
 #define __LOOP_QUEUE_H
 
-#include "rt.h"
+#include "mockturtle-rt.h"
 #include "wrtd-common.h"
 
 #define LOOP_QUEUE_SIZE 16

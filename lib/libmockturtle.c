@@ -18,11 +18,11 @@
 #include <fcntl.h>
 #include <glob.h>
 
-#include "libwrnc-internal.h"
+#include "libmockturtle-internal.h"
 
-const unsigned int wrnc_default_timeout_ms = 1000;
+const unsigned int trtl_default_timeout_ms = 1000;
 
-static char *wrnc_error_str[] = {
+static char *trtl_error_str[] = {
 	"Cannot parse data from sysfs attribute",
 	"Invalid slot",
 	"Operation not yet implemented",
@@ -35,25 +35,25 @@ static char *wrnc_error_str[] = {
 
 /**
  * It returns a string messages corresponding to a given error code. If
- * it is not a libwrnc error code, it will run strerror(3)
+ * it is not a libtrtl error code, it will run strerror(3)
  * @param[in] err error code. Typically 'errno' variable
  * @return a message error. No need to free the string.
  */
-char *wrnc_strerror(int err)
+char *trtl_strerror(int err)
 {
-	if (err < EWRNC_INVAL_PARSE || err > __EWRNC_MAX)
+	if (err < ETRTL_INVAL_PARSE || err > __ETRTL_MAX)
 		return strerror(err);
-	return wrnc_error_str[err - EWRNC_INVAL_PARSE];
+	return trtl_error_str[err - ETRTL_INVAL_PARSE];
 }
 
 
 /**
  * It initializes the WRNC library. It must be called before doing
  * anything else. If you are going to load/unload WRNC devices, then
- * you have to un-load (wrnc_exit()) e reload (wrnc_init()) the library.
+ * you have to un-load (trtl_exit()) e reload (trtl_init()) the library.
  * @return 0 on success, otherwise -1 and errno is appropriately set
  */
-int wrnc_init()
+int trtl_init()
 {
 	/* As you can see there is nothing to do because everything is
 	   dynamical and does not require a special initialization.
@@ -70,13 +70,13 @@ int wrnc_init()
 
 
 /**
- * It releases the resources allocated by wrnc_init(). It must be called when
+ * It releases the resources allocated by trtl_init(). It must be called when
  * you stop to use this library. Then, you cannot use functions from this
  * library anymore.
  */
-void wrnc_exit()
+void trtl_exit()
 {
-	/* READ wrnc_init() */
+	/* READ trtl_init() */
 }
 
 
@@ -85,17 +85,17 @@ void wrnc_exit()
  * It depends on library initialization.
  * @return the number of WRNC available
  */
-uint32_t wrnc_count()
+uint32_t trtl_count()
 {
 	glob_t g;
 	uint32_t count;
 	int err;
 
-	err = glob("/dev/wrnc-[A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9]",
+	err = glob("/dev/trtl-[A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9]",
 		   GLOB_NOSORT, NULL, &g);
 	if (err != GLOB_NOMATCH)
 		return 0;
-	err = glob("/dev/wr-node-core/wrnc-[A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9]",
+	err = glob("/dev/mockturtle/trtl-[A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9]",
 		   GLOB_NOSORT | GLOB_APPEND, NULL, &g);
 	if (err)
 		return 0;
@@ -108,21 +108,21 @@ uint32_t wrnc_count()
 
 /**
  * It allocates and returns the list of available WRNC devices. The user is
- * in charge to free the allocated memory wit wrnc_list_free(). The list
- * contains wrnc_count() + 1 elements. The last element is a NULL pointer.
+ * in charge to free the allocated memory wit trtl_list_free(). The list
+ * contains trtl_count() + 1 elements. The last element is a NULL pointer.
  * @return a list of WRNC device's names. NULL on error
  */
-char **wrnc_list()
+char **trtl_list()
 {
 	char **list = NULL;
 	glob_t g;
 	int err, i, count;
 
-	err = glob("/dev/wrnc-[A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9]",
+	err = glob("/dev/trtl-[A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9]",
 		   GLOB_NOSORT, NULL, &g);
 	if (err != GLOB_NOMATCH)
 		return NULL;
-	err = glob("/dev/wr-node-core/wrnc-[A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9]",
+	err = glob("/dev/mockturtle/trtl-[A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9][A-Fa-f0-9]",
 		   GLOB_NOSORT | GLOB_APPEND, NULL, &g);
 	if (err)
 		return NULL;
@@ -145,7 +145,7 @@ char **wrnc_list()
  * It release the list allocated memory
  * @param[in] list device list to release
  */
-void wrnc_list_free(char **list)
+void trtl_list_free(char **list)
 {
 	int i;
 
@@ -161,56 +161,56 @@ void wrnc_list_free(char **list)
  * @param[in] device name of the device to open
  * @return the WRNC token, NULL on error and errno is appropriately set
  */
-struct wrnc_dev *wrnc_open(const char *device)
+struct trtl_dev *trtl_open(const char *device)
 {
-	struct wrnc_desc *wrnc;
-	char path[WRNC_PATH_LEN + WRNC_NAME_LEN];
+	struct trtl_desc *trtl;
+	char path[TRTL_PATH_LEN + TRTL_NAME_LEN];
 	int i, err;
 	struct stat sb;
 
-	wrnc = malloc(sizeof(struct wrnc_desc));
-	if (!wrnc)
+	trtl = malloc(sizeof(struct trtl_desc));
+	if (!trtl)
 		return NULL;
-	strncpy(wrnc->name, device, WRNC_NAME_LEN);
+	strncpy(trtl->name, device, TRTL_NAME_LEN);
 
-	snprintf(path, WRNC_PATH_LEN + WRNC_NAME_LEN, "/dev/%s", wrnc->name);
+	snprintf(path, TRTL_PATH_LEN + TRTL_NAME_LEN, "/dev/%s", trtl->name);
 	err = stat(path, &sb);
 	if (!err) {
-		strncpy(wrnc->path, "/dev", WRNC_PATH_LEN);
+		strncpy(trtl->path, "/dev", TRTL_PATH_LEN);
 	} else {
-		snprintf(path, WRNC_PATH_LEN + WRNC_NAME_LEN,
-			 "/dev/wr-node-core/%s", wrnc->name);
+		snprintf(path, TRTL_PATH_LEN + TRTL_NAME_LEN,
+			 "/dev/mockturtle/%s", trtl->name);
 		err = stat(path, &sb);
 		if (err)
 			goto out_stat;
-		strncpy(wrnc->path, "/dev/wr-node-core", WRNC_PATH_LEN);
+		strncpy(trtl->path, "/dev/mockturtle", TRTL_PATH_LEN);
 	}
 
-	wrnc->fd_dev = -1;
-	for (i = 0; i < WRNC_MAX_CPU; ++i)
-		wrnc->fd_cpu[i] = -1;
+	trtl->fd_dev = -1;
+	for (i = 0; i < TRTL_MAX_CPU; ++i)
+		trtl->fd_cpu[i] = -1;
 
-	return (struct wrnc_dev *)wrnc;
+	return (struct trtl_dev *)trtl;
 
 out_stat:
-	free(wrnc);
+	free(trtl);
 	return NULL;
 }
 
 
 /**
  * It opens a WRNC device using its FMC device_id. The white-rabbit node-core
- * driver is based upon the FMC bus infrastructure, so all wrnc devices are
+ * driver is based upon the FMC bus infrastructure, so all trtl devices are
  * identified with their fmc-bus-id.
  * @param[in] device_id FMC device id of the device to use
  * @return the WRNC token, NULL on error and errno is appropriately set
  */
-struct wrnc_dev *wrnc_open_by_fmc(uint32_t device_id)
+struct trtl_dev *trtl_open_by_fmc(uint32_t device_id)
 {
 	char name[12];
 
-	snprintf(name, 12, "wrnc-%04x", device_id);
-	return wrnc_open(name);
+	snprintf(name, 12, "trtl-%04x", device_id);
+	return trtl_open(name);
 }
 
 
@@ -224,13 +224,13 @@ struct wrnc_dev *wrnc_open_by_fmc(uint32_t device_id)
  * @param[in] lun Logical Unit Number of the device to use
  * @return the WRNC token, NULL on error and errno is appropriately set
  */
-struct wrnc_dev *wrnc_open_by_lun(unsigned int lun)
+struct trtl_dev *trtl_open_by_lun(unsigned int lun)
 {
 	char path[16], dev_id_str[4];
 	uint32_t dev_id;
 	int ret;
 
-	ret = snprintf(path, sizeof(path), "/dev/wrnc.%d", lun);
+	ret = snprintf(path, sizeof(path), "/dev/trtl.%d", lun);
 	if (ret < 0 || ret >= sizeof(path)) {
 		errno = EINVAL;
 		return NULL;
@@ -241,27 +241,27 @@ struct wrnc_dev *wrnc_open_by_lun(unsigned int lun)
 		return NULL;
 	}
 
-	return wrnc_open_by_fmc(dev_id);
+	return trtl_open_by_fmc(dev_id);
 }
 
 
 /**
  * It closes a WRNC device opened with one of the following functions:
- * wrnc_open(), wrcn_open_by_lun(), wrnc_open_by_fmc()
- * @param[in] wrnc device token
+ * trtl_open(), wrcn_open_by_lun(), trtl_open_by_fmc()
+ * @param[in] trtl device token
  */
-void wrnc_close(struct wrnc_dev *wrnc)
+void trtl_close(struct trtl_dev *trtl)
 {
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
+	struct trtl_desc *wdesc = (struct trtl_desc *)trtl;
 	int i;
 
-	if (!wrnc)
+	if (!trtl)
 		return;
 
 	if (wdesc->fd_dev >= 0)
 		close(wdesc->fd_dev);
 
-	for (i = 0; i < WRNC_MAX_CPU; ++i)
+	for (i = 0; i < TRTL_MAX_CPU; ++i)
 		if (wdesc->fd_cpu[i] >= 0)
 			close(wdesc->fd_cpu[i]);
 
@@ -272,7 +272,7 @@ void wrnc_close(struct wrnc_dev *wrnc)
 /**
  * Generic function that reads from a sysfs attribute
  */
-static int wrnc_sysfs_read(char *path, void *buf, size_t len)
+static int trtl_sysfs_read(char *path, void *buf, size_t len)
 {
 	int fd, i;
 
@@ -289,7 +289,7 @@ static int wrnc_sysfs_read(char *path, void *buf, size_t len)
 /**
  * Generic function that writes to a sysfs attribute
  */
-static int wrnc_sysfs_write(char *path, void *buf, size_t len)
+static int trtl_sysfs_write(char *path, void *buf, size_t len)
 {
 	int fd, i;
 
@@ -305,13 +305,13 @@ static int wrnc_sysfs_write(char *path, void *buf, size_t len)
 /**
  * Generic function that parse a string from a sysfs attribute
  */
-static int wrnc_sysfs_scanf(char *path, const char *fmt, ...)
+static int trtl_sysfs_scanf(char *path, const char *fmt, ...)
 {
-	char buf[WRNC_SYSFS_READ_LEN];
+	char buf[TRTL_SYSFS_READ_LEN];
 	va_list args;
 	int ret;
 
-	ret = wrnc_sysfs_read(path, buf, WRNC_SYSFS_READ_LEN);
+	ret = trtl_sysfs_read(path, buf, TRTL_SYSFS_READ_LEN);
 	if (ret < 0)
 		return ret;
 
@@ -321,7 +321,7 @@ static int wrnc_sysfs_scanf(char *path, const char *fmt, ...)
 	if (ret < 0)
 		return ret;
 	if (ret != 1) {
-		errno = EWRNC_INVAL_PARSE;
+		errno = ETRTL_INVAL_PARSE;
 		return -1;
 	}
 
@@ -332,18 +332,18 @@ static int wrnc_sysfs_scanf(char *path, const char *fmt, ...)
 /**
  * Generic function that build a string to be written in a sysfs attribute
  */
-static int wrnc_sysfs_printf(char *path, const char *fmt, ...)
+static int trtl_sysfs_printf(char *path, const char *fmt, ...)
 {
-	char buf[WRNC_SYSFS_READ_LEN];
+	char buf[TRTL_SYSFS_READ_LEN];
 	va_list args;
 	int ret;
 
 	va_start(args, fmt);
-	vsnprintf(buf, WRNC_SYSFS_READ_LEN, fmt, args);
+	vsnprintf(buf, TRTL_SYSFS_READ_LEN, fmt, args);
 	va_end(args);
 
-        ret = wrnc_sysfs_write(path, buf, WRNC_SYSFS_READ_LEN);
-	if (ret == WRNC_SYSFS_READ_LEN)
+        ret = trtl_sysfs_write(path, buf, TRTL_SYSFS_READ_LEN);
+	if (ret == TRTL_SYSFS_READ_LEN)
 		return 0;
 	return -1;
 }
@@ -351,136 +351,136 @@ static int wrnc_sysfs_printf(char *path, const char *fmt, ...)
 
 /**
  * It returns the number of available WRNC CPUs on the FPGA bitstream
- * @param[in] wrnc device token
+ * @param[in] trtl device token
  * @param[out] n_cpu the number of available CPUs
  * @return 0 on success; -1 on error and errno is set appropriately
  */
-int wrnc_cpu_count(struct wrnc_dev *wrnc, uint32_t *n_cpu)
+int trtl_cpu_count(struct trtl_dev *trtl, uint32_t *n_cpu)
 {
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
-	char path[WRNC_SYSFS_PATH_LEN];
+	struct trtl_desc *wdesc = (struct trtl_desc *)trtl;
+	char path[TRTL_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN, "/sys/class/wr-node-core/%s/n_cpu",
+	snprintf(path, TRTL_SYSFS_PATH_LEN, "/sys/class/mockturtle/%s/n_cpu",
 		 wdesc->name);
 
-	return wrnc_sysfs_scanf(path, "%x", n_cpu);
+	return trtl_sysfs_scanf(path, "%x", n_cpu);
 }
 
 
 /**
  * It returns the application identifier of the FPGA bitstream in use
- * @param[in] wrnc device token
+ * @param[in] trtl device token
  * @param[out] app_id application identifier
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_app_id_get(struct wrnc_dev *wrnc, uint32_t *app_id)
+int trtl_app_id_get(struct trtl_dev *trtl, uint32_t *app_id)
 {
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
-	char path[WRNC_SYSFS_PATH_LEN];
+	struct trtl_desc *wdesc = (struct trtl_desc *)trtl;
+	char path[TRTL_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN,
-		 "/sys/class/wr-node-core/%s/application_id",
+	snprintf(path, TRTL_SYSFS_PATH_LEN,
+		 "/sys/class/mockturtle/%s/application_id",
 		 wdesc->name);
 
-	return wrnc_sysfs_scanf(path, "%x", app_id);
+	return trtl_sysfs_scanf(path, "%x", app_id);
 }
 
 
 /**
  * It returns the current status of the WRNC CPUs' reset line
- * @param[in] wrnc device token
+ * @param[in] trtl device token
  * @param[out] mask bit mask of the reset-lines
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_cpu_reset_get(struct wrnc_dev *wrnc, uint32_t *mask)
+int trtl_cpu_reset_get(struct trtl_dev *trtl, uint32_t *mask)
 {
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
-	char path[WRNC_SYSFS_PATH_LEN];
+	struct trtl_desc *wdesc = (struct trtl_desc *)trtl;
+	char path[TRTL_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN,
-		 "/sys/class/wr-node-core/%s/reset_mask",
+	snprintf(path, TRTL_SYSFS_PATH_LEN,
+		 "/sys/class/mockturtle/%s/reset_mask",
 		 wdesc->name);
 
-	return wrnc_sysfs_scanf(path, "%x", mask);
+	return trtl_sysfs_scanf(path, "%x", mask);
 }
 
 
 /**
  * Assert or de-assert the reset line of the WRNC CPUs
- * @param[in] wrnc device to use
+ * @param[in] trtl device to use
  * @param[in] mask bit mask of the reset-lines
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_cpu_reset_set(struct wrnc_dev *wrnc, uint32_t mask)
+int trtl_cpu_reset_set(struct trtl_dev *trtl, uint32_t mask)
 {
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
-	char path[WRNC_SYSFS_PATH_LEN];
+	struct trtl_desc *wdesc = (struct trtl_desc *)trtl;
+	char path[TRTL_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN,
-		 "/sys/class/wr-node-core/%s/reset_mask",
+	snprintf(path, TRTL_SYSFS_PATH_LEN,
+		 "/sys/class/mockturtle/%s/reset_mask",
 		 wdesc->name);
 
-	return wrnc_sysfs_printf(path, "%x", mask);
+	return trtl_sysfs_printf(path, "%x", mask);
 }
 
 
 /**
  * It returns the current status of the WRNC CPUs' enable line
- * @param[in] wrnc device token
+ * @param[in] trtl device token
  * @param[out] mask bit mask of the enable-lines
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_cpu_run_get(struct wrnc_dev *wrnc, uint32_t *mask)
+int trtl_cpu_run_get(struct trtl_dev *trtl, uint32_t *mask)
 {
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
-	char path[WRNC_SYSFS_PATH_LEN];
+	struct trtl_desc *wdesc = (struct trtl_desc *)trtl;
+	char path[TRTL_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN,
-		 "/sys/class/wr-node-core/%s/enable_mask",
+	snprintf(path, TRTL_SYSFS_PATH_LEN,
+		 "/sys/class/mockturtle/%s/enable_mask",
 		 wdesc->name);
 
-	return wrnc_sysfs_scanf(path, "%x", mask);
+	return trtl_sysfs_scanf(path, "%x", mask);
 }
 
 
 /**
  * Assert or de-assert the enable (a.k.a. running) line of the WRNC CPUs
- * @param[in] wrnc device token
+ * @param[in] trtl device token
  * @param[in] mask bit mask of the enable-lines
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_cpu_run_set(struct wrnc_dev *wrnc, uint32_t mask)
+int trtl_cpu_run_set(struct trtl_dev *trtl, uint32_t mask)
 {
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
-	char path[WRNC_SYSFS_PATH_LEN];
+	struct trtl_desc *wdesc = (struct trtl_desc *)trtl;
+	char path[TRTL_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN,
-		 "/sys/class/wr-node-core/%s/enable_mask",
+	snprintf(path, TRTL_SYSFS_PATH_LEN,
+		 "/sys/class/mockturtle/%s/enable_mask",
 		 wdesc->name);
 
-	return wrnc_sysfs_printf(path, "%x", mask);
+	return trtl_sysfs_printf(path, "%x", mask);
 }
 
 
 /**
- * It loads a wrnc CPU firmware from a given buffer
- * @param[in] wrnc device token
+ * It loads a trtl CPU firmware from a given buffer
+ * @param[in] trtl device token
  * @param[in] index CPU index
  * @param[in] code buffer containing the CPU firmware binary code
  * @param[in] length code length
  * @return the number of written byte, on error -1 and errno is
  *         set appropriately
  */
-int wrnc_cpu_load_application_raw(struct wrnc_dev *wrnc,
+int trtl_cpu_load_application_raw(struct trtl_dev *trtl,
 				  unsigned int index,
 				  void *code, size_t length,
 				  unsigned int offset)
 {
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
-	char path[WRNC_DEVICE_PATH_LEN];
+	struct trtl_desc *wdesc = (struct trtl_desc *)trtl;
+	char path[TRTL_DEVICE_PATH_LEN];
 	int fd, i = 0;
 
-	snprintf(path, WRNC_DEVICE_PATH_LEN, "%s/%s-cpu-%02d",
+	snprintf(path, TRTL_DEVICE_PATH_LEN, "%s/%s-cpu-%02d",
 		 wdesc->path, wdesc->name, index);
 	fd = open(path, O_WRONLY);
 	if (fd < 0)
@@ -498,23 +498,23 @@ int wrnc_cpu_load_application_raw(struct wrnc_dev *wrnc,
 
 /**
  * It dumps a WRNC CPU firmware into a given buffer
- * @param[in] wrnc device token
+ * @param[in] trtl device token
  * @param[in] index CPU index
  * @param[out] code buffer containing the CPU firmware binary code
  * @param[in] length code length
  * @return the number of written byte, on error -1 and errno is
  *         set appropriately
  */
-int wrnc_cpu_dump_application_raw(struct wrnc_dev *wrnc,
+int trtl_cpu_dump_application_raw(struct trtl_dev *trtl,
 				  unsigned int index,
 				  void *code, size_t length,
 				  unsigned int offset)
 {
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
-	char path[WRNC_DEVICE_PATH_LEN];
+	struct trtl_desc *wdesc = (struct trtl_desc *)trtl;
+	char path[TRTL_DEVICE_PATH_LEN];
 	int fd, i = 0, c = 100;
 
-	snprintf(path, WRNC_DEVICE_PATH_LEN, "%s/%s-cpu-%02d",
+	snprintf(path, TRTL_DEVICE_PATH_LEN, "%s/%s-cpu-%02d",
 		 wdesc->path, wdesc->name, index);
 	fd = open(path, O_RDONLY);
 	if (fd < 0)
@@ -534,12 +534,12 @@ int wrnc_cpu_dump_application_raw(struct wrnc_dev *wrnc,
 
 /**
  * It loads a WRNC CPU firmware from a given file
- * @param[in] wrnc device token
+ * @param[in] trtl device token
  * @param[in] index CPU index
  * @param[in] path path to the firmware file
  * @return 0 on success, on error -1 and errno is set appropriately
  */
-int wrnc_cpu_load_application_file(struct wrnc_dev *wrnc,
+int trtl_cpu_load_application_file(struct trtl_dev *trtl,
 				   unsigned int index,
 				   char *path)
 {
@@ -570,7 +570,7 @@ int wrnc_cpu_load_application_file(struct wrnc_dev *wrnc,
 		return -1;
 	}
 
-	i = wrnc_cpu_load_application_raw(wrnc, index, code, len, 0);
+	i = trtl_cpu_load_application_raw(trtl, index, code, len, 0);
 	if (i != len)
 		return -1;
 
@@ -582,12 +582,12 @@ int wrnc_cpu_load_application_file(struct wrnc_dev *wrnc,
 
 /**
  * It dumps a WRNC CPU firmware into a given file
- * @param[in] wrnc device token
+ * @param[in] trtl device token
  * @param[in] index CPU index
  * @param[in] path path to the firmware file
  * @return 0 on success, on error -1 and errno is set appropriately
  */
-int wrnc_cpu_dump_application_file(struct wrnc_dev *wrnc,
+int trtl_cpu_dump_application_file(struct trtl_dev *trtl,
 				   unsigned int index,
 				   char *path)
 {
@@ -601,7 +601,7 @@ int wrnc_cpu_dump_application_file(struct wrnc_dev *wrnc,
 
         do {
 		/* Read from driver and write into file */
-		i += wrnc_cpu_dump_application_raw(wrnc, index, code, 4096, i);
+		i += trtl_cpu_dump_application_raw(trtl, index, code, 4096, i);
 		if (i != 0)
 			fwrite(code, 1, i, f);
 	} while(i % 4096 == 0);
@@ -618,16 +618,16 @@ int wrnc_cpu_dump_application_file(struct wrnc_dev *wrnc,
  * @param[in] flags HMQ flags
  * @return a HMQ token on success, NULL on error and errno is set appropriately
  */
-struct wrnc_hmq *wrnc_hmq_open(struct wrnc_dev *wrnc, unsigned int index,
+struct trtl_hmq *trtl_hmq_open(struct trtl_dev *trtl, unsigned int index,
 			       unsigned long flags)
 {
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
-	struct wrnc_hmq *hmq;
+	struct trtl_desc *wdesc = (struct trtl_desc *)trtl;
+	struct trtl_hmq *hmq;
 	char path[64];
-	int fd, dir = flags & WRNC_HMQ_INCOMING;
+	int fd, dir = flags & TRTL_HMQ_INCOMING;
 
-	if (index >= WRNC_MAX_HMQ_SLOT / 2) {
-		errno = EWRNC_INVAL_SLOT;
+	if (index >= TRTL_MAX_HMQ_SLOT / 2) {
+		errno = ETRTL_INVAL_SLOT;
 		return NULL;
 	}
 
@@ -637,20 +637,20 @@ struct wrnc_hmq *wrnc_hmq_open(struct wrnc_dev *wrnc, unsigned int index,
 	if (fd < 0)
 		return NULL;
 
-	hmq = malloc(sizeof(struct wrnc_hmq));
+	hmq = malloc(sizeof(struct trtl_hmq));
 	if (!hmq) {
 		close(fd);
 		return NULL;
 	}
 
-	hmq->wrnc = wrnc;
+	hmq->trtl = trtl;
 	hmq->index = index;
 	hmq->flags = flags;
 	hmq->fd = fd;
-	snprintf(hmq->syspath, 64, "/sys/class/wr-node-core/%s/%s-hmq-%c-%02d",
+	snprintf(hmq->syspath, 64, "/sys/class/mockturtle/%s/%s-hmq-%c-%02d",
 		 wdesc->name, wdesc->name, (dir ? 'i' : 'o'), index);
 
-	return (struct wrnc_hmq *)hmq;
+	return (struct trtl_hmq *)hmq;
 }
 
 
@@ -659,7 +659,7 @@ struct wrnc_hmq *wrnc_hmq_open(struct wrnc_dev *wrnc, unsigned int index,
  * @param[in] hmq HMQ device descriptor
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-void wrnc_hmq_close(struct wrnc_hmq *hmq)
+void trtl_hmq_close(struct trtl_hmq *hmq)
 {
 	if (hmq && hmq->fd > 0) {
 		close(hmq->fd);
@@ -671,45 +671,45 @@ void wrnc_hmq_close(struct wrnc_hmq *hmq)
 /**
  * It enables/disables the message share mode. When enable, all users will read
  * the same messages.
- * @param[in] wrnc device token
+ * @param[in] trtl device token
  * @param[in] dir slot direction, 1 CPU input, 0 CPU output
  * @param[in] index slot index
  * @param[in] status status to set: 1 enable, 0 disable
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrnc_hmq_share_set(struct wrnc_dev *wrnc, unsigned int dir,
+int trtl_hmq_share_set(struct trtl_dev *trtl, unsigned int dir,
 		       unsigned int index, unsigned int status)
 {
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
-	char path[WRNC_SYSFS_PATH_LEN];
+	struct trtl_desc *wdesc = (struct trtl_desc *)trtl;
+	char path[TRTL_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN,
-		 "/sys/class/wr-node-core/%s/%s-hmq-%c-%02d/shared_by_users",
+	snprintf(path, TRTL_SYSFS_PATH_LEN,
+		 "/sys/class/mockturtle/%s/%s-hmq-%c-%02d/shared_by_users",
 		 wdesc->name, wdesc->name, (dir ? 'i' : 'o'), index);
 
-	return wrnc_sysfs_printf(path, "%d", status);
+	return trtl_sysfs_printf(path, "%d", status);
 }
 
 
 /**
  * It gets the current status of the message share mode
- * @param[in] wrnc device token
+ * @param[in] trtl device token
  * @param[in] dir slot direction, 1 CPU input, 0 CPU output
  * @param[in] index slot index
  * @param[out] status current value
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrnc_hmq_share_get(struct wrnc_dev *wrnc, unsigned int dir,
+int trtl_hmq_share_get(struct trtl_dev *trtl, unsigned int dir,
 		       unsigned int index, unsigned int *status)
 {
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
-	char path[WRNC_SYSFS_PATH_LEN];
+	struct trtl_desc *wdesc = (struct trtl_desc *)trtl;
+	char path[TRTL_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN,
-		 "/sys/class/wr-node-core/%s/%s-hmq-%c-%02d/shared_by_users",
+	snprintf(path, TRTL_SYSFS_PATH_LEN,
+		 "/sys/class/mockturtle/%s/%s-hmq-%c-%02d/shared_by_users",
 		 wdesc->name, wdesc->name, (dir ? 'i' : 'o'), index);
 
-	return wrnc_sysfs_scanf(path, "%d", status);
+	return trtl_sysfs_scanf(path, "%d", status);
 }
 
 /**
@@ -725,16 +725,16 @@ int wrnc_hmq_share_get(struct wrnc_dev *wrnc, unsigned int dir,
  *         the remaining ms to the timeout. -1 on error and errno is set
  *         appropriately
  */
-int wrnc_hmq_send_and_receive_sync(struct wrnc_hmq *hmq,
+int trtl_hmq_send_and_receive_sync(struct trtl_hmq *hmq,
 				   unsigned int index_out,
-				   struct wrnc_msg *msg,
+				   struct trtl_msg *msg,
 				   unsigned int timeout_ms)
 {
-	struct wrnc_msg_sync smsg;
+	struct trtl_msg_sync smsg;
 	int err;
 
 	if (!hmq || hmq->fd < 0) {
-		errno = EWRNC_HMQ_CLOSE;
+		errno = ETRTL_HMQ_CLOSE;
 		return -1;
 	}
 
@@ -745,7 +745,7 @@ int wrnc_hmq_send_and_receive_sync(struct wrnc_hmq *hmq,
 	smsg.msg = msg;
 
 	/* Send the message */
-	err = ioctl(hmq->fd, WRNC_IOCTL_MSG_SYNC, &smsg);
+	err = ioctl(hmq->fd, TRTL_IOCTL_MSG_SYNC, &smsg);
 	if (err)
 		return -1;
 
@@ -769,13 +769,13 @@ int wrnc_hmq_send_and_receive_sync(struct wrnc_hmq *hmq,
  * @param[in] size buffer size in bytes. It must be a power-of-2 value.
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrnc_hmq_buffer_size_set(struct wrnc_hmq *hmq, uint32_t size)
+int trtl_hmq_buffer_size_set(struct trtl_hmq *hmq, uint32_t size)
 {
-	char path[WRNC_SYSFS_PATH_LEN];
+	char path[TRTL_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN, "%s/buffer_size", hmq->syspath);
+	snprintf(path, TRTL_SYSFS_PATH_LEN, "%s/buffer_size", hmq->syspath);
 
-	return wrnc_sysfs_printf(path, "%d", size);
+	return trtl_sysfs_printf(path, "%d", size);
 }
 
 
@@ -785,13 +785,13 @@ int wrnc_hmq_buffer_size_set(struct wrnc_hmq *hmq, uint32_t size)
  * @param[out] size buffer size in bytes
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrnc_hmq_buffer_size_get(struct wrnc_hmq *hmq, uint32_t *size)
+int trtl_hmq_buffer_size_get(struct trtl_hmq *hmq, uint32_t *size)
 {
-	char path[WRNC_SYSFS_PATH_LEN];
+	char path[TRTL_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN, "%s/buffer_size", hmq->syspath);
+	snprintf(path, TRTL_SYSFS_PATH_LEN, "%s/buffer_size", hmq->syspath);
 
-	return wrnc_sysfs_scanf(path, "%d", size);
+	return trtl_sysfs_scanf(path, "%d", size);
 }
 
 
@@ -801,14 +801,14 @@ int wrnc_hmq_buffer_size_get(struct wrnc_hmq *hmq, uint32_t *size)
  * @param[out] width maximum message width in bytes
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrnc_hmq_width_get(struct wrnc_hmq *hmq, uint32_t *width)
+int trtl_hmq_width_get(struct trtl_hmq *hmq, uint32_t *width)
 {
-	char path[WRNC_SYSFS_PATH_LEN];
+	char path[TRTL_SYSFS_PATH_LEN];
 	int err;
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN, "%s/width_max", hmq->syspath);
+	snprintf(path, TRTL_SYSFS_PATH_LEN, "%s/width_max", hmq->syspath);
 
-	err = wrnc_sysfs_scanf(path, "%d", width);
+	err = trtl_sysfs_scanf(path, "%d", width);
 	*width = 4 * (*width); /* Convert to byte */
 
 	return err;
@@ -821,15 +821,15 @@ int wrnc_hmq_width_get(struct wrnc_hmq *hmq, uint32_t *width)
  * @param[out] max maximum number of messages in the buffer
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrnc_hmq_msg_max_get(struct wrnc_hmq *hmq, uint32_t *max)
+int trtl_hmq_msg_max_get(struct trtl_hmq *hmq, uint32_t *max)
 {
 	uint32_t buf_size, msg_size;
 	int err;
 
-	err = wrnc_hmq_buffer_size_get(hmq, &buf_size);
+	err = trtl_hmq_buffer_size_get(hmq, &buf_size);
 	if (err)
 		return err;
-	err = wrnc_hmq_width_get(hmq, &msg_size);
+	err = trtl_hmq_width_get(hmq, &msg_size);
 	if (err)
 		return err;
 
@@ -841,18 +841,18 @@ int wrnc_hmq_msg_max_get(struct wrnc_hmq *hmq, uint32_t *max)
 
 /**
  * It gets the maximum number of messages that can be stored within the
- * mock-turtle HMQ (in hardware).
+ * mockturtle HMQ (in hardware).
  * @param[in] hmq HMQ device descriptor
  * @param[out] max maximum number of message to set
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-int wrnc_hmq_count_max_hw_get(struct wrnc_hmq *hmq, uint32_t *max)
+int trtl_hmq_count_max_hw_get(struct trtl_hmq *hmq, uint32_t *max)
 {
-	char path[WRNC_SYSFS_PATH_LEN];
+	char path[TRTL_SYSFS_PATH_LEN];
 
-	snprintf(path, WRNC_SYSFS_PATH_LEN, "%s/count_max_hw", hmq->syspath);
+	snprintf(path, TRTL_SYSFS_PATH_LEN, "%s/count_max_hw", hmq->syspath);
 
-	return wrnc_sysfs_scanf(path, "%d", max);
+	return trtl_sysfs_scanf(path, "%d", max);
 }
 
 
@@ -861,7 +861,7 @@ int wrnc_hmq_count_max_hw_get(struct wrnc_hmq *hmq, uint32_t *max)
  * @param[in] wdesc device descriptor
  * @return 0 on success, -1 on error and errno is set appropriately
  */
-static int wrnc_dev_open(struct wrnc_desc *wdesc)
+static int trtl_dev_open(struct trtl_desc *wdesc)
 {
 	char path[64];
 
@@ -883,14 +883,14 @@ static int wrnc_dev_open(struct wrnc_desc *wdesc)
  * @param[in, out] data value in/to the shared memory
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-static int wrnc_smem_io(struct wrnc_desc *wdesc,
+static int trtl_smem_io(struct trtl_desc *wdesc,
 			uint32_t addr, uint32_t *data, size_t count,
-			enum wrnc_smem_modifier mod, int is_input)
+			enum trtl_smem_modifier mod, int is_input)
 {
-	struct wrnc_smem_io io;
+	struct trtl_smem_io io;
 	int err, i;
 
-	err = wrnc_dev_open(wdesc);
+	err = trtl_dev_open(wdesc);
 	if (err)
 		return -1;
 
@@ -900,7 +900,7 @@ static int wrnc_smem_io(struct wrnc_desc *wdesc,
 		io.addr = addr + (i * 4);
 		if (!io.is_input)
 			io.value = data[i];
-		err = ioctl(wdesc->fd_dev, WRNC_IOCTL_SMEM_IO, &io);
+		err = ioctl(wdesc->fd_dev, TRTL_IOCTL_SMEM_IO, &io);
 		if (err)
 			return -1;
 		data[i] = io.value;
@@ -912,7 +912,7 @@ static int wrnc_smem_io(struct wrnc_desc *wdesc,
 
 /**
  * It does a direct acces to the shared memory to read a set of cells
- * @param[in] wrnc device token
+ * @param[in] trtl device token
  * @param[in] addr memory address where start the operations
  * @param[out] data values read from in the shared memory. The function will
  *             replace this value with the read back value
@@ -920,18 +920,18 @@ static int wrnc_smem_io(struct wrnc_desc *wdesc,
  * @param[in] mod shared memory operation mode
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_smem_read(struct wrnc_dev *wrnc, uint32_t addr, uint32_t *data,
-		   size_t count, enum wrnc_smem_modifier mod)
+int trtl_smem_read(struct trtl_dev *trtl, uint32_t addr, uint32_t *data,
+		   size_t count, enum trtl_smem_modifier mod)
 {
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
+	struct trtl_desc *wdesc = (struct trtl_desc *)trtl;
 
-	return wrnc_smem_io(wdesc, addr, data, count, mod, 1);
+	return trtl_smem_io(wdesc, addr, data, count, mod, 1);
 }
 
 
 /**
  * It writes on the shared memory of the WRNC
- * @param[in] wrnc device to use
+ * @param[in] trtl device to use
  * @param[in] addr memory address
  * @param[in, out] data values to write in the shared memory. The function will
  *                 replace this value with the read back value
@@ -939,77 +939,77 @@ int wrnc_smem_read(struct wrnc_dev *wrnc, uint32_t addr, uint32_t *data,
  * @param[in] mod shared memory operation mode
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_smem_write(struct wrnc_dev *wrnc, uint32_t addr, uint32_t *data,
-		    size_t count, enum wrnc_smem_modifier mod)
+int trtl_smem_write(struct trtl_dev *trtl, uint32_t addr, uint32_t *data,
+		    size_t count, enum trtl_smem_modifier mod)
 {
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
+	struct trtl_desc *wdesc = (struct trtl_desc *)trtl;
 
-	return wrnc_smem_io(wdesc, addr, data, count, mod, 0);
+	return trtl_smem_io(wdesc, addr, data, count, mod, 0);
 }
 
 
 /**
  * It binds a slot to manage only messages that comply with the given filter
- * @param[in] wrnc device to use
+ * @param[in] trtl device to use
  * @param[in] flt filters to apply
  * @param[in] length number of filters
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_bind(struct wrnc_dev *wrnc, struct wrnc_msg_filter *flt,
+int trtl_bind(struct trtl_dev *trtl, struct trtl_msg_filter *flt,
 	      unsigned int length)
 {
-	errno = EWRNC_NO_IMPLEMENTATION;
+	errno = ETRTL_NO_IMPLEMENTATION;
 	return -1;
 }
 
 
 /**
  * It starts to execute code on a given CPU.
- * This function is a wrapper of wrnc_cpu_run_set() that allow you to safely
+ * This function is a wrapper of trtl_cpu_run_set() that allow you to safely
  * start a single CPU.
- * @param[in] wrnc device token
+ * @param[in] trtl device token
  * @param[in] index CPU index
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_cpu_start(struct wrnc_dev *wrnc, unsigned int index)
+int trtl_cpu_start(struct trtl_dev *trtl, unsigned int index)
 {
 	uint32_t tmp;
 
-	wrnc_cpu_run_get(wrnc, &tmp);
-	return wrnc_cpu_run_set(wrnc, tmp & ~(1 << index));
+	trtl_cpu_run_get(trtl, &tmp);
+	return trtl_cpu_run_set(trtl, tmp & ~(1 << index));
 }
 
 
 /**
  * It stops the execution of code on a given CPU
- * This function is a wrapper of wrnc_cpu_run_set() that allow you to safely
+ * This function is a wrapper of trtl_cpu_run_set() that allow you to safely
  * stop a single CPU.
- * @param[in] wrnc device token
+ * @param[in] trtl device token
  * @param[in] index CPU index
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_cpu_stop(struct wrnc_dev *wrnc, unsigned int index)
+int trtl_cpu_stop(struct trtl_dev *trtl, unsigned int index)
 {
 	uint32_t tmp;
 
-	wrnc_cpu_run_get(wrnc, &tmp);
-	return wrnc_cpu_run_set(wrnc, tmp | (1 << index));
+	trtl_cpu_run_get(trtl, &tmp);
+	return trtl_cpu_run_set(trtl, tmp | (1 << index));
 }
 
 
 /**
  * It checks if the CPU is running (or not)
- * @param[in] wrnc device token
+ * @param[in] trtl device token
  * @param[in] index CPU index
  * @param[out] run 1 if the CPU is running
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_cpu_is_running(struct wrnc_dev *wrnc, unsigned int index,
+int trtl_cpu_is_running(struct trtl_dev *trtl, unsigned int index,
 			unsigned int *run)
 {
 	uint32_t tmp, err;
 
-	err = wrnc_cpu_run_get(wrnc, &tmp);
+	err = trtl_cpu_run_get(trtl, &tmp);
 	if (err)
 		return -1;
 
@@ -1020,51 +1020,51 @@ int wrnc_cpu_is_running(struct wrnc_dev *wrnc, unsigned int index,
 
 /**
  * It enables a CPU; in other words, it clear the reset line of a CPU.
- * This function is a wrapper of wrnc_cpu_reset_set() that allow you to safely
+ * This function is a wrapper of trtl_cpu_reset_set() that allow you to safely
  * enable a single CPU.
- * @param[in] wrnc device token
+ * @param[in] trtl device token
  * @param[in] index CPU index
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_cpu_enable(struct wrnc_dev *wrnc, unsigned int index)
+int trtl_cpu_enable(struct trtl_dev *trtl, unsigned int index)
 {
 	uint32_t tmp;
 
-	wrnc_cpu_reset_get(wrnc, &tmp);
-	return wrnc_cpu_reset_set(wrnc, tmp & ~(1 << index));
+	trtl_cpu_reset_get(trtl, &tmp);
+	return trtl_cpu_reset_set(trtl, tmp & ~(1 << index));
 }
 
 
 /**
  * It disables a CPU; in other words, it sets the reset line of a CPU.
- * This function is a wrapper of wrnc_cpu_reset_set() that allow you to safely
+ * This function is a wrapper of trtl_cpu_reset_set() that allow you to safely
  * disable a single CPU.
- * @param[in] wrnc device token
+ * @param[in] trtl device token
  * @param[in] index CPU index
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_cpu_disable(struct wrnc_dev *wrnc, unsigned int index)
+int trtl_cpu_disable(struct trtl_dev *trtl, unsigned int index)
 {
 	uint32_t tmp;
 
-	wrnc_cpu_reset_get(wrnc, &tmp);
-	return wrnc_cpu_reset_set(wrnc, tmp | (1 << index));
+	trtl_cpu_reset_get(trtl, &tmp);
+	return trtl_cpu_reset_set(trtl, tmp | (1 << index));
 }
 
 
 /**
  * It checks if the CPU is enabled (or not)
- * @param[in] wrnc device token
+ * @param[in] trtl device token
  * @param[in] index CPU index
  * @param[out] enable 1 if the CPU is enable
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_cpu_is_enable(struct wrnc_dev *wrnc, unsigned int index,
+int trtl_cpu_is_enable(struct trtl_dev *trtl, unsigned int index,
 			unsigned int *enable)
 {
 	uint32_t tmp, err;
 
-	err = wrnc_cpu_reset_get(wrnc, &tmp);
+	err = trtl_cpu_reset_get(trtl, &tmp);
 	if (err)
 		return -1;
 
@@ -1080,21 +1080,21 @@ int wrnc_cpu_is_enable(struct wrnc_dev *wrnc, unsigned int index,
  * @param[in] n maximum number of messages to read
  * @return number of message read, -1 on error and errno is set appropriately
  */
-int wrnc_hmq_receive_n(struct wrnc_hmq *hmq,
-		       struct wrnc_msg *msg, unsigned int n)
+int trtl_hmq_receive_n(struct trtl_hmq *hmq,
+		       struct trtl_msg *msg, unsigned int n)
 {
 	int ret, size, i;
 
 	if (!hmq || hmq->fd < 0) {
-		errno = EWRNC_HMQ_CLOSE;
+		errno = ETRTL_HMQ_CLOSE;
 		return -1;
 	}
 
 	/* Get a message from the driver */
-	size = sizeof(struct wrnc_msg);
+	size = sizeof(struct trtl_msg);
 	ret = read(hmq->fd, msg, size * n);
-	if (ret % sizeof(struct wrnc_msg)) {
-		errno = EWRNC_HMQ_CLOSE;
+	if (ret % sizeof(struct trtl_msg)) {
+		errno = ETRTL_HMQ_CLOSE;
 		return -1;
 	}
 
@@ -1114,16 +1114,16 @@ int wrnc_hmq_receive_n(struct wrnc_hmq *hmq,
  * @param[in] hmq HMQ device descriptor
  * @return a WRNC message, NULL on error and errno is set appropriately
  */
-struct wrnc_msg *wrnc_hmq_receive(struct wrnc_hmq *hmq)
+struct trtl_msg *trtl_hmq_receive(struct trtl_hmq *hmq)
 {
-	struct wrnc_msg *msg;
+	struct trtl_msg *msg;
 	int ret;
 
-	msg = malloc(sizeof(struct wrnc_msg));
+	msg = malloc(sizeof(struct trtl_msg));
 	if (!msg)
 		return NULL;
 
-	ret =  wrnc_hmq_receive_n(hmq, msg, 1);
+	ret =  trtl_hmq_receive_n(hmq, msg, 1);
 	if (ret < 0) {
 		free(msg);
 		return NULL;
@@ -1139,23 +1139,23 @@ struct wrnc_msg *wrnc_hmq_receive(struct wrnc_hmq *hmq)
  * @param[in] msg message to send
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_hmq_send(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
+int trtl_hmq_send(struct trtl_hmq *hmq, struct trtl_msg *msg)
 {
 	int n;
 
 	if (!hmq || hmq->fd < 0) {
-		errno = EWRNC_HMQ_CLOSE;
+		errno = ETRTL_HMQ_CLOSE;
 		return -1;
 	}
 
-	if (msg->datalen >= WRNC_MAX_PAYLOAD_SIZE) {
+	if (msg->datalen >= TRTL_MAX_PAYLOAD_SIZE) {
 		errno = EINVAL;
 		return -1;
 	}
 
 	/* Get a message from the driver */
-	n = write(hmq->fd, msg, sizeof(struct wrnc_msg));
-	if (n != sizeof(struct wrnc_msg))
+	n = write(hmq->fd, msg, sizeof(struct trtl_msg));
+	if (n != sizeof(struct trtl_msg))
 		return -1;
 
 	return 0;
@@ -1168,9 +1168,9 @@ int wrnc_hmq_send(struct wrnc_hmq *hmq, struct wrnc_msg *msg)
  * @param[in] filter filter to add
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_hmq_filter_add(struct wrnc_hmq *hmq, struct wrnc_msg_filter *filter)
+int trtl_hmq_filter_add(struct trtl_hmq *hmq, struct trtl_msg_filter *filter)
 {
-	return ioctl(hmq->fd, WRNC_IOCTL_MSG_FILTER_ADD, filter);
+	return ioctl(hmq->fd, TRTL_IOCTL_MSG_FILTER_ADD, filter);
 }
 
 
@@ -1179,20 +1179,20 @@ int wrnc_hmq_filter_add(struct wrnc_hmq *hmq, struct wrnc_msg_filter *filter)
  * @param[in] hmq HMQ device descriptor
  * @return 0 on success, -1 otherwise and errno is set appropriately
  */
-int wrnc_hmq_filter_clean(struct wrnc_hmq *hmq)
+int trtl_hmq_filter_clean(struct trtl_hmq *hmq)
 {
-	return ioctl(hmq->fd, WRNC_IOCTL_MSG_FILTER_CLEAN, NULL);
+	return ioctl(hmq->fd, TRTL_IOCTL_MSG_FILTER_CLEAN, NULL);
 }
 
 
 /**
  * It returns the device name
- * @param[in] wrnc device token
+ * @param[in] trtl device token
  * @return the string representing the name of the device
  */
-char *wrnc_name_get(struct wrnc_dev *wrnc)
+char *trtl_name_get(struct trtl_dev *trtl)
 {
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
+	struct trtl_desc *wdesc = (struct trtl_desc *)trtl;
 
 	return wdesc->name;
 }
@@ -1200,21 +1200,21 @@ char *wrnc_name_get(struct wrnc_dev *wrnc)
 
 /**
  * It opens the debug message stream
- * @param[in] wrnc device token
+ * @param[in] trtl device token
  * @param[in] index CPU index
  * @return a debug token on success, NULL otherwise and errno is set
  *         appropriately
  */
-struct wrnc_dbg *wrnc_debug_open(struct wrnc_dev *wrnc, unsigned int index)
+struct trtl_dbg *trtl_debug_open(struct trtl_dev *trtl, unsigned int index)
 {
-	struct wrnc_desc *wdesc = (struct wrnc_desc *)wrnc;
-	struct wrnc_dbg *dbg;
+	struct trtl_desc *wdesc = (struct trtl_desc *)trtl;
+	struct trtl_dbg *dbg;
 	char path[64];
 
-	dbg = malloc(sizeof(struct wrnc_dbg));
+	dbg = malloc(sizeof(struct trtl_dbg));
 	if (!dbg)
 		return NULL;
-	dbg->wrnc = wrnc;
+	dbg->trtl = trtl;
 	dbg->cpu_index = index;
 	snprintf(path, 64, "/sys/kernel/debug/%s/%s-cpu-%02d-dbg",
 		 wdesc->name, wdesc->name, index);
@@ -1234,7 +1234,7 @@ struct wrnc_dbg *wrnc_debug_open(struct wrnc_dev *wrnc, unsigned int index)
  * @param[in] dbg_tkn debug token
  * @param[in] index CPU index
  */
-void wrnc_debug_close(struct wrnc_dbg *dbg)
+void trtl_debug_close(struct trtl_dbg *dbg)
 {
 	close(dbg->fd);
 	free(dbg);
@@ -1256,7 +1256,7 @@ void wrnc_debug_close(struct wrnc_dbg *dbg)
  * @return number of byte read on success, -1 otherwise and errno is set
  *         appropriately
  */
-int wrnc_debug_message_get(struct wrnc_dbg *dbg, char *buf, size_t count)
+int trtl_debug_message_get(struct trtl_dbg *dbg, char *buf, size_t count)
 {
 	int n = 0, real_count = 0, retry = N_RETRY;
 

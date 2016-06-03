@@ -9,7 +9,7 @@
 
 #ifndef __DEMO_COMMON_H
 #define __DEMO_COMMON_H
-#include <wrnc-common.h>
+#include <mockturtle-common.h>
 
 /* HMQ slots used for input */
 #define DEMO_HMQ_IN 0

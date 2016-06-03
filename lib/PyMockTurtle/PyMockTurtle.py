@@ -44,7 +44,7 @@ class Wrnc(object):
     This is an abstract class to handle the WRNC library
     """
     def __init__(self, lun=None, device_id=None):
-        self.libwrnc = CDLL("libwrnc.so", use_errno=True)
+        self.libwrnc = CDLL("libmockturtle.so", use_errno=True)
         self.lun = lun
         self.device_id = device_id
 

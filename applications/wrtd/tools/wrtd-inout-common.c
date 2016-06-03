@@ -11,7 +11,7 @@
 #include <errno.h>
 #include <string.h>
 
-#include <libwrnc.h>
+#include <libmockturtle.h>
 #include <libwrtd.h>
 #include <wrtd-common.h>
 #include <wrtd-internal.h>

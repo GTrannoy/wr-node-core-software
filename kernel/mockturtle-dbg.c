@@ -14,18 +14,18 @@
 #include <linux/circ_buf.h>
 
 #include <linux/fmc.h>
-#include <hw/wrn_cpu_csr.h>
+#include <hw/mockturtle_cpu_csr.h>
 
-#include "wrnc.h"
+#include "mockturtle-drv.h"
 
 int dbg_max_msg = 1024; /**< debug messages buffer */
 module_param_named(max_dbg_msg, dbg_max_msg, int, 0444);
 MODULE_PARM_DESC(max_dbg_msg, "Maximum number of debug messages in driver queue.");
 
 
-static int wrnc_dbg_open(struct inode *inode, struct file *file)
+static int trtl_dbg_open(struct inode *inode, struct file *file)
 {
-	struct wrnc_cpu *cpu;
+	struct trtl_cpu *cpu;
 
 	if (inode->i_private)
 		file->private_data = inode->i_private;
@@ -45,9 +45,9 @@ static int wrnc_dbg_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int wrnc_dbg_close(struct inode *inode, struct file *file)
+static int trtl_dbg_close(struct inode *inode, struct file *file)
 {
-	struct wrnc_cpu *cpu = file->private_data;
+	struct trtl_cpu *cpu = file->private_data;
 
 	spin_lock(&cpu->lock);
 	kfree(cpu->cbuf.buf);
@@ -57,10 +57,10 @@ static int wrnc_dbg_close(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t wrnc_dbg_read(struct file *f, char __user *buf,
+static ssize_t trtl_dbg_read(struct file *f, char __user *buf,
 			     size_t count, loff_t *offp)
 {
-	struct wrnc_cpu *cpu = f->private_data;
+	struct trtl_cpu *cpu = f->private_data;
 	size_t lcount;
 	int i;
 
@@ -95,9 +95,9 @@ static ssize_t wrnc_dbg_read(struct file *f, char __user *buf,
 	return lcount;
 }
 
-static unsigned int wrnc_dbg_poll(struct file *f, struct poll_table_struct *w)
+static unsigned int trtl_dbg_poll(struct file *f, struct poll_table_struct *w)
 {
-	struct wrnc_cpu *cpu = f->private_data;
+	struct trtl_cpu *cpu = f->private_data;
 
 	dev_dbg(&cpu->dev, "%s  head=%d, tail=%d\n", __func__,
 		cpu->cbuf.head, cpu->cbuf.tail);
@@ -106,38 +106,38 @@ static unsigned int wrnc_dbg_poll(struct file *f, struct poll_table_struct *w)
 	return 0;
 }
 
-const struct file_operations wrnc_cpu_dbg_fops = {
+const struct file_operations trtl_cpu_dbg_fops = {
 	.owner = THIS_MODULE,
-	.open  = wrnc_dbg_open,
-	.release = wrnc_dbg_close,
-	.read = wrnc_dbg_read,
-	.poll = wrnc_dbg_poll,
+	.open  = trtl_dbg_open,
+	.release = trtl_dbg_close,
+	.read = trtl_dbg_read,
+	.poll = trtl_dbg_poll,
 };
 
-irqreturn_t wrnc_irq_handler_debug(int irq_core_base, void *arg)
+irqreturn_t trtl_irq_handler_debug(int irq_core_base, void *arg)
 {
 	struct fmc_device *fmc = arg;
-	struct wrnc_dev *wrnc = fmc_get_drvdata(fmc);
+	struct trtl_dev *trtl = fmc_get_drvdata(fmc);
 	struct circ_buf *cb;
 	uint32_t status;
 	char c;
 	int i;
 
-	status = fmc_readl(fmc, wrnc->base_csr + WRN_CPU_CSR_REG_DBG_POLL);
+	status = fmc_readl(fmc, trtl->base_csr + WRN_CPU_CSR_REG_DBG_POLL);
 do_irq:
 	i = -1;
-	while (status && ++i < wrnc->n_cpu) {
+	while (status && ++i < trtl->n_cpu) {
 		if (!(status & 0x1)) {
 			status >>= 1;
 			continue;
 		}
 
 		/* Select the CPU to use */
-		spin_lock(&wrnc->cpu[i].lock);
-		fmc_writel(fmc, i, wrnc->base_csr + WRN_CPU_CSR_REG_CORE_SEL);
+		spin_lock(&trtl->cpu[i].lock);
+		fmc_writel(fmc, i, trtl->base_csr + WRN_CPU_CSR_REG_CORE_SEL);
 		c = fmc_readl(fmc,
-				wrnc->base_csr + WRN_CPU_CSR_REG_DBG_MSG);
-		cb = &wrnc->cpu[i].cbuf;
+				trtl->base_csr + WRN_CPU_CSR_REG_DBG_MSG);
+		cb = &trtl->cpu[i].cbuf;
 		if (cb->buf) {
 			/* We cans store the char */
 			pr_debug("%s:%d %d=%c\n", __func__, __LINE__, i, c);
@@ -147,10 +147,10 @@ do_irq:
 				cb->tail = (cb->tail + 1) & (dbg_max_msg - 1);
 			}
 		}
-		spin_unlock(&wrnc->cpu[i].lock);
+		spin_unlock(&trtl->cpu[i].lock);
 	}
 
-	status = fmc_readl(fmc, wrnc->base_csr + WRN_CPU_CSR_REG_DBG_POLL);
+	status = fmc_readl(fmc, trtl->base_csr + WRN_CPU_CSR_REG_DBG_POLL);
 	if (status)
 		goto do_irq;
 

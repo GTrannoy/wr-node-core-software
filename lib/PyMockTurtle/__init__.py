@@ -4,8 +4,8 @@
 @license: GPLv3
 """
 
-from .PyWRNC import WrncHeader, WrncMessage, \
-                    WrncCpu, WrncHmq, WrncSmem, WrncDebug
+from .PyMockTurtle import WrncHeader, WrncMessage, \
+                          WrncCpu, WrncHmq, WrncSmem, WrncDebug
 
 __all__ = (
     "WrncCpu",

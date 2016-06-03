@@ -20,7 +20,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "hw/wrn_cpu_lr.h"
+#include "hw/mockturtle_cpu_lr.h"
 
 /* Dedicated Peripheral base */
 #define CPU_DP_BASE 0x200000

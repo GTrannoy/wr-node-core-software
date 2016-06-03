@@ -4,40 +4,40 @@
  * License: GPL v2
  */
 
-#ifndef __WRNC_H__
-#define __WRNC_H__
+#ifndef __TRTL_H__
+#define __TRTL_H__
 
 #include <linux/circ_buf.h>
-#include "hw/mqueue.h"
-#include "wrnc-user.h"
+#include "hw/mockturtle_queue.h"
+#include "mockturtle.h"
 
-#define WRNC_MAX_CPU_MINORS (WRNC_MAX_CPU * WRNC_MAX_CARRIER)
-#define WRNC_MAX_HMQ_MINORS (WRNC_MAX_HMQ_SLOT * WRNC_MAX_CARRIER)
-#define WRNC_MAX_MINORS (WRNC_MAX_CARRIER + WRNC_MAX_CPU_MINORS + WRNC_MAX_HMQ_MINORS)
+#define TRTL_MAX_CPU_MINORS (TRTL_MAX_CPU * TRTL_MAX_CARRIER)
+#define TRTL_MAX_HMQ_MINORS (TRTL_MAX_HMQ_SLOT * TRTL_MAX_CARRIER)
+#define TRTL_MAX_MINORS (TRTL_MAX_CARRIER + TRTL_MAX_CPU_MINORS + TRTL_MAX_HMQ_MINORS)
 
-#define WRNC_SMEM_MAX_SIZE 65536
+#define TRTL_SMEM_MAX_SIZE 65536
 
-#define to_wrnc_cpu(_dev) (container_of(_dev, struct wrnc_cpu, dev))
-#define to_wrnc_dev(_dev) (container_of(_dev, struct wrnc_dev, dev))
-#define to_fmc_dev(_wrnc) (container_of(_wrnc->dev.parent, struct fmc_device, dev))
-#define to_wrnc_hmq(_dev) (container_of(_dev, struct wrnc_hmq, dev))
+#define to_trtl_cpu(_dev) (container_of(_dev, struct trtl_cpu, dev))
+#define to_trtl_dev(_dev) (container_of(_dev, struct trtl_dev, dev))
+#define to_fmc_dev(_trtl) (container_of(_trtl->dev.parent, struct fmc_device, dev))
+#define to_trtl_hmq(_dev) (container_of(_dev, struct trtl_hmq, dev))
 
-#define WRNC_FLAG_HMQ_DIR (1 << 0) /**< 1 CPU input, 0 CPU output */
-#define WRNC_FLAG_HMQ_SHR (1 << 1) /**< 1 shared, means that more than
+#define TRTL_FLAG_HMQ_DIR (1 << 0) /**< 1 CPU input, 0 CPU output */
+#define TRTL_FLAG_HMQ_SHR (1 << 1) /**< 1 shared, means that more than
 				      1 CPU is using it */
 
-#define WRNC_FLAG_HMQ_SHR_USR (1 << 2) /**< Shared by users */
-#define WRNC_FLAG_HMQ_SYNC_WAIT (1 << 3) /**< wait sync answer */
-#define WRNC_FLAG_HMQ_SYNC_READY (1 << 4) /**< sync answer is ready */
+#define TRTL_FLAG_HMQ_SHR_USR (1 << 2) /**< Shared by users */
+#define TRTL_FLAG_HMQ_SYNC_WAIT (1 << 3) /**< wait sync answer */
+#define TRTL_FLAG_HMQ_SYNC_READY (1 << 4) /**< sync answer is ready */
 
 
-static inline uint32_t wrnc_get_sequence(struct wrnc_msg *msg)
+static inline uint32_t trtl_get_sequence(struct trtl_msg *msg)
 {
 	return msg->data[1];
 }
 
-struct wrnc_msg_filter_element {
-	struct wrnc_msg_filter filter;
+struct trtl_msg_filter_element {
+	struct trtl_msg_filter filter;
 	struct list_head list;
 };
 
@@ -45,18 +45,18 @@ struct wrnc_msg_filter_element {
 /**
  * Available type of devices
  */
-enum wrnc_dev_type {
-	WRNC_DEV, /**< the whole WRNC component */
-	WRNC_CPU, /**< CPU core of the WRNC*/
-	WRNC_HMQ, /**< HMQ slot ot the WRNC */
+enum trtl_dev_type {
+	TRTL_DEV, /**< the whole WRNC component */
+	TRTL_CPU, /**< CPU core of the WRNC*/
+	TRTL_HMQ, /**< HMQ slot ot the WRNC */
 };
 
 /**
  * Message structure for the driver
  */
-struct wrnc_msg_element {
+struct trtl_msg_element {
 	struct list_head list; /**< to keep it in our local queue */
-	struct wrnc_msg *msg; /**< the real message */
+	struct trtl_msg *msg; /**< the real message */
 };
 
 
@@ -80,7 +80,7 @@ struct mturtle_hmq_buffer {
 /**
  * It describe the status of a HMQ slot
  */
-struct wrnc_hmq {
+struct trtl_hmq {
 	struct device dev;
 	int index; /**< instance number */
 	unsigned long flags; /**< describe the status of the HMQ slot from
@@ -102,7 +102,7 @@ struct wrnc_hmq {
 
 
 	unsigned int waiting_seq; /**< sequence number to wait */
-	struct wrnc_msg sync_answer; /**< synchronous answer message */
+	struct trtl_msg sync_answer; /**< synchronous answer message */
 
 	unsigned int max_width; /**< maximum words number per single buffer */
 	unsigned int max_depth; /**< maximum buffer queue length (HW) */
@@ -113,9 +113,9 @@ struct wrnc_hmq {
 /**
  * It describes the consumer of the output slot
  */
-struct wrnc_hmq_user {
+struct trtl_hmq_user {
 	struct list_head list; /**< to keep it in our local queue */
-	struct wrnc_hmq *hmq; /**< reference to opened HMQ */
+	struct trtl_hmq *hmq; /**< reference to opened HMQ */
 	struct spinlock lock; /**< to protect list read/write */
 
 	struct list_head list_filters; /**< list of filters to apply */
@@ -129,31 +129,31 @@ struct wrnc_hmq_user {
 /**
  * It describes a single instance of a CPU of the WRNC
  */
-struct wrnc_cpu {
+struct trtl_cpu {
 	int index; /**< instance number */
 
 	struct device dev; /**< device representing a single CPU */
 	struct dentry *dbg_msg; /**< debug messages interface */
 	struct circ_buf cbuf; /**< debug circular buffer */
 	struct spinlock lock;
-	struct wrnc_hmq *hmq[WRNC_MAX_HMQ_SLOT]; /**< list of HMQ slots used by
+	struct trtl_hmq *hmq[TRTL_MAX_HMQ_SLOT]; /**< list of HMQ slots used by
 						    this CPU */
 };
 
 /**
  * It describes the generic instance of a WRNC
  */
-struct wrnc_dev {
+struct trtl_dev {
 	unsigned int app_id; /**< Application ID of the FPGA bitstream */
 	struct device dev;
 
 	unsigned int n_cpu; /**< number of CPU in the FPGA bitstream */
-	struct wrnc_cpu cpu[WRNC_MAX_CPU]; /**< CPU instances */
+	struct trtl_cpu cpu[TRTL_MAX_CPU]; /**< CPU instances */
 
 	unsigned int n_hmq_in; /**< number of input slots in the HMQ */
 	unsigned int n_hmq_out; /**< number of output slots in the HMQ */
-	struct wrnc_hmq hmq_in[MAX_MQUEUE_SLOTS]; /**< HMQ input instances */
-	struct wrnc_hmq hmq_out[MAX_MQUEUE_SLOTS]; /**< HMQ output instances */
+	struct trtl_hmq hmq_in[MAX_MQUEUE_SLOTS]; /**< HMQ input instances */
+	struct trtl_hmq hmq_out[MAX_MQUEUE_SLOTS]; /**< HMQ output instances */
 	uint32_t base_core; /**< base address of the WRNC component */
 	uint32_t base_csr; /**< base address of the Shared Control Register */
 	uint32_t base_hmq; /**< base address of the HMQ */
@@ -162,7 +162,7 @@ struct wrnc_dev {
 	uint32_t base_smem; /**< base address of the Shared Memory */
 	uint32_t irq_mask; /**< IRQ mask in use */
 
-	enum wrnc_smem_modifier mod; /**< smem operation modifier */
+	enum trtl_smem_modifier mod; /**< smem operation modifier */
 
 	struct dentry *dbg_dir; /**< root debug directory */
 
@@ -170,19 +170,19 @@ struct wrnc_dev {
 };
 
 /* Global data */
-extern struct device *minors[WRNC_MAX_MINORS];
+extern struct device *minors[TRTL_MAX_MINORS];
 /* CPU data */
-extern const struct file_operations wrnc_cpu_dbg_fops;
-extern const struct file_operations wrnc_cpu_fops;
-extern const struct attribute_group *wrnc_cpu_groups[];
-extern void wrnc_cpu_enable_set(struct wrnc_dev *wrnc, uint8_t mask);
-extern void wrnc_cpu_reset_set(struct wrnc_dev *wrnc, uint8_t mask);
+extern const struct file_operations trtl_cpu_dbg_fops;
+extern const struct file_operations trtl_cpu_fops;
+extern const struct attribute_group *trtl_cpu_groups[];
+extern void trtl_cpu_enable_set(struct trtl_dev *trtl, uint8_t mask);
+extern void trtl_cpu_reset_set(struct trtl_dev *trtl, uint8_t mask);
 extern int dbg_max_msg;
-extern irqreturn_t wrnc_irq_handler_debug(int irq_core_base, void *arg);
+extern irqreturn_t trtl_irq_handler_debug(int irq_core_base, void *arg);
 /* HMQ */
 extern int hmq_default_buf_size;
 extern int hmq_shared;
-extern const struct attribute_group *wrnc_hmq_groups[];
-extern const struct file_operations wrnc_hmq_fops;
-extern irqreturn_t wrnc_irq_handler(int irq_core_base, void *arg);
+extern const struct attribute_group *trtl_hmq_groups[];
+extern const struct file_operations trtl_hmq_fops;
+extern irqreturn_t trtl_irq_handler(int irq_core_base, void *arg);
 #endif

@@ -9,11 +9,11 @@
 #define __LIBRT_H__
 
 #include <stdint.h>
-#include "wrnc-common.h"
-#include "hw/wrn_cpu_lr.h"
-#include "rt-common.h"
-#include "rt-mqueue.h"
-#include "rt-message.h"
+#include "mockturtle-common.h"
+#include "hw/mockturtle_cpu_lr.h"
+#include "mockturtle-rt-common.h"
+#include "mockturtle-rt-mqueue.h"
+#include "mockturtle-rt-message.h"
 #include "pp-printf.h"
 
 #define RT_VARIABLE_FLAG_REG	(1 << 0)
@@ -37,7 +37,7 @@ static inline void rt_print_data(uint32_t *d, unsigned int count)
 		delay(1000);
 	}
 }
-static inline void rt_print_header(struct wrnc_proto_header *h)
+static inline void rt_print_header(struct trtl_proto_header *h)
 {
 	pp_printf("header ----\n");
 	delay(1000);
@@ -63,8 +63,8 @@ struct rt_variable {
 	uint32_t flags; /**< variable options */
 };
 
-typedef int (action_t)(struct wrnc_proto_header *hin, void *pin,
-		       struct wrnc_proto_header *hout, void *pout);
+typedef int (action_t)(struct trtl_proto_header *hin, void *pin,
+		       struct trtl_proto_header *hout, void *pout);
 
 /**
  * Description of a RealTime structure that we want to export to user-space
@@ -85,7 +85,7 @@ struct rt_mq {
  */
 struct rt_application {
 	const char name[16];
-	const struct wrnc_rt_version version;
+	const struct trtl_rt_version version;
 	struct rt_mq *mq; /**< list of used MQ */
 	uint8_t n_mq; /**< number of available MQ */
 
@@ -109,8 +109,8 @@ extern int rt_mq_action_dispatch(unsigned int mq_in);
  * This is a helper that send back a simple ACK message. Keep it static inline
  * to avoid a function call. We gain performance, we loose memory
  */
-static inline void rt_send_ack(struct wrnc_proto_header *hin, void *pin,
-			       struct wrnc_proto_header *hout, void *pout)
+static inline void rt_send_ack(struct trtl_proto_header *hin, void *pin,
+			       struct trtl_proto_header *hout, void *pout)
 {
 	hout->msg_id = RT_ACTION_SEND_ACK;
 	hout->len = 0;
@@ -120,8 +120,8 @@ static inline void rt_send_ack(struct wrnc_proto_header *hin, void *pin,
  * This is a helper that send back a simple NACK message. Keep it static inline
  * to avoid a function call. We gain performance, we loose memory
  */
-static inline void rt_send_nack(struct wrnc_proto_header *hin, void *pin,
-				struct wrnc_proto_header *hout, void *pout)
+static inline void rt_send_nack(struct trtl_proto_header *hin, void *pin,
+				struct trtl_proto_header *hout, void *pout)
 {
 	hout->msg_id = RT_ACTION_SEND_NACK;
 	hout->len = 0;
@@ -130,38 +130,38 @@ static inline void rt_send_nack(struct wrnc_proto_header *hin, void *pin,
 
 extern void rt_get_time(uint32_t *seconds, uint32_t *cycles);
 extern void rt_action_export(action_t **actions, unsigned int count);
-extern int rt_variable_setter(struct wrnc_proto_header *hin, void *pin,
-			    struct wrnc_proto_header *hout, void *pout);
-extern int rt_variable_getter(struct wrnc_proto_header *hin, void *pin,
-			    struct wrnc_proto_header *hout, void *pout);
-extern int rt_structure_setter(struct wrnc_proto_header *hin, void *pin,
-			       struct wrnc_proto_header *hout, void *pout);
-extern int rt_structure_getter(struct wrnc_proto_header *hin, void *pin,
-			       struct wrnc_proto_header *hout, void *pout);
-extern int rt_recv_ping(struct wrnc_proto_header *hin, void *pin,
-			struct wrnc_proto_header *hout, void *pout);
-extern int rt_version_getter(struct wrnc_proto_header *hin, void *pin,
-			     struct wrnc_proto_header *hout, void *pout);
+extern int rt_variable_setter(struct trtl_proto_header *hin, void *pin,
+			    struct trtl_proto_header *hout, void *pout);
+extern int rt_variable_getter(struct trtl_proto_header *hin, void *pin,
+			    struct trtl_proto_header *hout, void *pout);
+extern int rt_structure_setter(struct trtl_proto_header *hin, void *pin,
+			       struct trtl_proto_header *hout, void *pout);
+extern int rt_structure_getter(struct trtl_proto_header *hin, void *pin,
+			       struct trtl_proto_header *hout, void *pout);
+extern int rt_recv_ping(struct trtl_proto_header *hin, void *pin,
+			struct trtl_proto_header *hout, void *pout);
+extern int rt_version_getter(struct trtl_proto_header *hin, void *pin,
+			     struct trtl_proto_header *hout, void *pout);
 
 
 /**
  * It send the message associate to the given header
  * @param[in] msg message to send
  */
-static inline void rt_mq_msg_send(struct wrnc_msg *msg)
+static inline void rt_mq_msg_send(struct trtl_msg *msg)
 {
-	struct wrnc_proto_header *hdr;
+	struct trtl_proto_header *hdr;
 
 	hdr = rt_proto_header_get((void *)msg->data);
 
 	/* When we are not using sync messages, we use the global
 	   sequence number */
-	if (!(hdr->flags & WRNC_PROTO_FLAG_SYNC))
+	if (!(hdr->flags & TRTL_PROTO_FLAG_SYNC))
 		hdr->seq = msg_seq++;
 
-	mq_send(!!(hdr->flags & WRNC_PROTO_FLAG_REMOTE),
+	mq_send(!!(hdr->flags & TRTL_PROTO_FLAG_REMOTE),
 		(hdr->slot_io & 0xF),
-		hdr->len + (sizeof(struct wrnc_proto_header) / 4));
+		hdr->len + (sizeof(struct trtl_proto_header) / 4));
 }
 
 #endif /* __LIBRT_H__ */

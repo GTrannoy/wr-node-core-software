@@ -31,7 +31,7 @@ static void print_time(struct wr_timestamp *t)
 		t->seconds, t->ticks, t->frac);
 }
 
-static void print_version(struct wrnc_rt_version *v)
+static void print_version(struct trtl_rt_version *v)
 {
 	fprintf(stdout, "\tRealTime Application Version:");
 	fprintf(stdout, "\tfpga_id\t\t%x\n",
@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 {
 	struct wrtd_node *wrtd;
 	uint32_t dev_id = 0, n = 1;
-	struct wrnc_rt_version vi, vo;
+	struct trtl_rt_version vi, vo;
 	uint64_t period = 0;
 	struct wr_timestamp tsi, tso;
 	int err, time = 0, version = 0;

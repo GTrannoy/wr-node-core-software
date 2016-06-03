@@ -4,19 +4,19 @@
 -include Makefile.specific
 
 DESTDIR ?= /usr/local
-WRNC ?= ../
+TRTL ?= ../
 
-CFLAGS += -Wall -Werror -ggdb -I$(WRNC)/lib
-CFLAGS += -I$(WRNC)/include
+CFLAGS += -Wall -Werror -ggdb -I$(TRTL)/lib
+CFLAGS += -I$(TRTL)/include
 CFLAGS += $(EXTRACFLAGS)
-LDLIBS += -Wl,-Bstatic -L$(WRNC)/lib -lwrnc
+LDLIBS += -Wl,-Bstatic -L$(TRTL)/lib -lmockturtle
 LDLIBS += -Wl,-Bdynamic -lpthread
-PROGS := wrnc-count
-PROGS += lswrnc
-PROGS += wrnc-loader
-PROGS += wrnc-messages
-PROGS += wrnc-cpu-restart
-PROGS += wrnc-smem
+PROGS := mockturtle-count
+PROGS += lsmockturtle
+PROGS += mockturtle-loader
+PROGS += mockturtle-messages
+PROGS += mockturtle-cpu-restart
+PROGS += mockturtle-smem
 
 all: $(PROGS)
 
@@ -24,7 +24,7 @@ install:
 	install -d $(DESTDIR)/bin
 	install -D $(PROGS) $(DESTDIR)/bin
 
-%: %.c $(WRNC)/libwrnc.a
+%: %.c $(TRTL)/libmockturtle.a
 	$(CC) $(CFLAGS) $^ -o $@ $(LDLIBS)
 
 # make nothing for modules_install, but avoid errors

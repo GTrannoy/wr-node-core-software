@@ -3,7 +3,7 @@
 # build a particular environment.
 -include Makefile.specific
 
-WRNC ?= ../../../
+TRTL ?= ../../../
 LIBTDC ?= ../fmc-tdc-sw/lib
 LIBFD ?= ../fine-delay-sw/lib
 
@@ -15,7 +15,7 @@ LOBJ += libwrtd-logging.o
 LOBJ += libwrtd-input.o
 LOBJ += libwrtd-output.o
 
-CFLAGS += -Wall -ggdb -O2 -fPIC -I. -I../include -I$(WRNC)/include -I$(WRNC)/lib -I$(LIBFD) -I$(LIBTDC) -I$(LIBFD)/../kernel
+CFLAGS += -Wall -ggdb -O2 -fPIC -I. -I../include -I$(TRTL)/include -I$(TRTL)/lib -I$(LIBFD) -I$(LIBTDC) -I$(LIBFD)/../kernel
 CFLAGS += $(EXTRACFLAGS)
 LDLIBS += -L. -lwrtd
 

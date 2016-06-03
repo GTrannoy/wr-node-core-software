@@ -14,7 +14,6 @@
 #include <inttypes.h>
 #include <libgen.h>
 #include <pthread.h>
-#include <libwrnc.h>
 #include <libwrtd.h>
 
 static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
@@ -43,7 +42,7 @@ static void help()
 static void *logging_thread(void *arg)
 {
 	struct wrtd_log_th *th_data = arg;
-	struct wrnc_hmq *hlog;
+	struct trtl_hmq *hlog;
 	struct wrtd_log_entry log;
 	int i, count;
 
@@ -169,7 +168,7 @@ int main(int argc, char *argv[])
 	err = wrtd_init();
 	if (err) {
 		fprintf(stderr, "Cannot init White Rabbit Node Core lib: %s\n",
-			wrnc_strerror(errno));
+			trtl_strerror(errno));
 		exit(1);
 	}
 

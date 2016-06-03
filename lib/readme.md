@@ -1,7 +1,7 @@
 Library Overview {#mainpage}
 ================
-This is the **WRNC** library documentation. Here you can find all
-the information about the *White-Rabbit Node-Core* API and the main
+This is the **Mock Turtle** (*TRTL*) library documentation. Here you can find all
+the information about the *Mock Turtle* API and the main
 library behavior that you need to be aware of.
 
 If you are reading this from the doxygen documentation, then you can find
@@ -15,9 +15,9 @@ to use the library API.
 Initialization
 ==============
 To be able to use this library the first thing to do is to initialize a library
-instance using wrnc_init(); form this point on you are able to use the
+instance using trtl_init(); form this point on you are able to use the
 library API. Of course, when you finished to use the library you have to
-remove this instance using wrnc_exit().
+remove this instance using trtl_exit().
 
 At the beginning, all communication channels are close, so before start to
 communicate with the Real Time application you have to open your communication
@@ -61,7 +61,7 @@ Shared Memory
 The **shared memory** is mainly used to synchronize the Real-Time applications
 running on different cores, but it can be accessed as well from the host system.
 Basically, you can read/write any shared memory location performing different
-action. These actions are defined by wrnc_smem_modifier enumeration.
+action. These actions are defined by trtl_smem_modifier enumeration.
 
 
 Debug

@@ -9,14 +9,14 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <errno.h>
-#include <libwrnc.h>
+#include <libmockturtle.h>
 
 static void help()
 {
 	fprintf(stderr, "\n");
-	fprintf(stderr, "lswrnc [options]\n\n");
-	fprintf(stderr, "It shows the current white-rabbit node-core available on the system.\n\n");
-	fprintf(stderr, "-v   show more information about a wrnc\n");
+	fprintf(stderr, "lsmockturtle [options]\n\n");
+	fprintf(stderr, "It shows the current Mock Turtle available on the system.\n\n");
+	fprintf(stderr, "-v   show more information\n");
 	fprintf(stderr, "-h   show this help\n");
 	fprintf(stderr, "\n");
 	exit(1);
@@ -26,11 +26,11 @@ int main(int argc, char *argv[])
 {
 	char **list;
 	unsigned int appid = 0, cpucount = 0;
-	struct wrnc_dev *wrnc;
+	struct trtl_dev *trtl;
 	char c;
 	int i, verbose = 0, err;
 
-	atexit(wrnc_exit);
+	atexit(trtl_exit);
 
 	while ((c = getopt (argc, argv, "h:v")) != -1) {
 		switch (c) {
@@ -43,33 +43,33 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	err = wrnc_init();
+	err = trtl_init();
 	if (err) {
 		fprintf(stderr, "Cannot init White Rabbit Node Core lib: %s\n",
-			wrnc_strerror(errno));
+			trtl_strerror(errno));
 		exit(1);
 	}
 
-	list = wrnc_list();
+	list = trtl_list();
 	if (!list)
 		goto out;
 	for (i = 0; list[i]; ++i) {
 		fprintf(stdout, "%s\n" , list[i]);
-		wrnc = wrnc_open(list[i]);
-		if (!wrnc) {
+		trtl = trtl_open(list[i]);
+		if (!trtl) {
 			fprintf(stderr, "Cannot open device: %s\n",
-				wrnc_strerror(errno));
+				trtl_strerror(errno));
 			continue;
 		}
 		if (verbose == 1) {
-			wrnc_app_id_get(wrnc, &appid);
-			wrnc_cpu_count(wrnc, &cpucount);
+			trtl_app_id_get(trtl, &appid);
+			trtl_cpu_count(trtl, &cpucount);
 			fprintf(stdout, "    Application ID: 0x%08x\n", appid);
 			fprintf(stdout, "    Number of CPU: %d\n", cpucount);
 		}
-		wrnc_close(wrnc);
+		trtl_close(trtl);
 	}
-	wrnc_list_free(list);
+	trtl_list_free(list);
 out:
-        exit(0);
+	exit(0);
 }

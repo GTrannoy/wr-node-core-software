@@ -15,7 +15,7 @@ extern "C" {
 
 #include <stdint.h>
 #include <stdio.h>
-#include "libwrnc.h"
+#include "libmockturtle.h"
 /**
  * @file wrtd-common.h
  */
@@ -163,7 +163,7 @@ extern void wrtd_exit();
 extern struct wrtd_node *wrtd_open_by_fmc(uint32_t device_id);
 extern struct wrtd_node *wrtd_open_by_lun(int lun);
 extern void wrtd_close(struct wrtd_node *dev);
-extern struct wrnc_dev *wrtd_get_wrnc_dev(struct wrtd_node *dev);
+extern struct trtl_dev *wrtd_get_trtl_dev(struct wrtd_node *dev);
 extern int wrtd_load_application(struct wrtd_node *dev, char *rt_tdc,
 					 char *rt_fd);
 extern int wrtd_white_rabbit_sync(struct wrtd_node *dev,
@@ -197,10 +197,10 @@ extern void wrtd_sec_pico_to_ts(uint64_t sec, uint64_t pico,
 extern const char *wrtd_strlogging(enum wrtd_log_level lvl);
 enum wrtd_log_level wrtd_strlogging_to_level(char *log);
 extern void wrtd_strlogging_full(char *buf, uint32_t log_level);
-extern int wrtd_log_read(struct wrnc_hmq *hmq_log, struct wrtd_log_entry *log,
+extern int wrtd_log_read(struct trtl_hmq *hmq_log, struct wrtd_log_entry *log,
 			 int count, int poll_timeout);
-extern void wrtd_log_close(struct wrnc_hmq *hmq);
-extern struct wrnc_hmq *wrtd_in_log_open(struct wrtd_node *dev, int input);
+extern void wrtd_log_close(struct trtl_hmq *hmq);
+extern struct trtl_hmq *wrtd_in_log_open(struct wrtd_node *dev, int input);
 extern int wrtd_in_log_level_set(struct wrtd_node *dev, unsigned int input,
 				 uint32_t log_level);
 extern int wrtd_in_log_level_get(struct wrtd_node *dev, unsigned int input,
@@ -209,7 +209,7 @@ extern int wrtd_out_log_level_set(struct wrtd_node *dev, unsigned int output,
 				  uint32_t log_level);
 extern int wrtd_out_log_level_get(struct wrtd_node *dev, unsigned int input,
 				  uint32_t *log_level);
-extern struct wrnc_hmq *wrtd_out_log_open(struct wrtd_node *dev, int output);
+extern struct trtl_hmq *wrtd_out_log_open(struct wrtd_node *dev, int output);
 /**@}*/
 
 
@@ -251,7 +251,7 @@ extern int wrtd_in_has_trigger(struct wrtd_node *dev, unsigned int input,
 extern int wrtd_in_ping(struct wrtd_node *dev);
 extern int wrtd_in_base_time(struct wrtd_node *dev, struct wr_timestamp *ts);
 extern int wrtd_in_version(struct wrtd_node *dev,
-			   struct wrnc_rt_version *version);
+			   struct trtl_rt_version *version);
 extern int wrtd_in_dead_time_get(struct wrtd_node *dev, unsigned int input,
 				 uint64_t *dead_time_ps);
 extern int wrtd_in_delay_get(struct wrtd_node *dev, unsigned int input,
@@ -304,7 +304,7 @@ extern int wrtd_out_trig_enable(struct wrtd_node *dev,
 extern int wrtd_out_ping(struct wrtd_node *dev);
 extern int wrtd_out_base_time(struct wrtd_node *dev, struct wr_timestamp *ts);
 extern int wrtd_out_version(struct wrtd_node *dev,
-			    struct wrnc_rt_version *version);
+			    struct trtl_rt_version *version);
 extern int wrtd_out_trigger_mode_set(struct wrtd_node *dev,
 				     unsigned int output,
 				     enum wrtd_trigger_mode mode);

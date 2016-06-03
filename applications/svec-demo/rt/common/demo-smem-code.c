@@ -7,7 +7,7 @@
  * Released according to the GNU GPL, version 2 or any later version.
  */
 
-#include "rt.h"
+#include "mockturtle-rt.h"
 #include "demo-common-rt.h"
 
 SMEM volatile int autodemo_run;

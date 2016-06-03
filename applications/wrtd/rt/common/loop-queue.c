@@ -14,7 +14,7 @@
  * loop-queue.c: Shared Memory-based Loopback queue.
  */
 
-#include "rt.h"
+#include "mockturtle-rt.h"
 #include "wrtd-common.h"
 
 #define LOOP_QUEUE_SIZE 16

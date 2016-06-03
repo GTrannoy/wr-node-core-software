@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-#include <libwrnc.h>
+#include <libmockturtle.h>
 #include <libwrtd-internal.h>
 #include <wrtd-serializers.h>
 
@@ -39,14 +39,14 @@ const char *wrtd_errors[] = {
 
 /**
  * It returns a string messages corresponding to a given error code. If
- * it is not a libwrtd error code, it will run wrnc_strerror()
+ * it is not a libwrtd error code, it will run trtl_strerror()
  * @param[in] err error code
  * @return a message error
  */
 const char *wrtd_strerror(int err)
 {
 	if (err < EWRTD_INVALID_ANSWER_ACK || err >= __EWRTD_MAX_ERROR_NUMBER)
-		return wrnc_strerror(err);
+		return trtl_strerror(err);
 
 	return wrtd_errors[err - EWRTD_INVALID_ANSWER_ACK];
 }
@@ -57,15 +57,15 @@ const char *wrtd_strerror(int err)
  * anything else. If you are going to load/unload WRTD devices, then
  * you have to un-load (wrtd_exit()) e reload (wrtd_init()) the library.
  *
- * This library is based on the libwrnc, so internally, this function also
- * run wrnc_init() in order to initialize the WRNC library.
+ * This library is based on the libmockturtle, so internally, this function also
+ * run trtl_init() in order to initialize the WRNC library.
  * @return 0 on success, otherwise -1 and errno is appropriately set
  */
 int wrtd_init()
 {
 	int err;
 
-	err = wrnc_init();
+	err = trtl_init();
 	if (err)
 		return err;
 
@@ -80,7 +80,7 @@ int wrtd_init()
  */
 void wrtd_exit()
 {
-	wrnc_exit();
+	trtl_exit();
 }
 
 
@@ -93,7 +93,7 @@ void wrtd_exit()
  */
 int wrtd_version_is_valid(struct wrtd_node *dev)
 {
-	struct wrnc_rt_version version;
+	struct trtl_rt_version version;
 	int err;
 
 	errno = 0;
@@ -127,21 +127,21 @@ static struct wrtd_node *wrtd_open(uint32_t device_id, unsigned int is_lun)
 		return NULL;
 
 	if (is_lun)
-		wrtd->wrnc = wrnc_open_by_lun(device_id);
+		wrtd->trtl = trtl_open_by_lun(device_id);
 	else
-		wrtd->wrnc = wrnc_open_by_fmc(device_id);
-	if (!wrtd->wrnc)
+		wrtd->trtl = trtl_open_by_fmc(device_id);
+	if (!wrtd->trtl)
 		goto out;
 
 	wrtd->dev_id = device_id;
 
 	/* Logging interface is always in share mode */
-	err = wrnc_hmq_share_set(wrtd->wrnc, WRNC_HMQ_OUTCOMING,
+	err = trtl_hmq_share_set(wrtd->trtl, TRTL_HMQ_OUTCOMING,
 				 WRTD_OUT_FD_LOGGING, 1);
 	if (err)
 		goto out;
 
-	err = wrnc_hmq_share_set(wrtd->wrnc, WRNC_HMQ_OUTCOMING,
+	err = trtl_hmq_share_set(wrtd->trtl, TRTL_HMQ_OUTCOMING,
 				 WRTD_OUT_TDC_LOGGING, 1);
 	if (err)
 		goto out;
@@ -187,7 +187,7 @@ void wrtd_close(struct wrtd_node *dev)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 
-	wrnc_close(wrtd->wrnc);
+	trtl_close(wrtd->trtl);
 	free(wrtd);
 	dev = NULL;
 }
@@ -199,11 +199,11 @@ void wrtd_close(struct wrtd_node *dev)
  * @param[in] dev device token
  * @return the WRNC token
  */
-struct wrnc_dev *wrtd_get_wrnc_dev(struct wrtd_node *dev)
+struct trtl_dev *wrtd_get_trtl_dev(struct wrtd_node *dev)
 {
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 
-	return (struct wrnc_dev *)wrtd->wrnc;
+	return (struct trtl_dev *)wrtd->trtl;
 }
 
 
@@ -217,16 +217,16 @@ int wrtd_cpu_restart(struct wrtd_node *dev)
 	struct wrtd_desc *wrtd = (struct wrtd_desc *)dev;
 	int err;
 
-	err = wrnc_cpu_disable(wrtd->wrnc,WRTD_CPU_TDC);
+	err = trtl_cpu_disable(wrtd->trtl,WRTD_CPU_TDC);
 	if (err)
 		return err;
-	err = wrnc_cpu_disable(wrtd->wrnc,WRTD_CPU_FD);
+	err = trtl_cpu_disable(wrtd->trtl,WRTD_CPU_FD);
 	if (err)
 		return err;
-	err = wrnc_cpu_enable(wrtd->wrnc,WRTD_CPU_TDC);
+	err = trtl_cpu_enable(wrtd->trtl,WRTD_CPU_TDC);
 	if (err)
 		return err;
-	return wrnc_cpu_enable(wrtd->wrnc,WRTD_CPU_FD);
+	return trtl_cpu_enable(wrtd->trtl,WRTD_CPU_FD);
 }
 
 /**
@@ -246,26 +246,26 @@ int wrtd_load_application(struct wrtd_node *dev, char *rt_tdc,
 		errno = EWRTD_INVALID_BINARY;
 		return -1;
 	}
-	err = wrnc_cpu_reset_get(wrtd->wrnc, &reg_old);
+	err = trtl_cpu_reset_get(wrtd->trtl, &reg_old);
 	if (err)
 		return err;
 
 	/* Keep the CPUs in reset state */
-	err = wrnc_cpu_reset_set(wrtd->wrnc,
+	err = trtl_cpu_reset_set(wrtd->trtl,
 				 (1 << WRTD_CPU_TDC) | (1 << WRTD_CPU_FD));
 	if (err)
 		return err;
 
 	/* Program CPUs application */
-	err = wrnc_cpu_load_application_file(wrtd->wrnc, WRTD_CPU_TDC, rt_tdc);
+	err = trtl_cpu_load_application_file(wrtd->trtl, WRTD_CPU_TDC, rt_tdc);
 	if (err)
 		return err;
-	err = wrnc_cpu_load_application_file(wrtd->wrnc, WRTD_CPU_FD, rt_fd);
+	err = trtl_cpu_load_application_file(wrtd->trtl, WRTD_CPU_FD, rt_fd);
 	if (err)
 		return err;
 
 	/* Re-enable the CPUs */
-	err = wrnc_cpu_reset_set(wrtd->wrnc, reg_old);
+	err = trtl_cpu_reset_set(wrtd->trtl, reg_old);
 	if (err)
 		return err;
 

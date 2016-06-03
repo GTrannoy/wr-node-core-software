@@ -10,7 +10,6 @@
 #include <errno.h>
 #include <string.h>
 #include <getopt.h>
-#include <libwrnc.h>
 #include <libdemo.h>
 #include <inttypes.h>
 
@@ -41,7 +40,7 @@ static void demo_print_status(struct demo_status *status)
 	fprintf(stdout, "\tautodemo\t%s\n", status->autodemo ? "run" : "stop");
 }
 
-static void demo_print_version(struct wrnc_rt_version *version)
+static void demo_print_version(struct trtl_rt_version *version)
 {
 	fprintf(stdout, "Version:\n");
 	fprintf(stdout, "\tFPGA: 0x%x\n", version->fpga_id);
@@ -69,7 +68,7 @@ int main(int argc, char *argv[])
 	char c, c_color = 0, autodemo = 0;
 	int err = 0, show_status = 0, show_version = 0, structure = 0;
 	enum demo_color color = DEMO_RED;
-	struct wrnc_rt_version version;
+	struct trtl_rt_version version;
 	struct demo_structure test, test_rb;
 
 	while ((c = getopt (argc, argv, "hD:l:L:d:c:sa:vt")) != -1) {

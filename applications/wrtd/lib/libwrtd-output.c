@@ -41,24 +41,6 @@ static inline int wrtd_out_send_and_receive_sync(struct wrtd_desc *wrtd,
 }
 
 
-static int wrtd_out_trigger_first_free(struct wrtd_node *dev)
-{
-	struct wrtd_output_trigger_state trigger;
-	int err, i;
-
-	for (i = 0; i < FD_HASH_ENTRIES; i++) {
-		/* It does not matter which channel, use 0 */
-		err = wrtd_out_trig_state_get_by_index(dev, i, 0,
-						       &trigger);
-		if (err && errno == EWRTD_NOFOUND_TRIGGER)
-			return i;
-	}
-
-	errno = ENOMEM;
-	return -1;
-}
-
-
 /**
  * It retrieves the trigger index where you can write.
  * If the trigger with ID 'tid' already exists it returns its index,

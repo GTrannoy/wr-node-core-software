@@ -190,6 +190,12 @@ int main(int argc, char *argv[])
 	fprintf(stdout, "Reboot applications\n");
 
 	/* Start running application on TDC and FD CPUs */
+	err = trtl_cpu_enable(trtl, 0);
+	if (err)
+		exit(1);
+	err = trtl_cpu_enable(trtl, 1);
+	if (err)
+		exit(1);
 	err = trtl_cpu_start(trtl, 0);
 	if (err)
 		exit(1);

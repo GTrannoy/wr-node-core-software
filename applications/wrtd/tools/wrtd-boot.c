@@ -204,7 +204,7 @@ int main(int argc, char *argv[])
 		exit(1);
 
 	if (!wrtd_version_is_valid(wrtd)) {
-		fprintf(stderr, "Cannot run %s: %s\n",
+		fprintf(stderr, "Invalid version %s: %s\n",
 			basename(argv[0]), wrtd_strerror(errno));
 		goto out;
 	}

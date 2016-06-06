@@ -105,6 +105,15 @@ int wrtd_version_is_valid(struct wrtd_node *dev)
 		return 0;
 	}
 
+	err = wrtd_out_version(dev, &version);
+	if (err)
+		return 0;
+
+	if (version.rt_id != WRTD_OUT_RT_ID) {
+		errno = EWRTD_INVALID_IN_APP;
+		return 0;
+	}
+
 	return 1;
 }
 

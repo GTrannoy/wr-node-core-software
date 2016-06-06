@@ -24,5 +24,6 @@
 #include "rt-common.h"
 #include "rt-smem.h"
 #include "pp-printf.h"
+#include "rt-i2c.h"
 
 #endif

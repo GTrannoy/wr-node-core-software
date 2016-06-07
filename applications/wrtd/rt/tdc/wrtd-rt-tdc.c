@@ -278,7 +278,7 @@ static int wrtd_in_trigger_sw(struct trtl_proto_header *hin, void *pin,
 	   So add to it the current time */
 
 	struct wr_timestamp ts_orig;
-	
+
 	ts_orig.seconds = lr_readl(WRN_CPU_LR_REG_TAI_SEC);
 	ts_orig.ticks = lr_readl(WRN_CPU_LR_REG_TAI_CYCLES);
 
@@ -349,7 +349,7 @@ void wr_update_link(void)
 	}
 
 	if ( wr_state != WR_LINK_OFFLINE && !wr_link_up() ) {
-	        pp_printf("rt-tdc: WR sync lost\n");
+		pp_printf("rt-tdc: WR sync lost\n");
 		wr_state = WR_LINK_OFFLINE;
 		wr_enable_lock(0);
 	}

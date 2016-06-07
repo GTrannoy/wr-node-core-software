@@ -163,7 +163,7 @@ static int wrtd_out_hash_table_find(struct wrtd_trig_id *tid)
 			return hidx;
 	}
 
-        return -1;
+	return -1;
 }
 
 
@@ -282,9 +282,9 @@ static inline int pulse_queue_empty(struct lrt_pulse_queue *p)
  */
 static struct pulse_queue_entry* pulse_queue_front(struct lrt_pulse_queue *p)
 {
-    if (!p->count)
-	   return NULL;
-    return &p->data[p->tail];
+	if (!p->count)
+		return NULL;
+	return &p->data[p->tail];
 }
 
 
@@ -462,7 +462,7 @@ static void do_output (struct wrtd_out_channel *out)
 
 	/* Output is idle: check if there's something in the queue to execute */
 	if (pulse_queue_empty(q))
-        	return;
+		return;
 
 	pq_ent = pulse_queue_front(q);
 	ts = &pq_ent->trig.ts;
@@ -636,7 +636,7 @@ static void filter_trigger(struct wrtd_trigger_entry *trig)
 
 void do_rx(void)
 {
-        volatile struct wrtd_trigger_entry *ent;
+	volatile struct wrtd_trigger_entry *ent;
 	struct wrtd_trigger_entry trig;
 	struct wrtd_trigger_message *msg;
 	int i;
@@ -737,7 +737,7 @@ static int wrtd_out_hash_table_free(struct wrtd_trig_id *tid)
 		if (trig_eq(tid, &ht[hidx]->id))
 			break;
 	}
-        return -1;
+	return -1;
 }
 
 
@@ -818,7 +818,7 @@ static int wrtd_out_trigger_index(struct trtl_proto_header *hin, void *pin,
 	if (hin->len * 4 != sizeof(struct wrtd_trig_id)) {
 		pp_printf("%s: wrong incoming message size %d (expected %d)\n",
 			  __func__, hin->len * 4, sizeof(struct wrtd_trig_id));
-	        goto err;
+		goto err;
 	}
 	if (!pout) {
 		pp_printf("%s: missing payload)\n", __func__);
@@ -967,14 +967,14 @@ void init(void)
 	for (i = 0; i < FD_NUM_CHANNELS; i++) {
 		memset(&wrtd_out_channels[i], 0,
 		       sizeof(struct wrtd_out_channel));
-	        wrtd_out_channels[i].base_addr = 0x100 + i * 0x100;
-	        wrtd_out_channels[i].n = i;
-	        wrtd_out_channels[i].config.mode = WRTD_TRIGGER_MODE_AUTO;
-	        wrtd_out_channels[i].priv.pending_trig = NULL;
-	        wrtd_out_channels[i].config.state = OUT_ST_IDLE;
-	        wrtd_out_channels[i].priv.idle = 1;
-	        wrtd_out_channels[i].config.dead_time = 80000 / 8; // 80 us
-	        wrtd_out_channels[i].config.width_cycles = 1250; // 1us
+		wrtd_out_channels[i].base_addr = 0x100 + i * 0x100;
+		wrtd_out_channels[i].n = i;
+		wrtd_out_channels[i].config.mode = WRTD_TRIGGER_MODE_AUTO;
+		wrtd_out_channels[i].priv.pending_trig = NULL;
+		wrtd_out_channels[i].config.state = OUT_ST_IDLE;
+		wrtd_out_channels[i].priv.idle = 1;
+		wrtd_out_channels[i].config.dead_time = 80000 / 8; // 80 us
+		wrtd_out_channels[i].config.width_cycles = 1250; // 1us
 		pp_printf("mode %d %d\n", i , wrtd_out_channels[i].config.mode);
 	}
 

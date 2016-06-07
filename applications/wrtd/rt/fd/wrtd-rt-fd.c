@@ -42,10 +42,12 @@ static struct wrtd_out_channel wrtd_out_channels[FD_NUM_CHANNELS]; /**< Output
 								      array */
 static struct wrtd_out wrtd_out_device;
 
-#define WR_LINK_OFFLINE		1
-#define WR_LINK_ONLINE		2
-#define WR_LINK_SYNCING		3
-#define WR_LINK_SYNCED		4
+enum wrtd_in_wr_link {
+	WR_LINK_OFFLINE = 1,
+	WR_LINK_ONLINE,
+	WR_LINK_SYNCING,
+	WR_LINK_SYNCED,
+};
 
 static int wr_state;
 

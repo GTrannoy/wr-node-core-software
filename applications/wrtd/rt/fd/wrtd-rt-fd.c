@@ -33,6 +33,14 @@ static uint32_t promiscuous_mode = 0;
 
 struct rt_application app;
 
+struct wrtd_out_trigger triggers[FD_HASH_ENTRIES]; /**< list of triggers */
+struct wrtd_out_trigger *ht[FD_HASH_ENTRIES]; /* hash table */
+unsigned int tlist_count = 0; /**< number of valid trigger entry
+					in tlist */
+static struct wrtd_out_channel wrtd_out_channels[FD_NUM_CHANNELS]; /**< Output
+								      state
+								      array */
+static struct wrtd_out wrtd_out_device;
 
 #define WR_LINK_OFFLINE		1
 #define WR_LINK_ONLINE		2
@@ -69,8 +77,12 @@ void wr_enable_lock(int enable)
  */
 void wr_update_link(void)
 {
+	int i;
+
 	switch(wr_state) {
 	case WR_LINK_OFFLINE:
+		for(i = 0; i < FD_NUM_CHANNELS; i++)
+			wrtd_out_channels[i].config.flags |= WRTD_NO_WR;
 		if (wr_link_up())
 			wr_state = WR_LINK_ONLINE;
 		break;
@@ -87,6 +99,8 @@ void wr_update_link(void)
 		}
 		break;
 	case WR_LINK_SYNCED:
+		for(i = 0; i < FD_NUM_CHANNELS; i++)
+			wrtd_out_channels[i].config.flags &= ~WRTD_NO_WR;
 		break;
 	}
 
@@ -102,15 +116,6 @@ int wr_is_timing_ok()
 	return (wr_state == WR_LINK_SYNCED);
 }
 
-
-struct wrtd_out_trigger triggers[FD_HASH_ENTRIES]; /**< list of triggers */
-struct wrtd_out_trigger *ht[FD_HASH_ENTRIES]; /* hash table */
-unsigned int tlist_count = 0; /**< number of valid trigger entry
-					in tlist */
-static struct wrtd_out_channel wrtd_out_channels[FD_NUM_CHANNELS]; /**< Output
-								      state
-								      array */
-static struct wrtd_out wrtd_out_device;
 
 /**
  * Writes to FD output registers for output (out)

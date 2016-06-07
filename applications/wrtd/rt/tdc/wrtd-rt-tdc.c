@@ -314,9 +314,12 @@ void wr_enable_lock(int enable)
  */
 void wr_update_link(void)
 {
+	int i;
 
 	switch (wr_state) {
 	case WR_LINK_OFFLINE:
+		for(i = 0; i < TDC_NUM_CHANNELS; i++)
+			wrtd_in_channels[i].config.flags |= WRTD_NO_WR;
 		if (wr_link_up())
 			wr_state = WR_LINK_ONLINE;
 		break;
@@ -340,6 +343,8 @@ void wr_update_link(void)
 		}
 		break;
 	case WR_LINK_SYNCED:
+		for(i = 0; i < TDC_NUM_CHANNELS; i++)
+			wrtd_in_channels[i].config.flags &= ~WRTD_NO_WR;
 		break;
 	}
 

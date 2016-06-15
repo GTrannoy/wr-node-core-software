@@ -8,4 +8,4 @@ EXTRA_CFLAGS += -DRTPERFORMANCE
 EXTRA_CFLAGS += -DLIBRT_DEBUG -DLIBRT_ERROR
 RT_USE_LIBRT := 1
 
-include $(TRTL)/applications/common/rt/Makefile
+include $(TRTL)/rt/Makefile

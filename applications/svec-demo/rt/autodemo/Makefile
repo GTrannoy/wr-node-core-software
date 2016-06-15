@@ -7,4 +7,4 @@ EXTRA_CFLAGS += -I../common
 EXTRA_CFLAGS += -DFPGA_APPLICATION_ID=0xd330d330
 EXTRA_CFLAGS += -DRT_APPLICATION_ID=0x1236
 
-include $(TRTL)/applications/common/rt/Makefile
+include $(TRTL)/rt/Makefile

@@ -10,4 +10,4 @@ EXTRA_CFLAGS += -I../common
 EXTRA_CFLAGS += -DLIBRT_ERROR
 #EXTRA_CFLAGS += -DLIBRT_DEBUG
 RT_USE_LIBRT := 1
-include $(TRTL)/applications/common/rt/Makefile
+include $(TRTL)/rt/Makefile

@@ -17,22 +17,21 @@ RT_GIT_VERSION = 0x$(shell cd ../../..; git rev-parse --short=8 HEAD)
 
 CFLAGS += -Wall -DWRNODE_RT -g -Os -mmultiply-enabled -mbarrel-shift-enabled
 CFLAGS += -I.
-CFLAGS += -I$(TRTL)/applications/common/rt
-CFLAGS += -I$(TRTL)/applications/common/include
+CFLAGS += -I$(TRTL)/rt
 CFLAGS += -I$(TRTL)/include
 CFLAGS += -DGIT_VERSION=$(RT_GIT_VERSION)
 CFLAGS += $(EXTRA_CFLAGS)
 
 
-OBJS += $(TRTL)/applications/common/rt/mockturtle-crt0.o
-OBJS += $(TRTL)/applications/common/rt/vsprintf-xint.o
-OBJS += $(TRTL)/applications/common/rt/printf.o
-OBJS += $(TRTL)/applications/common/rt/mockturtle-rt-common.o
+OBJS += $(TRTL)/rt/mockturtle-crt0.o
+OBJS += $(TRTL)/rt/vsprintf-xint.o
+OBJS += $(TRTL)/rt/printf.o
+OBJS += $(TRTL)/rt/mockturtle-rt-common.o
 ifdef RT_USE_LIBRT
-OBJS += $(TRTL)/applications/common/rt/libmockturtle-rt.o
+OBJS += $(TRTL)/rt/libmockturtle-rt.o
 endif
 
-LDSCRIPT = $(TRTL)/applications/common/rt/mockturtle.ld
+LDSCRIPT = $(TRTL)/rt/mockturtle.ld
 
 all: clean $(OUTPUT)
 

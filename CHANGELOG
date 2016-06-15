@@ -1,0 +1,23 @@
+# Change Log
+
+## [2.0] - 2016-06-08
+### Changed
+- Project change name to Mock Turtle. this means renaming all files
+  functions, data structures, enumerates and variables to a new
+  convention
+- port output real-time application to the real-time library
+- improve kernel driver performance
+### Added
+- unittest
+
+## [1.1] - 2015-10-20
+### Changed
+- minor changes in API behaviour on error
+
+## [1.0] - 2015-09-17
+
+- first release White Rabbit Node Core
+
+[2.0] http://www.ohwr.org/projects/wr-node-core-sw/repository/show?rev=mock-turtle-2.0
+[1.1] http://www.ohwr.org/projects/wr-node-core-sw/repository/show?rev=mock-turtle-1.1
+[1.0] http://www.ohwr.org/projects/wr-node-core-sw/repository/show?rev=mock-turtle-1.0

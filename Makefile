@@ -1,40 +1,44 @@
+# include parent_common.mk for buildsystem's defines
+# use absolute path for REPO_PARENT
+CURDIR:=$(shell /bin/pwd)
+REPO_PARENT ?= $(CURDIR)/..
+-include $(REPO_PARENT)/parent_common.mk
 
-.PHONY: all clean modules install modules_install clean_all
-.PHONY: gitmodules prereq prereq_install prereq_install_warn prereq_clean
+all: kernel lib tools
 
-DIRS = kernel lib tools 
+FMC_BUS ?= fmc-bus
 
-all clean modules install modules_install: gitmodules
-	@if echo $@ | grep -q install; then $(MAKE) prereq_install_warn; fi
-	for d in $(DIRS); do $(MAKE) -C $$d $@ || exit 1; done
-
-all modules: prereq
-
-clean_all: clean prereq_clean
-
-#### The following targets are used to manage prerequisite repositories
-#### only for THIS repository
-gitmodules:
-	@test -d fmc-bus/doc || echo "Checking out submodules"
-	@test -d fmc-bus/doc || git submodule update --init
-
-# The user can override, using environment variables, the place for our
-# three submodules. Note that svec-sw is not built, as it uses cern-internal
-# pathnames, and thus won't build elsewhere. We have it as a submodule to
-# find needed headers to build kernel code.
-#
 # Use the absolute path so it can be used by submodule
-CURDIR ?= $(shell pwd)
-FMC_BUS ?= $(CURDIR)/fmc-bus
-export FMC_BUS
-SUBMOD = $(FMC_BUS)
-LIBWRNC= $(CURDIR)/lib
-export LIBWRNC
-WRNC=$(CURDIR)
-export WRNC
+# FMC_BUS_ABS has to be absolut path, due to beeing passed to the Kbuild
+FMC_BUS_ABS ?= $(abspath $(FMC_BUS) )
 
-prereq:
-	for d in $(SUBMOD); do $(MAKE) -C $$d || exit 1; done
+export FMC_BUS_ABS
+
+DIRS = $(FMC_BUS_ABS) kernel lib tools
+
+kernel: $(FMC_BUS_ABS)
+tools: lib
+# we take only headers from svec-sw, no need to compile
+kernel: fmc-bus-init_repo
+
+.PHONY: all clean modules install modules_install $(DIRS)
+.PHONY: gitmodules prereq_install prereq_install_warn
+
+install modules_install: prereq_install_warn
+
+all clean modules install modules_install: $(DIRS)
+
+clean: TARGET = clean
+modules: TARGET = modules
+install: TARGET = install
+modules_install: TARGET = modules_install
+
+
+$(DIRS):
+	$(MAKE) -C $@ $(TARGET)
+
+
+SUBMOD = $(FMC_BUS_ABS)
 
 prereq_install_warn:
 	@test -f .prereq_installed || \
@@ -44,5 +48,8 @@ prereq_install:
 	for d in $(SUBMOD); do $(MAKE) -C $$d modules_install || exit 1; done
 	touch .prereq_installed
 
-prereq_clean:
-	for d in $(SUBMOD); do $(MAKE) -C $$d clean || exit 1; done
+$(FMC_BUS_ABS): fmc-bus-init_repo
+
+# init submodule if missing
+fmc-bus-init_repo:
+	@test -d $(FMC_BUS_ABS)/doc || ( echo "Checking out submodule $(FMC_BUS_ABS)" && git submodule update --init $(FMC_BUS_ABS) )

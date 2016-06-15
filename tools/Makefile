@@ -3,8 +3,14 @@
 # build a particular environment.
 -include Makefile.specific
 
+# include parent_common.mk for buildsystem's defines
+REPO_PARENT ?= ../..
+-include $(REPO_PARENT)/parent_common.mk
+
 DESTDIR ?= /usr/local
 TRTL ?= ../
+
+GIT_VERSION := $(shell git describe --dirty --long --tags)
 
 CFLAGS += -Wall -Werror -ggdb -I$(TRTL)/lib
 CFLAGS += -I$(TRTL)/include

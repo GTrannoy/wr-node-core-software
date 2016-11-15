@@ -250,6 +250,11 @@ void main_loop()
     dds_master_init ( &master_loop );
     dds_slave_init ( &slave_loop );
 
+    /* Inform RT D3S is running  */
+    uint32_t reg = dp_readl(DDS_REG_CR);
+    reg |= DDS_CR_RT_D3S_RUNNING;
+    dp_writel(reg, DDS_REG_CR);
+
     for(;;)
     {
         dds_master_update (&master_loop);

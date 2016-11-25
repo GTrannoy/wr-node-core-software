@@ -250,6 +250,9 @@ void main_loop()
     dds_master_init ( &master_loop );
     dds_slave_init ( &slave_loop );
 
+    /* Inform RT D3S is running  */
+    dp_writel(DDS_SR_RT_D3S_RUNNING,DDS_REG_SR);
+
     for(;;)
     {
         dds_master_update (&master_loop);

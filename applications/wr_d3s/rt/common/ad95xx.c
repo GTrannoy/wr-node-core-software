@@ -29,6 +29,7 @@ struct ad95xx_reg {
 
 #include "ad9516_config.h"
 #include "ad9510_master_config.h"
+#include "ad9510_slave_config.h"
 
 #define CS_PLL_SYS 0
 #define CS_PLL_VCXO 1
@@ -176,18 +177,23 @@ int ad9516_set_output_divider(int output, int ratio, int phase_offset)
 		{
 			if(ratio == 1)  /* bypass the divider 1 */
 				ad95xx_write_reg(CS_PLL_SYS,base + 3, ad95xx_read_reg(CS_PLL_SYS,base + 3) | 0x10); 
+			else if(ratio == 50) {                         // added for WHIST OUT8 at 10 MHz
+				ad95xx_write_reg(CS_PLL_SYS,base + 3, 0x00); // enable both dividers, necessary for ratio > 32
+				ad95xx_write_reg(CS_PLL_SYS,base , (2 << 4) | 1); // div4.1=(2+1) + (1+1)=5
+				ad95xx_write_reg(CS_PLL_SYS,base + 2, (4 << 4) | 4); // div4.2=10= (4+1)+(4+1), 50% duty cycle
+			}
 			else {
-				ad95xx_write_reg(CS_PLL_SYS,base, (lcycles << 4) | hcycles); 
+				ad95xx_write_reg(CS_PLL_SYS,base, (lcycles << 4) | hcycles); // ok for ratios<32
 				ad95xx_write_reg(CS_PLL_SYS,base + 1, phase_offset & 0xf);
 			}
 		} else {
 			if(ratio == 1)  /* bypass the divider 2 */
-				ad95xx_write_reg(CS_PLL_SYS,base + 3, ad95xx_read_reg(CS_PLL_SYS,base + 3) | 0x20); 
+				ad95xx_write_reg(CS_PLL_SYS,base + 3, ad95xx_read_reg(CS_PLL_SYS,base + 3) | 0x20);
 			else {
-				ad95xx_write_reg(CS_PLL_SYS,base + 2, (lcycles << 4) | hcycles); 
+				ad95xx_write_reg(CS_PLL_SYS,base + 2, (lcycles << 4) | hcycles); // ok for ratios<32
 //				ad95xx_write_reg(CS_PLL_SYS,base + 1, phase_offset & 0xf);
 				
-		}
+			}
 		}		
 	}
 
@@ -240,11 +246,12 @@ int ad9516_init()
 
 	ad95xx_load_regset(CS_PLL_SYS, ad9516_config, ARRAY_SIZE(ad9516_config));
 
-	ad9516_set_vco_divider(3); 
+	ad9516_set_vco_divider(3); // vco div 3 = 500 MHz
 
 	ad9516_set_output_divider(0, 1, 1);  	// OUT1. 500 MHz for the DDS
 	ad9516_set_output_divider(6, 4, 0);  	// OUT6. 125 MHz for the FPGA
-	ad9516_set_output_divider(8, 4, 0);  	// OUT6. 125 MHz for the UFL debug connectors
+	//	ad9516_set_output_divider(8, 4, 0);  	// OUT6. 125 MHz for the UFL debug connectors
+	ad9516_set_output_divider(8, 50, 0);  	// OUT6. 10 MHz for WHIST
 
 	ad9516_wait_lock();
 
@@ -277,4 +284,19 @@ int ad9510_init()
 	   wait for lock */
 
 	return 0;	    
+}
+
+int ad9510_set_config(int mode)
+{
+  if(mode==D3S_STREAM_SLAVE)
+  {
+    ad95xx_load_regset (CS_PLL_VCXO, ad9510_slave_config,  ARRAY_SIZE(ad9510_slave_config) );
+  }
+  else
+  {
+    ad95xx_load_regset (CS_PLL_VCXO, ad9510_master_config,  ARRAY_SIZE(ad9510_master_config) );
+  }
+
+  delay(100);
+  return 0;	    
 }

@@ -71,7 +71,7 @@ void init()
 
     wr_init();
 
-    dbg_printf("RT_D3S firmware initialized.");
+    dbg_printf("RT_D3S ad9510 dbg firmware initialized.");
 }
 
 static void setup_test_output(uint32_t tune_hi, uint32_t tune_lo)
@@ -208,6 +208,59 @@ static inline void ctl_d3s_ping (uint32_t seq, struct wrnc_msg *ibuf)
     ctl_ack(seq);
 }
 
+static inline void ctl_d3s_set_ad9510(uint32_t seq, struct wrnc_msg *ibuf)
+{
+  int dir;
+  int offset;
+  int data;
+  wrnc_msg_int32(ibuf,&dir);
+  wrnc_msg_int32(ibuf,&offset);
+  if(dir == 1)
+  {
+    wrnc_msg_int32(ibuf,&data);
+    ad95xx_write_reg(1,offset,data);
+    delay_us(100);
+    ad95xx_write_reg(1,0x5a,1);
+    pp_printf("wrote 0x%08x @ 0x%08x\n",data,offset);
+  }
+  else
+  {
+    ad95xx_write_reg(1,0x000,0x90);
+    delay_us(100);
+    data = ad95xx_read_reg(1,offset);
+    struct wrnc_msg buf = hmq_msg_claim_out (WR_D3S_OUT_CONTROL, 16);
+    uint32_t id_ack = WR_D3S_REP_ACK_ID;
+    wrnc_msg_header (&buf, &id_ack, &seq);
+    wrnc_msg_int32 ( &buf, &data );
+    hmq_msg_send (&buf);
+    pp_printf("read 0x%08x @ 0x%08x\n",data,offset);
+  }
+}
+
+static inline void ctl_d3s_set_ad9516(uint32_t seq, struct wrnc_msg *ibuf)
+{
+  int dir;
+  int offset;
+  int data;
+  wrnc_msg_int32(ibuf,&dir);
+  wrnc_msg_int32(ibuf,&offset);
+  if(dir == 1)
+  {
+    wrnc_msg_int32(ibuf,&data);
+    ad95xx_write_reg(0,offset,data);
+    pp_printf("wrote 0x%08x @ 0x%08x\n",data,offset);
+  }
+  else
+  {
+    data = ad95xx_read_reg(0,offset);
+    struct wrnc_msg buf = hmq_msg_claim_out (WR_D3S_OUT_CONTROL, 16);
+    uint32_t id_ack = WR_D3S_REP_ACK_ID;
+    wrnc_msg_header (&buf, &id_ack, &seq);
+    wrnc_msg_int32 ( &buf, &data );
+    hmq_msg_send (&buf);
+    pp_printf("read 0x%08x @ 0x%08x\n",data,offset);
+  }
+}
 
 /* Receives command messages and call matching command handlers */
 static inline void do_control()
@@ -229,7 +282,6 @@ static inline void do_control()
         func(seq, &ibuf);       \
         break;                  \
     }
-
     switch(cmd)
     {
     _CMD(WR_D3S_CMD_START_RESPONSE_LOGGING,  ctl_d3s_start_response_logging)
@@ -237,6 +289,8 @@ static inline void do_control()
     _CMD(WR_D3S_CMD_STREAM_CONFIG,           ctl_d3s_stream_config)
     _CMD(WR_D3S_CMD_PING,                    ctl_d3s_ping)
     _CMD(WR_D3S_CMD_SET_GAINS,               ctl_d3s_set_gains)
+    _CMD(WR_D3S_CMD_SET_AD9510,              ctl_d3s_set_ad9510)
+    _CMD(WR_D3S_CMD_SET_AD9516,              ctl_d3s_set_ad9516)
     default:
           break;
     }

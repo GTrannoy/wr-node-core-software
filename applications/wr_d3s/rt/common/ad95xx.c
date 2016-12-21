@@ -107,7 +107,7 @@ static void ad9510_reset()
  * "reg" is 12 bits, "val" is 8 bits, but both are better used as int
  */
 
-static void ad95xx_write_reg(int cs, int reg, int val)
+void ad95xx_write_reg(int cs, int reg, int val)
 {
 	bb_spi_txrx(cs, 24, (reg << 8) | val, NULL);
 }
@@ -276,7 +276,7 @@ int ad9510_init()
 		return -1;
 	}
 
-	ad95xx_load_regset (CS_PLL_VCXO, ad9510_master_config,  ARRAY_SIZE(ad9510_master_config) );
+	//ad95xx_load_regset (CS_PLL_VCXO, ad9510_master_config,  ARRAY_SIZE(ad9510_master_config) );
 
 	/* Todo: implement slave mode. */
 

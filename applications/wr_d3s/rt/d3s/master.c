@@ -303,7 +303,8 @@ void dds_master_init (struct dds_master_state *state)
 
 void dds_master_start(struct dds_master_state *state)
 {
-    ad9510_set_config(D3S_STREAM_MASTER);
+  //initialize RF domain AD9516 PLL
+    ad9516_rfpll_init(D3S_STREAM_MASTER);
 
     state->enabled = 1;
     state->integ = 0;

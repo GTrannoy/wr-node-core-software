@@ -46,8 +46,9 @@ static inline int gpior_get(uint32_t mask)
     return (gpior & mask) ? 1 : 0;
 }
 
-int ad9516_init();
-int ad9510_init();
+void ad9516_reset();
+int ad9516_wrpll_init();
+int ad9516_rfpll_init(int mode);
 void adf4002_configure(int r_div, int n_div, int mon_output);
 
 

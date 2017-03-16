@@ -51,10 +51,10 @@ static void reset_core()
 
 void init()
 {
-    ad9516_init();
+    ad9516_reset();
 
-    /* Setup for 352 MHz RF reference: divider = 8 (44 MHz internal/DDS frequency) */
-    ad9510_init();
+    //initialize WR domain AD9516 PLL
+    ad9516_wrpll_init();
 
     reset_core();
 
@@ -71,7 +71,7 @@ void init()
 
     wr_init();
 
-    dbg_printf("RT_D3S ad9510 dbg firmware initialized.");
+    dbg_printf("RT_D3S firmware initialized.");
 }
 
 static void setup_test_output(uint32_t tune_hi, uint32_t tune_lo)
@@ -208,57 +208,32 @@ static inline void ctl_d3s_ping (uint32_t seq, struct wrnc_msg *ibuf)
     ctl_ack(seq);
 }
 
-static inline void ctl_d3s_set_ad9510(uint32_t seq, struct wrnc_msg *ibuf)
-{
-  int dir;
-  int offset;
-  int data;
-  wrnc_msg_int32(ibuf,&dir);
-  wrnc_msg_int32(ibuf,&offset);
-  if(dir == 1)
-  {
-    wrnc_msg_int32(ibuf,&data);
-    ad95xx_write_reg(1,offset,data);
-    delay_us(100);
-    ad95xx_write_reg(1,0x5a,1);
-    pp_printf("wrote 0x%08x @ 0x%08x\n",data,offset);
-  }
-  else
-  {
-    ad95xx_write_reg(1,0x000,0x90);
-    delay_us(100);
-    data = ad95xx_read_reg(1,offset);
-    struct wrnc_msg buf = hmq_msg_claim_out (WR_D3S_OUT_CONTROL, 16);
-    uint32_t id_ack = WR_D3S_REP_ACK_ID;
-    wrnc_msg_header (&buf, &id_ack, &seq);
-    wrnc_msg_int32 ( &buf, &data );
-    hmq_msg_send (&buf);
-    pp_printf("read 0x%08x @ 0x%08x\n",data,offset);
-  }
-}
-
 static inline void ctl_d3s_set_ad9516(uint32_t seq, struct wrnc_msg *ibuf)
 {
   int dir;
   int offset;
+  int cs; //0 for AD9516 WR PLL, 1 for AD9516 RF PLL
   int data;
   wrnc_msg_int32(ibuf,&dir);
   wrnc_msg_int32(ibuf,&offset);
+  wrnc_msg_int32(ibuf,&cs);
   if(dir == 1)
   {
     wrnc_msg_int32(ibuf,&data);
-    ad95xx_write_reg(0,offset,data);
-    pp_printf("wrote 0x%08x @ 0x%08x\n",data,offset);
+    ad95xx_write_reg(cs,offset,data);
+    //update
+    ad95xx_write_reg(cs,0x232,0x1);
   }
   else
   {
-    data = ad95xx_read_reg(0,offset);
+    //readback active register
+    ad95xx_write_reg(cs,0x4,0x1);
+    data = ad95xx_read_reg(cs,offset);
     struct wrnc_msg buf = hmq_msg_claim_out (WR_D3S_OUT_CONTROL, 16);
     uint32_t id_ack = WR_D3S_REP_ACK_ID;
     wrnc_msg_header (&buf, &id_ack, &seq);
     wrnc_msg_int32 ( &buf, &data );
     hmq_msg_send (&buf);
-    pp_printf("read 0x%08x @ 0x%08x\n",data,offset);
   }
 }
 
@@ -289,7 +264,6 @@ static inline void do_control()
     _CMD(WR_D3S_CMD_STREAM_CONFIG,           ctl_d3s_stream_config)
     _CMD(WR_D3S_CMD_PING,                    ctl_d3s_ping)
     _CMD(WR_D3S_CMD_SET_GAINS,               ctl_d3s_set_gains)
-    _CMD(WR_D3S_CMD_SET_AD9510,              ctl_d3s_set_ad9510)
     _CMD(WR_D3S_CMD_SET_AD9516,              ctl_d3s_set_ad9516)
     default:
           break;

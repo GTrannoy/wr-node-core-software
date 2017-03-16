@@ -279,7 +279,8 @@ void dds_slave_init(struct dds_slave_state *state)
 
 void dds_slave_start(struct dds_slave_state *state)
 {
-    ad9510_set_config(D3S_STREAM_SLAVE);
+  //initialize RF domain AD9516 PLL
+    ad9516_rfpll_init(D3S_STREAM_SLAVE);
     
     state->enabled = 1;
 
